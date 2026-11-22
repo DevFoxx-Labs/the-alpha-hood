@@ -1,4 +1,4 @@
-import type { FooterContent, HomeBlock } from "./types";
+import type { FooterContent, HomeBlock, ListingTile } from "./types";
 
 /**
  * Demo homepage + footer content (reference/01-homepage.png). Every offer, price and claim here is DEMO
@@ -186,3 +186,15 @@ export function mockFooter(env: Record<string, string | undefined>): FooterConte
     paymentMethods: ["UPI", "Visa", "Mastercard", "RuPay", "COD"],
   };
 }
+
+/** PLP-05 grid tile (reference/02 shows Alpha Club, which is P1 — a combo tile links to a live collection). */
+export const MOCK_LISTING_TILE: ListingTile = {
+  id: "combo-bottoms",
+  kicker: "Combo offer",
+  lines: ["Any 2", "bottoms", "₹2,999"],
+  highlightLine: 2,
+  text: "Mix and match jeans, trousers, cargos and joggers.",
+  cta: { label: "Shop combos", href: "/collections/combo-bottoms" },
+};
+
+export const MOCK_TRENDING_SEARCHES = ["Baggy jeans", "Oversized tee", "Puffer jacket", "Linen shirt", "Korean trousers", "Hoodie"];

@@ -167,6 +167,14 @@
   }
 }
 
+/* Search inputs: the overlay has its own close button — hide the native clear "×". */
+@layer base {
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-decoration {
+    appearance: none;
+  }
+}
+
 /* HOME-01 hero: placeholder diagonal stripes (prototype) and the progress dash fill. */
 @layer components {
   .hero-stripes {

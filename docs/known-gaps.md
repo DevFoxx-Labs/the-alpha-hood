@@ -30,7 +30,12 @@
 - 🟠 All imagery is placeholder art — real photography + hero campaign crops (16:7 / 4:5) required (DESIGN.md §5).
   `next.config.ts` `images.remotePatterns` must allow the CMS asset host.
 - 🟠 CMS provider not chosen — homepage blocks are editable only in `lib/cms/mock-home.ts`; CMS-02 preview mode pending.
-- 🟠 Footer/menu/SEO links point to PLP, search, help and account routes that arrive in M3–M8 (render the 404 until then).
+- 🟠 Product pages (`/products/*`, M4), help, account, wishlist, track-order, gift cards and Alpha Club routes still
+  404. Category, collection and search links now resolve (M3).
+- 🟠 Search is in-process over the mock catalogue — choose the hosted engine (Algolia / Typesense / Meilisearch or
+  platform search) and load `SYNONYM_GROUPS` into it; add the `search{query,results}` analytics event in M8.
+- 🟡 Single-filter landing pages are `noindex` like every filtered URL — revisit with SEO in M8.
+- 🟡 PLP card hover shows the same placeholder art (second photo needed for the hover swap).
 - 🟠 Homepage offers/claims (ALPHA10, combos, "up to 40%", COD, payment chips) are demo copy — publish only live offers.
 - 🟠 UPI app tiles are neutral placeholders; real brand logos need licensed assets (M5).
 - 🟡 HOME-07/09/10 (Shop the Look, Alpha Club band, #WearTheHood) are P1 (M9) — not on the homepage yet.

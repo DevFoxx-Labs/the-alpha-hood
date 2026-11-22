@@ -13,7 +13,7 @@ import { GarmentArt, ModelFigure } from "./garment-art";
 /** Desktop: label on top, cut-out below on white. Mobile: 72 px circular crop with label below. */
 export function CategoryRailItem({ category }: { category: Category }) {
   return (
-    <Link href={`/men/${category.handle}`} className="group flex shrink-0 flex-col items-center gap-1.5 lg:gap-4">
+    <Link href={category.href ?? `/men/${category.handle}`} className="group flex shrink-0 flex-col items-center gap-1.5 lg:gap-4">
       <span className="order-2 text-[10.5px] font-semibold uppercase tracking-[0.05em] lg:order-1 lg:text-[14px] lg:tracking-[0.06em]">
         {category.title}
       </span>

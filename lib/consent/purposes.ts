@@ -76,6 +76,13 @@ export const COOKIE_INVENTORY: CookieInfo[] = [
     provider: "The Alpha Hood (first party)",
   },
   {
+    name: "ah_recent_searches (local storage)",
+    purpose: "Your last 8 searches, shown when you open search. Stays on your device, never sent to us; clear it from the search screen.",
+    category: "necessary",
+    lifetime: "Until you clear it",
+    provider: "The Alpha Hood (first party, this device only)",
+  },
+  {
     name: "_ga, _ga_<ID>",
     purpose: "Google Analytics 4: distinguishes visitors and sessions to measure site usage.",
     category: "analytics",

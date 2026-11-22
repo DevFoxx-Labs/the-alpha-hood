@@ -9,6 +9,11 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
 ];
 
+const LISTING_PARAMS = [
+  "size", "fit", "colour", "fabric", "sleeve", "pattern", "occasion",
+  "price", "discount", "instock", "sort", "page",
+];
+
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
@@ -25,6 +30,13 @@ const nextConfig: NextConfig = {
     return [
       { source: "/:path*", headers: securityHeaders },
       { source: "/dev/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
+      // PLP-02: filtered / sorted / paged listing URLs are crawlable but not indexed (canonical = clean URL).
+      ...LISTING_PARAMS.map((key) => ({
+        source: "/:path*",
+        has: [{ type: "query" as const, key }],
+        headers: [{ key: "X-Robots-Tag", value: "noindex, follow" }],
+      })),
+      { source: "/search", headers: [{ key: "X-Robots-Tag", value: "noindex, follow" }] },
     ];
   },
 };

@@ -1,56 +1,97 @@
-import { rupees } from "@/lib/format";
-import type { Category, Colour, GarmentKind, Product, ProductBadge, SizeOption } from "../types";
+import { percentOff, rupees } from "@/lib/format";
+import type {
+  Category,
+  CategoryNode,
+  Collection,
+  GarmentKind,
+  Product,
+  ProductAttributes,
+  ProductBadge,
+  SizeOption,
+} from "../types";
 
 /**
- * Demo catalogue — fictional products, prices and ratings for development only.
+ * Demo catalogue — fictional styles, prices, stock and ratings for development only.
+ * Each style group expands to one product per colour (every colour is its own URL — PDP-03).
  * Replace with the real catalogue from the chosen commerce platform (PRD §4).
  */
 
-const TOP_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
-const WAIST_SIZES = ["28", "30", "32", "34", "36", "38", "40"];
-const SHOE_SIZES = ["UK 6", "UK 7", "UK 8", "UK 9", "UK 10", "UK 11"];
+const TOP = ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+const WAIST = ["28", "30", "32", "34", "36", "38", "40"];
+const SHOES = ["UK 6", "UK 7", "UK 8", "UK 9", "UK 10", "UK 11"];
+const ONE = ["One size"];
 
-function sizes(labels: string[], soldOut: string[] = [], low: Record<string, number> = {}): SizeOption[] {
-  return labels.map((label) => ({
-    label,
-    stock: soldOut.includes(label) ? 0 : (low[label] ?? 12),
-  }));
+interface SizeSpec {
+  labels: string[];
+  soldOut?: string[];
+  low?: Record<string, number>;
 }
 
-type Row = {
-  title: string;
+function sizes({ labels, soldOut = [], low = {} }: SizeSpec): SizeOption[] {
+  return labels.map((label) => ({ label, stock: soldOut.includes(label) ? 0 : (low[label] ?? 12) }));
+}
+
+interface ColourSpec {
+  name: string;
+  hex: string;
+  family: string;
+  /** Per-colour stock override. */
+  sizes?: SizeSpec;
+}
+
+interface Group {
+  base: string;
   category: string;
+  subcategory?: string;
   art: GarmentKind;
-  colour: Colour;
   price: number;
   mrp: number;
+  attributes: ProductAttributes;
+  colours: ColourSpec[];
+  sizes: SizeSpec;
   badge?: ProductBadge;
   rating?: { average: number; count: number };
-  colours: Colour[];
-  sizes: SizeOption[];
-};
+  tags?: string[];
+  /** Days before 2026-11-22 the style went live. */
+  age: number;
+}
 
-const c = (name: string, hex: string): Colour => ({ name, hex });
+const col = (name: string, hex: string, family: string, sizeSpec?: SizeSpec): ColourSpec => ({ name, hex, family, sizes: sizeSpec });
 
-const ROWS: Row[] = [
-  { title: "Heavyweight Oversized Tee — Jet Black", category: "t-shirts", art: "oversized", colour: c("Jet Black", "#1b1b1b"), price: 899, mrp: 1299, badge: "NEW", rating: { average: 4.6, count: 212 }, colours: [c("Jet Black", "#1b1b1b"), c("Bone", "#f2f0ea"), c("Olive", "#5b6b4e")], sizes: sizes(TOP_SIZES, ["XS"]) },
-  { title: "Washed Baggy Jeans — Ice Blue", category: "jeans", art: "baggy", colour: c("Ice Blue", "#8fb3d1"), price: 2199, mrp: 2999, badge: "BESTSELLER", colours: [c("Ice Blue", "#8fb3d1"), c("Mid Blue", "#3e5c7a")], sizes: sizes(WAIST_SIZES, ["28"], { "34": 2 }) },
-  { title: "Boxy Fit Corduroy Overshirt", category: "shirts", art: "shirt", colour: c("Tan", "#7a5230"), price: 1799, mrp: 2499, rating: { average: 4.6, count: 74 }, colours: [c("Tan", "#7a5230"), c("Forest", "#2f3a2a"), c("Sand", "#c8b79a")], sizes: sizes(TOP_SIZES) },
-  { title: "Essential Zip Hoodie — Charcoal", category: "hoodies", art: "hoodie", colour: c("Charcoal", "#3a3a3c"), price: 1699, mrp: 2299, rating: { average: 4.4, count: 98 }, colours: [c("Charcoal", "#3a3a3c"), c("Slate", "#6d7a8a"), c("Oat", "#e9e4d8")], sizes: sizes(TOP_SIZES) },
-  { title: "Relaxed Cargo Pants — Olive", category: "cargo-pants", art: "cargo", colour: c("Olive", "#59603f"), price: 1899, mrp: 2599, badge: "NEW", colours: [c("Olive", "#59603f"), c("Black", "#1b1b1b"), c("Khaki", "#c2b28f")], sizes: sizes(WAIST_SIZES) },
-  { title: "Brushed Flannel Check Shirt — Slate Grey", category: "shirts", art: "check", colour: c("Slate Grey", "#5c6670"), price: 1299, mrp: 1799, badge: "BESTSELLER", rating: { average: 4.6, count: 128 }, colours: [c("Slate Grey", "#5c6670"), c("Maroon", "#7a2b2b"), c("Forest", "#3d5a40"), c("Sand", "#c8b79a")], sizes: sizes(TOP_SIZES, ["XS", "3XL"], { L: 2 }) },
-  { title: "Cable Knit Polo Sweater — Cream", category: "sweaters", art: "sweater", colour: c("Cream", "#e8e1cf"), price: 1999, mrp: 2799, colours: [c("Cream", "#e8e1cf"), c("Navy", "#2b3a55")], sizes: sizes(TOP_SIZES) },
-  { title: "Matte Puffer Jacket — Black", category: "jackets", art: "puffer", colour: c("Black", "#202020"), price: 3499, mrp: 4999, rating: { average: 4.7, count: 56 }, colours: [c("Black", "#202020"), c("Olive", "#4a5a3c")], sizes: sizes(TOP_SIZES, [], { M: 1 }) },
-  { title: "Mandarin Collar Linen Shirt", category: "shirts", art: "shirt", colour: c("Stone", "#d9d3c3"), price: 1499, mrp: 1999, rating: { average: 4.5, count: 41 }, colours: [c("Stone", "#d9d3c3"), c("White", "#ffffff"), c("Sage", "#8aa0a8")], sizes: sizes(TOP_SIZES) },
-  { title: "Straight Fit Raw Denim", category: "jeans", art: "jeans", colour: c("Raw Indigo", "#2d3f5a"), price: 1999, mrp: 2599, rating: { average: 4.6, count: 33 }, colours: [c("Raw Indigo", "#2d3f5a"), c("Black", "#1b1b1b")], sizes: sizes(WAIST_SIZES) },
-  { title: "Varsity Knit Bomber", category: "jackets", art: "jacket", colour: c("Maroon", "#5a1f2a"), price: 2799, mrp: 3699, badge: "NEW", colours: [c("Maroon", "#5a1f2a"), c("Navy", "#1d2a44")], sizes: sizes(TOP_SIZES) },
-  { title: "Retro Low-Top Sneakers", category: "sneakers", art: "sneaker", colour: c("Black", "#2a2a2a"), price: 2499, mrp: 3299, colours: [c("Black", "#2a2a2a"), c("Off White", "#f1efe9")], sizes: sizes(SHOE_SIZES, ["UK 11"]) },
-  { title: "Pleated Korean Trousers — Beige", category: "trousers", art: "trouser", colour: c("Beige", "#c8b99b"), price: 1799, mrp: 2399, rating: { average: 4.6, count: 19 }, colours: [c("Beige", "#c8b99b"), c("Charcoal", "#3a3a3c"), c("Black", "#1b1b1b")], sizes: sizes(WAIST_SIZES) },
-  { title: "Textured Knit Polo — Forest", category: "t-shirts", art: "polo", colour: c("Forest", "#2f4a3a"), price: 1299, mrp: 1699, colours: [c("Forest", "#2f4a3a"), c("Cream", "#e8e1cf")], sizes: sizes(TOP_SIZES) },
-  { title: "Graphic Print Oversized Tee", category: "t-shirts", art: "oversized", colour: c("Bone", "#f2f0ea"), price: 999, mrp: 1399, colours: [c("Bone", "#f2f0ea"), c("Jet Black", "#1b1b1b")], sizes: sizes(TOP_SIZES, TOP_SIZES) },
-  { title: "Aviator Sunglasses", category: "sunglasses", art: "shades", colour: c("Black", "#1b1b1b"), price: 999, mrp: 1499, colours: [c("Black", "#1b1b1b"), c("Tortoise", "#7a5230"), c("Gold", "#b8973a"), c("Silver", "#a8a8a8"), c("Green", "#2f4a3a")], sizes: sizes(["One size"]) },
-  { title: "Six-Panel Logo Cap", category: "accessories", art: "cap", colour: c("Black", "#1b1b1b"), price: 599, mrp: 799, colours: [c("Black", "#1b1b1b")], sizes: sizes(["One size"]) },
-  { title: "Essential Crew Tee — Off White", category: "t-shirts", art: "tee", colour: c("Off White", "#f4f2ec"), price: 999, mrp: 1299, colours: [c("Off White", "#f4f2ec")], sizes: sizes(TOP_SIZES) },
+const GROUPS: Group[] = [
+  // T-shirts
+  { base: "Heavyweight Oversized Tee", category: "t-shirts", subcategory: "oversized", art: "oversized", price: 899, mrp: 1299, badge: "NEW", rating: { average: 4.6, count: 212 }, age: 3, attributes: { fit: "oversized", fabric: "cotton", sleeve: "half", pattern: "solid", occasion: "casual" }, colours: [col("Jet Black", "#1b1b1b", "black"), col("Bone", "#f2f0ea", "cream"), col("Olive", "#5b6b4e", "olive")], sizes: { labels: TOP, soldOut: ["XS"] }, tags: ["streetwear", "drop shoulder", "240 gsm"] },
+  { base: "Graphic Print Oversized Tee", category: "t-shirts", subcategory: "oversized", art: "oversized", price: 999, mrp: 1399, age: 20, attributes: { fit: "oversized", fabric: "cotton", sleeve: "half", pattern: "printed", occasion: "casual" }, colours: [col("Jet Black", "#1b1b1b", "black"), col("Bone", "#f2f0ea", "cream", { labels: TOP, soldOut: TOP })], sizes: { labels: TOP }, tags: ["graphic", "streetwear"] },
+  { base: "Essential Crew Tee", category: "t-shirts", subcategory: "crew", art: "tee", price: 699, mrp: 999, rating: { average: 4.3, count: 64 }, age: 60, attributes: { fit: "regular", fabric: "cotton", sleeve: "half", pattern: "solid", occasion: "casual" }, colours: [col("Off White", "#f4f2ec", "white"), col("Navy", "#1d2a44", "navy"), col("Black", "#1b1b1b", "black"), col("Grey Melange", "#9a9a9a", "grey")], sizes: { labels: TOP }, tags: ["basic", "plain", "round neck"] },
+  { base: "Textured Knit Polo", category: "t-shirts", subcategory: "polos", art: "polo", price: 1299, mrp: 1699, age: 9, attributes: { fit: "regular", fabric: "knit", sleeve: "half", pattern: "textured", occasion: "smart-casual" }, colours: [col("Forest", "#2f4a3a", "green"), col("Cream", "#e8e1cf", "cream")], sizes: { labels: TOP } },
+  { base: "Pique Polo", category: "t-shirts", subcategory: "polos", art: "polo", price: 999, mrp: 1499, rating: { average: 4.4, count: 38 }, age: 75, attributes: { fit: "slim", fabric: "cotton", sleeve: "half", pattern: "solid", occasion: "smart-casual" }, colours: [col("Navy", "#1d2a44", "navy"), col("White", "#ffffff", "white"), col("Maroon", "#5a1f2a", "maroon")], sizes: { labels: TOP, low: { M: 2 } } },
+  // Shirts
+  { base: "Brushed Flannel Check Shirt", category: "shirts", subcategory: "checks", art: "check", price: 1299, mrp: 1799, badge: "BESTSELLER", rating: { average: 4.6, count: 128 }, age: 40, attributes: { fit: "regular", fabric: "cotton", sleeve: "full", pattern: "checks", occasion: "casual" }, colours: [col("Slate Grey", "#5c6670", "grey"), col("Maroon", "#7a2b2b", "maroon"), col("Forest", "#3d5a40", "green"), col("Sand", "#c8b79a", "beige")], sizes: { labels: TOP, soldOut: ["XS", "3XL"], low: { L: 2 } }, tags: ["flannel", "plaid"] },
+  { base: "Boxy Fit Corduroy Overshirt", category: "shirts", subcategory: "overshirts", art: "shirt", price: 1799, mrp: 2499, rating: { average: 4.6, count: 74 }, age: 30, attributes: { fit: "oversized", fabric: "corduroy", sleeve: "full", pattern: "solid", occasion: "casual" }, colours: [col("Tan", "#7a5230", "brown"), col("Forest", "#2f3a2a", "green"), col("Sand", "#c8b79a", "beige")], sizes: { labels: TOP }, tags: ["shacket", "cord"] },
+  { base: "Mandarin Collar Linen Shirt", category: "shirts", subcategory: "linen", art: "shirt", price: 1499, mrp: 1999, rating: { average: 4.5, count: 41 }, age: 55, attributes: { fit: "regular", fabric: "linen", sleeve: "full", pattern: "solid", occasion: "smart-casual" }, colours: [col("Stone", "#d9d3c3", "beige"), col("White", "#ffffff", "white"), col("Sage", "#8aa0a8", "green")], sizes: { labels: TOP }, tags: ["chinese collar", "band collar", "summer"] },
+  { base: "Oxford Formal Shirt", category: "shirts", subcategory: "formal", art: "shirt", price: 1399, mrp: 1899, rating: { average: 4.4, count: 52 }, age: 90, attributes: { fit: "slim", fabric: "cotton", sleeve: "full", pattern: "solid", occasion: "office" }, colours: [col("White", "#ffffff", "white"), col("Sky Blue", "#a9c4e0", "blue"), col("Black", "#1b1b1b", "black")], sizes: { labels: TOP }, tags: ["office", "work"] },
+  { base: "Cuban Collar Printed Shirt", category: "shirts", subcategory: "printed", art: "shirt", price: 1199, mrp: 1699, badge: "NEW", age: 2, attributes: { fit: "relaxed", fabric: "viscose", sleeve: "half", pattern: "printed", occasion: "party" }, colours: [col("Black", "#1b1b1b", "black"), col("Maroon", "#5a1f2a", "maroon")], sizes: { labels: TOP }, tags: ["resort", "camp collar", "party wear"] },
+  // Jeans
+  { base: "Washed Baggy Jeans", category: "jeans", subcategory: "baggy", art: "baggy", price: 2199, mrp: 2999, badge: "BESTSELLER", rating: { average: 4.5, count: 176 }, age: 25, attributes: { fit: "relaxed", fabric: "denim", pattern: "solid", occasion: "casual" }, colours: [col("Ice Blue", "#8fb3d1", "blue"), col("Mid Blue", "#3e5c7a", "blue")], sizes: { labels: WAIST, soldOut: ["28"], low: { "34": 2 } }, tags: ["wide leg", "streetwear"] },
+  { base: "Straight Fit Raw Denim", category: "jeans", subcategory: "straight", art: "jeans", price: 1999, mrp: 2599, rating: { average: 4.6, count: 33 }, age: 45, attributes: { fit: "regular", fabric: "denim", pattern: "solid", occasion: "casual" }, colours: [col("Raw Indigo", "#2d3f5a", "navy"), col("Black", "#1b1b1b", "black")], sizes: { labels: WAIST } },
+  { base: "Slim Tapered Jeans", category: "jeans", subcategory: "slim", art: "jeans", price: 1799, mrp: 2399, age: 70, attributes: { fit: "slim", fabric: "denim", pattern: "solid", occasion: "casual" }, colours: [col("Light Blue", "#9fbcd6", "blue"), col("Charcoal", "#3a3a3c", "grey")], sizes: { labels: WAIST } },
+  // Trousers, cargos, joggers, shorts
+  { base: "Pleated Korean Trousers", category: "trousers", subcategory: "korean", art: "trouser", price: 1799, mrp: 2399, rating: { average: 4.6, count: 19 }, age: 15, attributes: { fit: "relaxed", fabric: "poly-viscose", pattern: "solid", occasion: "smart-casual" }, colours: [col("Beige", "#c8b99b", "beige"), col("Charcoal", "#3a3a3c", "grey"), col("Black", "#1b1b1b", "black")], sizes: { labels: WAIST }, tags: ["pleated", "wide leg"] },
+  { base: "Stretch Chinos", category: "trousers", subcategory: "chinos", art: "trouser", price: 1499, mrp: 1999, rating: { average: 4.3, count: 27 }, age: 80, attributes: { fit: "slim", fabric: "cotton", pattern: "solid", occasion: "office" }, colours: [col("Khaki", "#c2b28f", "beige"), col("Navy", "#1d2a44", "navy"), col("Olive", "#59603f", "olive")], sizes: { labels: WAIST } },
+  { base: "Relaxed Cargo Pants", category: "cargo-pants", art: "cargo", price: 1899, mrp: 2599, badge: "NEW", age: 4, attributes: { fit: "relaxed", fabric: "cotton", pattern: "solid", occasion: "casual" }, colours: [col("Olive", "#59603f", "olive"), col("Black", "#1b1b1b", "black"), col("Khaki", "#c2b28f", "beige")], sizes: { labels: WAIST }, tags: ["utility", "streetwear"] },
+  { base: "Fleece Joggers", category: "joggers", art: "trouser", price: 1299, mrp: 1799, age: 35, attributes: { fit: "regular", fabric: "fleece", pattern: "solid", occasion: "lounge" }, colours: [col("Grey Melange", "#9a9a9a", "grey"), col("Black", "#1b1b1b", "black")], sizes: { labels: TOP }, tags: ["track pants", "gym"] },
+  { base: "Nylon Cargo Shorts", category: "shorts", art: "cargo", price: 999, mrp: 1399, age: 100, attributes: { fit: "relaxed", fabric: "nylon", pattern: "solid", occasion: "casual" }, colours: [col("Black", "#1b1b1b", "black"), col("Olive", "#59603f", "olive")], sizes: { labels: WAIST } },
+  // Hoodies, sweaters, jackets
+  { base: "Essential Zip Hoodie", category: "hoodies", art: "hoodie", price: 1699, mrp: 2299, rating: { average: 4.4, count: 98 }, age: 28, attributes: { fit: "regular", fabric: "fleece", sleeve: "full", pattern: "solid", occasion: "winter" }, colours: [col("Charcoal", "#3a3a3c", "grey"), col("Slate", "#6d7a8a", "grey"), col("Oat", "#e9e4d8", "cream")], sizes: { labels: TOP } },
+  { base: "Heavyweight Oversized Hoodie", category: "hoodies", art: "hoodie", price: 1999, mrp: 2799, badge: "BESTSELLER", rating: { average: 4.7, count: 143 }, age: 22, attributes: { fit: "oversized", fabric: "fleece", sleeve: "full", pattern: "solid", occasion: "winter" }, colours: [col("Black", "#1b1b1b", "black"), col("Maroon", "#5a1f2a", "maroon")], sizes: { labels: TOP, low: { XL: 1 } }, tags: ["sweatshirt", "streetwear"] },
+  { base: "Cable Knit Polo Sweater", category: "sweaters", art: "sweater", price: 1999, mrp: 2799, age: 12, attributes: { fit: "regular", fabric: "knit", sleeve: "full", pattern: "textured", occasion: "winter" }, colours: [col("Cream", "#e8e1cf", "cream"), col("Navy", "#2b3a55", "navy")], sizes: { labels: TOP } },
+  { base: "Matte Puffer Jacket", category: "jackets", subcategory: "puffers", art: "puffer", price: 3499, mrp: 4999, rating: { average: 4.7, count: 56 }, age: 8, attributes: { fit: "regular", fabric: "nylon", sleeve: "full", pattern: "solid", occasion: "winter" }, colours: [col("Black", "#202020", "black"), col("Olive", "#4a5a3c", "olive")], sizes: { labels: TOP, low: { M: 1 } } },
+  { base: "Varsity Knit Bomber", category: "jackets", subcategory: "bombers", art: "jacket", price: 2799, mrp: 3699, badge: "NEW", age: 5, attributes: { fit: "regular", fabric: "wool-blend", sleeve: "full", pattern: "solid", occasion: "winter" }, colours: [col("Maroon", "#5a1f2a", "maroon"), col("Navy", "#1d2a44", "navy")], sizes: { labels: TOP } },
+  { base: "Denim Trucker Jacket", category: "jackets", subcategory: "denim", art: "jacket", price: 2499, mrp: 3299, age: 50, attributes: { fit: "regular", fabric: "denim", sleeve: "full", pattern: "solid", occasion: "casual" }, colours: [col("Mid Blue", "#3e5c7a", "blue"), col("Black", "#1b1b1b", "black")], sizes: { labels: TOP } },
+  // Footwear & accessories
+  { base: "Retro Low-Top Sneakers", category: "sneakers", art: "sneaker", price: 2499, mrp: 3299, age: 18, attributes: { occasion: "casual" }, colours: [col("Black", "#2a2a2a", "black"), col("Off White", "#f1efe9", "white")], sizes: { labels: SHOES, soldOut: ["UK 11"] }, tags: ["shoes", "trainers"] },
+  { base: "Aviator Sunglasses", category: "sunglasses", art: "shades", price: 999, mrp: 1499, age: 65, attributes: { occasion: "casual" }, colours: [col("Black", "#1b1b1b", "black"), col("Tortoise", "#7a5230", "brown"), col("Silver", "#a8a8a8", "grey")], sizes: { labels: ONE }, tags: ["uv protection", "shades"] },
+  { base: "Six-Panel Logo Cap", category: "accessories", art: "cap", price: 599, mrp: 799, age: 85, attributes: { occasion: "casual" }, colours: [col("Black", "#1b1b1b", "black"), col("Beige", "#c8b99b", "beige")], sizes: { labels: ONE }, tags: ["baseball cap"] },
 ];
 
 function slugify(text: string) {
@@ -61,32 +102,112 @@ function slugify(text: string) {
     .replace(/(^-|-$)/g, "");
 }
 
-export const MOCK_PRODUCTS: Product[] = ROWS.map((row, i) => {
-  const handle = slugify(row.title);
-  return {
-    id: `mock_${String(i + 1).padStart(3, "0")}`,
-    handle,
-    title: row.title,
-    category: row.category,
-    price: rupees(row.price),
-    mrp: rupees(row.mrp),
-    badge: row.badge,
-    rating: row.rating,
-    colour: row.colour,
-    colours: row.colours,
-    sizes: row.sizes,
-    images: [
-      { art: row.art, colour: row.colour.hex, alt: `${row.title}, front` },
-      { art: row.art, colour: row.colours[1]?.hex ?? row.colour.hex, alt: `${row.title}, alternate view` },
-    ],
-  };
+const NOW = Date.parse("2026-11-22T00:00:00Z");
+
+export const MOCK_PRODUCTS: Product[] = GROUPS.flatMap((g, gi) => {
+  const handles = g.colours.map((c) => slugify(`${g.base} ${c.name}`));
+  const swatches = g.colours.map((c, i) => ({ name: c.name, hex: c.hex, handle: handles[i] }));
+  return g.colours.map((c, ci): Product => {
+    const title = `${g.base} — ${c.name}`;
+    return {
+      id: `mock_${String(gi + 1).padStart(2, "0")}${String(ci + 1)}`,
+      handle: handles[ci],
+      title,
+      category: g.category,
+      subcategory: g.subcategory,
+      price: rupees(g.price),
+      mrp: rupees(g.mrp),
+      badge: g.badge,
+      rating: g.rating,
+      colour: swatches[ci],
+      colours: swatches,
+      sizes: sizes(c.sizes ?? g.sizes),
+      images: [
+        { art: g.art, colour: c.hex, alt: `${title}, front` },
+        { art: g.art, colour: c.hex, alt: `${title}, back` },
+      ],
+      attributes: g.attributes,
+      colourFamily: c.family,
+      createdAt: new Date(NOW - (g.age * 24 + ci) * 3_600_000).toISOString(),
+      popularity: Math.round((g.rating?.count ?? 10) * (g.rating?.average ?? 4)) + (g.badge === "BESTSELLER" ? 600 : 0) - ci * 5,
+      tags: g.tags ?? [],
+    };
+  });
 });
 
+const img = (art: GarmentKind, colour: string, alt: string) => ({ art, colour, alt });
+
+/** Category pages (PLP-01). Categories without products show the empty state (PLP-06). */
+export const MOCK_CATEGORY_TREE: CategoryNode[] = [
+  { handle: "shirts", title: "Shirts", image: img("check", "#5c6670", "Shirts"), subcategories: [
+    { handle: "checks", title: "Checks", image: img("check", "#5c6670", "Check shirts") },
+    { handle: "linen", title: "Linen", image: img("shirt", "#d9d3c3", "Linen shirts") },
+    { handle: "overshirts", title: "Overshirts", image: img("shirt", "#7a5230", "Overshirts") },
+    { handle: "formal", title: "Formal", image: img("shirt", "#ffffff", "Formal shirts") },
+    { handle: "printed", title: "Printed", image: img("shirt", "#5a1f2a", "Printed shirts") },
+  ] },
+  { handle: "t-shirts", title: "T-shirts", image: img("oversized", "#1b1b1b", "T-shirts"), subcategories: [
+    { handle: "oversized", title: "Oversized", image: img("oversized", "#1b1b1b", "Oversized tees") },
+    { handle: "crew", title: "Crew neck", image: img("tee", "#f4f2ec", "Crew neck tees") },
+    { handle: "polos", title: "Polos", image: img("polo", "#2f4a3a", "Polos") },
+  ] },
+  { handle: "jeans", title: "Jeans", image: img("baggy", "#8fb3d1", "Jeans"), subcategories: [
+    { handle: "baggy", title: "Baggy", image: img("baggy", "#8fb3d1", "Baggy jeans") },
+    { handle: "straight", title: "Straight", image: img("jeans", "#2d3f5a", "Straight jeans") },
+    { handle: "slim", title: "Slim", image: img("jeans", "#9fbcd6", "Slim jeans") },
+  ] },
+  { handle: "trousers", title: "Trousers", image: img("trouser", "#c8b99b", "Trousers"), subcategories: [
+    { handle: "korean", title: "Korean", image: img("trouser", "#c8b99b", "Korean trousers") },
+    { handle: "chinos", title: "Chinos", image: img("trouser", "#c2b28f", "Chinos") },
+  ] },
+  { handle: "cargo-pants", title: "Cargo pants", image: img("cargo", "#59603f", "Cargo pants"), subcategories: [] },
+  { handle: "joggers", title: "Joggers", image: img("trouser", "#9a9a9a", "Joggers"), subcategories: [] },
+  { handle: "hoodies", title: "Hoodies", image: img("hoodie", "#3a3a3c", "Hoodies"), subcategories: [] },
+  { handle: "sweaters", title: "Sweaters", image: img("sweater", "#e8e1cf", "Sweaters"), subcategories: [] },
+  { handle: "jackets", title: "Jackets", image: img("jacket", "#1b1b1b", "Jackets"), subcategories: [
+    { handle: "puffers", title: "Puffers", image: img("puffer", "#202020", "Puffer jackets") },
+    { handle: "bombers", title: "Bombers", image: img("jacket", "#5a1f2a", "Bomber jackets") },
+    { handle: "denim", title: "Denim", image: img("jacket", "#3e5c7a", "Denim jackets") },
+  ] },
+  { handle: "co-ords", title: "Co-ords", image: img("shirt", "#c8b99b", "Co-ords"), subcategories: [] },
+  { handle: "shorts", title: "Shorts", image: img("cargo", "#1b1b1b", "Shorts"), subcategories: [] },
+  { handle: "sneakers", title: "Sneakers", image: img("sneaker", "#2a2a2a", "Sneakers"), subcategories: [] },
+  { handle: "sunglasses", title: "Sunglasses", image: img("shades", "#1b1b1b", "Sunglasses"), subcategories: [] },
+  { handle: "accessories", title: "Accessories", image: img("cap", "#1b1b1b", "Accessories"), subcategories: [] },
+];
+
+/** HOME-02 rail. */
 export const MOCK_CATEGORIES: Category[] = [
-  { handle: "t-shirts", title: "Oversized Tees", image: { art: "oversized", colour: "#1b1b1b", alt: "Oversized tee" } },
-  { handle: "shirts", title: "Shirts", image: { art: "check", colour: "#5c6670", alt: "Check shirt" } },
-  { handle: "jeans", title: "Jeans", image: { art: "baggy", colour: "#8fb3d1", alt: "Baggy jeans" } },
-  { handle: "hoodies", title: "Hoodies", image: { art: "hoodie", colour: "#3a3a3c", alt: "Hoodie" } },
-  { handle: "jackets", title: "Jackets", image: { art: "jacket", colour: "#1b1b1b", alt: "Jacket" } },
-  { handle: "cargo-pants", title: "Cargos", image: { art: "cargo", colour: "#59603f", alt: "Cargo pants" } },
+  { handle: "t-shirts", title: "Oversized Tees", href: "/men/t-shirts/oversized", image: img("oversized", "#1b1b1b", "Oversized tee") },
+  { handle: "shirts", title: "Shirts", image: img("check", "#5c6670", "Check shirt") },
+  { handle: "jeans", title: "Jeans", image: img("baggy", "#8fb3d1", "Baggy jeans") },
+  { handle: "hoodies", title: "Hoodies", image: img("hoodie", "#3a3a3c", "Hoodie") },
+  { handle: "jackets", title: "Jackets", image: img("jacket", "#1b1b1b", "Jacket") },
+  { handle: "cargo-pants", title: "Cargos", image: img("cargo", "#59603f", "Cargo pants") },
+];
+
+const BOTTOMS = new Set(["jeans", "trousers", "cargo-pants", "joggers"]);
+const has3xl = (p: Product) => p.sizes.some((s) => s.label === "3XL" && s.stock > 0);
+const isNew = (p: Product) => p.badge === "NEW" || NOW - Date.parse(p.createdAt) < 21 * 86_400_000;
+
+/** Rule-based collections (PLP-07 auto-collections). Linked from the header, menu and homepage. */
+export const MOCK_COLLECTIONS: (Collection & { rule: (p: Product) => boolean })[] = [
+  { handle: "new-in", title: "New in", description: "Fresh drops from the last three weeks.", rule: isNew },
+  { handle: "bestsellers", title: "Bestsellers", description: "What everyone is wearing right now.", rule: (p) => p.badge === "BESTSELLER" || p.popularity >= 300 },
+  { handle: "sale", title: "Sale", description: "30% off or more.", rule: (p) => percentOff(p.price, p.mrp) >= 30 },
+  { handle: "price-drop", title: "Price drop", description: "Styles with a recent price drop.", rule: (p) => percentOff(p.price, p.mrp) >= 30 },
+  { handle: "winter-drop", title: "Winter drop", description: "Puffers, knits and heavyweight hoodies.", rule: (p) => p.attributes.occasion === "winter" },
+  { handle: "winter-edit", title: "Winter edit", description: "Layers for the cold.", rule: (p) => p.attributes.occasion === "winter" },
+  { handle: "puffer-season", title: "Puffer season", description: "Warmth with an attitude.", rule: (p) => p.category === "jackets" },
+  { handle: "knit-club", title: "Knit club", description: "Texture that talks.", rule: (p) => p.attributes.fabric === "knit" || p.attributes.fabric === "wool-blend" },
+  { handle: "smart-casuals", title: "Smart casuals", description: "Monday to Friday, sorted.", rule: (p) => p.attributes.occasion === "smart-casual" || p.attributes.occasion === "office" },
+  { handle: "office-ready", title: "Office ready", description: "Sharp without trying too hard.", rule: (p) => p.attributes.occasion === "office" },
+  { handle: "streetwear", title: "Streetwear", description: "Oversized, relaxed and loud.", rule: (p) => p.attributes.fit === "oversized" || p.attributes.fit === "relaxed" },
+  { handle: "weekend-uniform", title: "Weekend uniform", description: "Relaxed cargos, boxy overshirts and heavyweight tees.", rule: (p) => p.attributes.occasion === "casual" && p.category !== "sunglasses" && p.category !== "accessories" },
+  { handle: "under-999", title: "Under ₹999", description: "Everything at ₹999 or less.", rule: (p) => p.price <= rupees(999) },
+  { handle: "plus-size", title: "Plus size", description: "Styles available in 3XL.", rule: has3xl },
+  { handle: "combos", title: "Combos", description: "Mix-and-match eligible styles.", rule: (p) => BOTTOMS.has(p.category) || p.category === "hoodies" || p.category === "t-shirts" },
+  { handle: "combo-bottoms", title: "Combo: bottoms", description: "Mix-and-match eligible bottoms.", rule: (p) => BOTTOMS.has(p.category) },
+  { handle: "combo-hoodies", title: "Combo: hoodies", description: "Mix-and-match eligible hoodies.", rule: (p) => p.category === "hoodies" },
+  { handle: "combo-tees", title: "Combo: tees", description: "Mix-and-match eligible tees.", rule: (p) => p.category === "t-shirts" && p.subcategory !== "polos" },
 ];

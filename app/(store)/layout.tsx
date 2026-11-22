@@ -39,7 +39,7 @@ export default async function StoreLayout({ children }: LayoutProps<"/">) {
   return (
     <>
       {skip}
-      <SiteHeader announcements={shell.announcements} links={shell.headerLinks} />
+      <SiteHeader announcements={shell.announcements} links={shell.headerLinks} trendingSearches={shell.trendingSearches} />
       <MenuDrawer menu={shell.menu} />
       <MiniCart sizesByProduct={shell.sizesByProduct} upsell={shell.upsell} />
       <main id="main">{children}</main>

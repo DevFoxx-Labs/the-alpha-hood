@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { emptyQuery } from "@/lib/catalog/query";
+import { percentOff } from "@/lib/format";
 import { createMockAdapter } from "./mock";
 import { MOCK_PRODUCTS } from "./mock/data";
 import { resolveCommerce } from "./resolve";
@@ -29,7 +31,10 @@ describe("mock adapter — catalogue reads", () => {
   });
 
   it("puts sold-out products last (CARD-02)", async () => {
-    const { products } = await commerce.listProducts({ limit: 60 });
+    const first = await commerce.listProducts({ limit: 60 });
+    const rest = await commerce.listProducts({ limit: 60, offset: 60 });
+    const products = [...first.products, ...rest.products];
+    expect(products).toHaveLength(first.total);
     const firstSoldOut = products.findIndex((p) => p.sizes.every((s) => s.stock === 0));
     expect(firstSoldOut).toBeGreaterThan(-1);
     expect(products.slice(firstSoldOut).every((p) => p.sizes.every((s) => s.stock === 0))).toBe(true);
@@ -40,9 +45,28 @@ describe("mock adapter — catalogue reads", () => {
     expect(products.length).toBeLessThanOrEqual(60);
   });
 
-  it("returns a category collection and null for unknown handles", async () => {
-    expect((await commerce.getCollection("shirts"))?.products.every((p) => p.category === "shirts")).toBe(true);
+  it("returns collections/categories and null for unknown or malformed handles", async () => {
+    expect((await commerce.getCollection("sale"))?.title).toBe("Sale");
     expect(await commerce.getCollection("nope")).toBeNull();
+    expect((await commerce.getCategory("jeans"))?.subcategories.map((s) => s.handle)).toContain("baggy");
+    expect(await commerce.getCategory("../x")).toBeNull();
+  });
+
+  it("scopes searchCatalog to a category / sub-category / collection and rejects bad scopes", async () => {
+    const q = emptyQuery();
+    const jeans = await commerce.searchCatalog({ kind: "category", category: "jeans", subcategory: "baggy" }, q);
+    expect(jeans.total).toBeGreaterThan(0);
+    expect(jeans.products.every((p) => p.category === "jeans" && p.subcategory === "baggy")).toBe(true);
+    const sale = await commerce.searchCatalog({ kind: "collection", collection: "sale" }, q);
+    expect(sale.products.every((p) => percentOff(p.price, p.mrp) >= 30)).toBe(true);
+    await expect(commerce.searchCatalog({ kind: "category", category: "a/../b" }, q)).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(commerce.searchCatalog({ kind: "collection", collection: "nope" }, q)).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("every colour is its own product and links its siblings (PDP-03)", () => {
+    const tee = MOCK_PRODUCTS.filter((p) => p.title.startsWith("Heavyweight Oversized Tee"));
+    expect(tee.length).toBe(3);
+    expect(tee[0].colours.map((c) => c.handle)).toEqual(tee.map((p) => p.handle));
   });
 });
 

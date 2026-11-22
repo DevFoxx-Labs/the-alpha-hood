@@ -39,7 +39,12 @@ function refusingAdapter(message: string): CommerceAdapter {
     getProduct: fail,
     listProducts: fail,
     getCollection: fail,
+    listCollections: fail,
     listCategories: fail,
+    listCategoryTree: fail,
+    getCategory: fail,
+    searchCatalog: fail,
+    suggest: fail,
     cart: { get: fail, create: fail, addLine: fail, updateLine: fail, removeLine: fail },
   };
 }

@@ -2,7 +2,8 @@ import { cacheLife } from "next/cache";
 import { commerce } from "@/lib/commerce";
 import type { Category, Product } from "@/lib/commerce/types";
 import { cms } from "@/lib/cms";
-import { liveBlocks } from "@/lib/cms/schedule";
+import { isLive, liveBlocks } from "@/lib/cms/schedule";
+import type { CatalogQuery, CatalogScope } from "@/lib/catalog/types";
 import type { HomeBlock } from "@/lib/cms/types";
 
 /**
@@ -20,17 +21,20 @@ export async function getShell() {
   "use cache";
   cacheLife("minutes");
   if (!storefrontAvailable()) return null;
-  const [announcements, headerLinks, menu, footer, catalogue] = await Promise.all([
+  const [announcements, headerLinks, menu, footer, trendingSearches, first, second] = await Promise.all([
     cms.getAnnouncements(),
     cms.getHeaderLinks(),
     cms.getMenu(),
     cms.getFooter(),
+    cms.getTrendingSearches(),
     commerce.listProducts({ limit: 60 }),
+    commerce.listProducts({ limit: 60, offset: 60 }),
   ]);
+  const catalogue = { products: [...first.products, ...second.products] };
   // M1 display-only bag needs sizes for in-place size change; M5 replaces this with the server cart.
   const sizesByProduct = Object.fromEntries(catalogue.products.map((p) => [p.id, p.sizes]));
   const upsell = catalogue.products.filter((p) => p.price <= 99_900 && p.sizes.some((s) => s.stock > 0)).slice(0, 3);
-  return { announcements, headerLinks, menu, footer, sizesByProduct, upsell };
+  return { announcements, headerLinks, menu, footer, trendingSearches, sizesByProduct, upsell };
 }
 
 export type ResolvedHomeBlock =
@@ -67,4 +71,71 @@ export async function getHomePage(): Promise<ResolvedHomeBlock[] | null> {
       }
     }),
   );
+}
+
+// ── Listing pages (M3) ────────────────────────────────────────────────────────────────────────────
+
+export async function getCategoryNode(handle: string) {
+  "use cache";
+  cacheLife("minutes");
+  if (!storefrontAvailable()) return null;
+  return commerce.getCategory(handle);
+}
+
+export async function getCollectionInfo(handle: string) {
+  "use cache";
+  cacheLife("minutes");
+  if (!storefrontAvailable()) return null;
+  return commerce.getCollection(handle);
+}
+
+export async function getCategoryTree() {
+  "use cache";
+  cacheLife("minutes");
+  if (!storefrontAvailable()) return null;
+  return commerce.listCategoryTree();
+}
+
+/** Scope + parsed URL query → products, totals and facets. Cached per canonical query. */
+export async function getListing(scope: CatalogScope, query: CatalogQuery) {
+  "use cache";
+  cacheLife("minutes");
+  if (!storefrontAvailable()) return null;
+  return commerce.searchCatalog(scope, query);
+}
+
+export async function getListingTile() {
+  "use cache";
+  cacheLife("minutes");
+  if (!storefrontAvailable()) return null;
+  const tile = await cms.getListingTile();
+  return tile && isLive(tile, new Date()) ? tile : null;
+}
+
+/** PLP-06 suggestions. */
+export async function getBestsellers(limit = 4) {
+  "use cache";
+  cacheLife("minutes");
+  if (!storefrontAvailable()) return [];
+  return (await commerce.listProducts({ limit })).products;
+}
+
+/**
+ * Build-time params. Cache Components requires at least one entry, so without a backend a placeholder
+ * is returned (its page renders the holding state).
+ */
+export async function categoryParams(): Promise<{ category: string }[]> {
+  const tree = storefrontAvailable() ? await commerce.listCategoryTree() : [];
+  return tree.length ? tree.map((c) => ({ category: c.handle })) : [{ category: "all" }];
+}
+
+export async function subcategoryParams(): Promise<{ category: string; sub: string }[]> {
+  const tree = storefrontAvailable() ? await commerce.listCategoryTree() : [];
+  const out = tree.flatMap((c) => c.subcategories.map((s) => ({ category: c.handle, sub: s.handle })));
+  return out.length ? out : [{ category: "all", sub: "all" }];
+}
+
+export async function collectionParams(): Promise<{ handle: string }[]> {
+  const list = storefrontAvailable() ? await commerce.listCollections() : [];
+  return list.length ? list.map((c) => ({ handle: c.handle })) : [{ handle: "all" }];
 }

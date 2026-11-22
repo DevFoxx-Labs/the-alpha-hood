@@ -73,6 +73,17 @@ export interface FooterContent {
   paymentMethods: string[];
 }
 
+/** PLP-05 merchandising tile inserted into listing grids. */
+export interface ListingTile extends Targeting {
+  id: string;
+  kicker: string;
+  lines: string[];
+  /** Index of the line shown in volt. */
+  highlightLine?: number;
+  text: string;
+  cta: { label: string; href: string };
+}
+
 export interface CmsAdapter {
   readonly name: string;
   getAnnouncements(): Promise<AnnouncementMessage[]>;
@@ -80,4 +91,7 @@ export interface CmsAdapter {
   getMenu(): Promise<{ tabs: MenuTab[]; footerTiles: { title: string; href: string; tone: "volt" | "black" }[] }>;
   getHomepage(): Promise<HomeBlock[]>;
   getFooter(): Promise<FooterContent>;
+  getListingTile(): Promise<ListingTile | null>;
+  /** SRCH-01 trending searches. */
+  getTrendingSearches(): Promise<string[]>;
 }

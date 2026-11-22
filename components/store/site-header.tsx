@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { AnnouncementMessage, NavLink } from "@/lib/cms/mock";
 import { cn } from "@/lib/utils";
+import { SearchOverlay } from "@/components/search/search-overlay";
 import { AnnouncementBar } from "./announcement-bar";
 import { Logo } from "./logo";
 import { useStoreUI } from "./store-ui-provider";
@@ -22,8 +23,17 @@ import { useStoreUI } from "./store-ui-provider";
  */
 const iconBtn = "relative grid size-10 place-items-center text-ink transition-colors hover:text-ink-2";
 
-export function SiteHeader({ announcements, links }: { announcements: AnnouncementMessage[]; links: NavLink[] }) {
+export function SiteHeader({
+  announcements,
+  links,
+  trendingSearches = [],
+}: {
+  announcements: AnnouncementMessage[];
+  links: NavLink[];
+  trendingSearches?: string[];
+}) {
   const { setMenuOpen, setCartOpen, itemCount, wishlist } = useStoreUI();
+  const [searchOpen, setSearchOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const lastY = useRef(0);
@@ -86,9 +96,9 @@ export function SiteHeader({ announcements, links }: { announcements: Announceme
         <Logo />
 
         <div className="flex items-center justify-end gap-0.5 lg:gap-2">
-          <Link href="/search" aria-label="Search" className={iconBtn}>
+          <button type="button" onClick={() => setSearchOpen(true)} aria-haspopup="dialog" aria-label="Search" className={iconBtn}>
             <Icon icon={Search01Icon} />
-          </Link>
+          </button>
           <Link
             href="/wishlist"
             aria-label={`Wishlist${wishlist.size ? `, ${wishlist.size} items` : ""}`}
@@ -118,6 +128,7 @@ export function SiteHeader({ announcements, links }: { announcements: Announceme
           </button>
         </div>
       </header>
+      <SearchOverlay open={searchOpen} onOpenChange={setSearchOpen} trending={trendingSearches} />
     </div>
   );
 }

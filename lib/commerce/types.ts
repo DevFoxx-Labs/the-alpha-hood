@@ -1,3 +1,4 @@
+import type { CatalogQuery, CatalogResult, CatalogScope, SearchSuggestions } from "@/lib/catalog/types";
 import type { Paise } from "@/lib/format";
 
 /**
@@ -27,6 +28,8 @@ export type GarmentKind =
 export interface Colour {
   name: string;
   hex: string;
+  /** Handle of the product page for this colour (each colour is its own URL — PDP-03). */
+  handle?: string;
 }
 
 export interface ProductImage {
@@ -58,12 +61,42 @@ export interface Product {
   colours: Colour[];
   sizes: SizeOption[];
   images: ProductImage[];
+  /** Sub-category handle within `category`, e.g. "baggy" in /men/jeans/baggy. */
+  subcategory?: string;
+  /** Filter attributes (PLP-02); values are slugs from lib/catalog/attributes.ts. */
+  attributes: ProductAttributes;
+  /** Colour family used by the colour filter (several shades map to one family). */
+  colourFamily: string;
+  /** ISO date the style went live (sort: new arrivals). */
+  createdAt: string;
+  /** Platform popularity score (sales + views); default sort (PLP-03). */
+  popularity: number;
+  /** Search keywords / synonyms beyond the title. */
+  tags: string[];
+}
+
+export interface ProductAttributes {
+  fit?: string;
+  fabric?: string;
+  sleeve?: string;
+  pattern?: string;
+  occasion?: string;
 }
 
 export interface Category {
   handle: string;
   title: string;
   image: ProductImage;
+  /** Link override (e.g. the home rail's "Oversized Tees" → /men/t-shirts/oversized). */
+  href?: string;
+}
+
+/** A category page node (PLP-01) with its sub-category image rail. */
+export interface CategoryNode {
+  handle: string;
+  title: string;
+  image: ProductImage;
+  subcategories: { handle: string; title: string; image: ProductImage }[];
 }
 
 export interface Collection {
@@ -106,11 +139,17 @@ export interface CommerceAdapter {
   readonly name: string;
   getProduct(handle: string): Promise<Product | null>;
   listProducts(options?: ListOptions): Promise<{ products: Product[]; total: number }>;
-  getCollection(
-    handle: string,
-    options?: ListOptions,
-  ): Promise<{ collection: Collection; products: Product[]; total: number } | null>;
+  getCollection(handle: string): Promise<Collection | null>;
+  /** Featured categories for the homepage rail (HOME-02). */
   listCategories(): Promise<Category[]>;
+  /** Every category page with its sub-categories (PLP-01). */
+  listCategoryTree(): Promise<CategoryNode[]>;
+  getCategory(handle: string): Promise<CategoryNode | null>;
+  listCollections(): Promise<Collection[]>;
+  /** PLP / search results: scope + filters + sort + page, with facet counts (PLP-02…04, SRCH-02). */
+  searchCatalog(scope: CatalogScope, query: CatalogQuery): Promise<CatalogResult>;
+  /** Instant search suggestions (SRCH-01). */
+  suggest(q: string, limit?: number): Promise<SearchSuggestions>;
   cart: {
     get(cartId: string): Promise<Cart | null>;
     create(): Promise<Cart>;

@@ -1,6 +1,8 @@
 import { STORE_CONFIG } from "@/lib/config/store";
 import { CommerceError, type Cart, type CartLine, type CommerceAdapter, type ListOptions, type Product } from "../types";
-import { MOCK_CATEGORIES, MOCK_PRODUCTS } from "./data";
+import { runQuery } from "@/lib/catalog/engine";
+import { MOCK_CATEGORIES, MOCK_CATEGORY_TREE, MOCK_COLLECTIONS, MOCK_PRODUCTS } from "./data";
+import { searchIndex } from "./search";
 
 /**
  * In-memory mock commerce adapter for local development and tests.
@@ -66,22 +68,75 @@ export function createMockAdapter(): CommerceAdapter {
 
     async listProducts(options = {}) {
       const filtered = options.category ? MOCK_PRODUCTS.filter((p) => p.category === options.category) : MOCK_PRODUCTS;
-      // Mock "newest": later catalogue rows were added later.
-      const ordered = options.sort === "newest" ? [...filtered].reverse() : filtered;
+      const ordered =
+        options.sort === "newest"
+          ? [...filtered].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          : [...filtered].sort((a, b) => b.popularity - a.popularity);
       const all = inStockFirst(ordered);
       return { products: page(all, options), total: all.length };
     },
 
-    async getCollection(handle, options = {}) {
+    async getCollection(handle) {
       if (!HANDLE_RE.test(handle)) return null;
-      const category = MOCK_CATEGORIES.find((c) => c.handle === handle);
-      if (!category) return null;
-      const { products, total } = await adapter.listProducts({ ...options, category: handle });
-      return { collection: { handle, title: category.title }, products, total };
+      const found = MOCK_COLLECTIONS.find((c) => c.handle === handle);
+      return found ? { handle: found.handle, title: found.title, description: found.description } : null;
+    },
+
+    async listCollections() {
+      return MOCK_COLLECTIONS.map(({ handle, title, description }) => ({ handle, title, description }));
     },
 
     async listCategories() {
       return MOCK_CATEGORIES;
+    },
+
+    async listCategoryTree() {
+      return MOCK_CATEGORY_TREE;
+    },
+
+    async getCategory(handle) {
+      if (!HANDLE_RE.test(handle)) return null;
+      return MOCK_CATEGORY_TREE.find((c) => c.handle === handle) ?? null;
+    },
+
+    async searchCatalog(scope, query) {
+      let scoped: Product[];
+      let relevance: Map<string, number> | undefined;
+      switch (scope.kind) {
+        case "all":
+          scoped = MOCK_PRODUCTS;
+          break;
+        case "category":
+          if (!HANDLE_RE.test(scope.category) || (scope.subcategory && !HANDLE_RE.test(scope.subcategory))) {
+            throw new CommerceError("invalid_input", "Invalid category");
+          }
+          scoped = MOCK_PRODUCTS.filter(
+            (p) => p.category === scope.category && (!scope.subcategory || p.subcategory === scope.subcategory),
+          );
+          break;
+        case "collection": {
+          const c = MOCK_COLLECTIONS.find((x) => x.handle === scope.collection);
+          if (!c) throw new CommerceError("not_found", "Collection not found");
+          scoped = MOCK_PRODUCTS.filter(c.rule);
+          break;
+        }
+        case "search": {
+          relevance = searchIndex().search(scope.q);
+          scoped = MOCK_PRODUCTS.filter((p) => relevance!.has(p.id));
+          break;
+        }
+      }
+      return runQuery(scoped, query, relevance);
+    },
+
+    async suggest(q, limit = 6) {
+      const term = q.slice(0, 80);
+      const scores = searchIndex().search(term);
+      const products = MOCK_PRODUCTS.filter((p) => scores.has(p.id))
+        .sort((a, b) => scores.get(b.id)! - scores.get(a.id)! || b.popularity - a.popularity)
+        .slice(0, Math.min(Math.max(1, limit), 10))
+        .map((p) => ({ handle: p.handle, title: p.title, price: p.price, mrp: p.mrp, image: p.images[0] }));
+      return { products, categories: searchIndex().categories(term) };
     },
 
     cart: {

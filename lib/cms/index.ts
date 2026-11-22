@@ -1,6 +1,6 @@
 import { type Env, mockDataAllowed } from "@/lib/mock-guard";
 import { ANNOUNCEMENTS, HEADER_LINKS, MENU } from "./mock";
-import { MOCK_HOMEPAGE, mockFooter } from "./mock-home";
+import { MOCK_HOMEPAGE, MOCK_LISTING_TILE, MOCK_TRENDING_SEARCHES, mockFooter } from "./mock-home";
 import type { CmsAdapter } from "./types";
 
 /**
@@ -20,6 +20,8 @@ export function resolveCms(env: Env = process.env): CmsAdapter {
     getMenu: async () => MENU,
     getHomepage: async () => MOCK_HOMEPAGE,
     getFooter: async () => mockFooter(env),
+    getListingTile: async () => MOCK_LISTING_TILE,
+    getTrendingSearches: async () => MOCK_TRENDING_SEARCHES,
   };
 }
 
@@ -34,8 +36,10 @@ function refusingCms(): CmsAdapter {
     getMenu: fail,
     getHomepage: fail,
     getFooter: fail,
+    getListingTile: fail,
+    getTrendingSearches: fail,
   };
 }
 
 export const cms = resolveCms(process.env);
-export type { CmsAdapter, FooterContent, HomeBlock, HeroSlide } from "./types";
+export type { CmsAdapter, FooterContent, HomeBlock, HeroSlide, ListingTile } from "./types";
