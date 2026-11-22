@@ -198,3 +198,24 @@ export function ListingSkeleton() {
     </div>
   );
 }
+
+/**
+ * Whole-page fallback for listing routes while `params` resolve (instant navigation): the header block
+ * (breadcrumb, H1, sub-category rail) plus the grid skeleton, sized like the real page so nothing shifts.
+ */
+export function ListingPageSkeleton() {
+  return (
+    <div aria-hidden="true" className={cn(gutter, "pt-5 lg:pt-6")}>
+      <Skeleton className="h-3 w-40" />
+      <Skeleton className="mt-3 h-[34px] w-56 lg:h-[52px] lg:w-80" />
+      <div className="mt-4 flex gap-2 lg:mt-5 lg:gap-4">
+        {Array.from({ length: 5 }, (_, i) => (
+          <Skeleton key={i} className="h-20 w-[72px] shrink-0 rounded-full lg:h-[120px] lg:w-[110px] lg:rounded-none" />
+        ))}
+      </div>
+      <div className="mt-6">
+        <ListingSkeleton />
+      </div>
+    </div>
+  );
+}

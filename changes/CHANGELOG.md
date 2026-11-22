@@ -1,5 +1,34 @@
 # Change log
 
+## 2026-11-24 — Fix: instant navigation on dynamic routes ("URL data during prerendering")
+
+**Problem:** in dev, Next 16 (Cache Components + Partial Prefetching) flagged `/men/[category]`: `params` awaited
+outside `<Suspense>`, so client navigation to the page blocked with no loading UI. The same pattern was in
+`/men/[category]/[sub]`, `/collections/[handle]`, `/products/[handle]`, `/help/[slug]`, `/legal/[slug]` and
+`/legal/[slug]/hi`.
+
+**Fix** (Next docs: instant-navigation, migrating-to-cache-components):
+- Each page's default export is now a sync shell. The params-dependent work moved into a `…Content` component
+  inside `<Suspense>`, so the shell renders at once and the content streams in.
+- New fallbacks with the same shape as the page: `ListingPageSkeleton` (header, rail, grid), `PdpSkeleton`
+  (gallery and panel) and `TextPageSkeleton` (860 px text column).
+- `generateMetadata` still reads `params`, which counts as runtime data. Following the docs, a
+  `<DynamicMarker />` (`await connection()` inside `<Suspense>`, `components/store/dynamic-marker.tsx`) is rendered
+  on these pages, so the shell prerenders and the metadata streams. It is rendered in the "store not live"
+  (Holding) branch too; without it, the production build failed on `/collections/[handle]`.
+- Tried and rejected: `"use cache"` in `generateMetadata`. Params are runtime data, so it did not help.
+
+**Effect:** these routes are ◐ (static shell plus streamed content). `/legal/*` and `/help/*` went from fully static
+to ◐ because of the marker.
+
+**Verification**
+- `pnpm verify` ✓ (typecheck, lint, test 247/247, build).
+- On the running dev server (port 3001): `/men/jeans`, `/men/jeans/baggy`, `/collections/winter-drop`, `/help/faq`,
+  `/legal/privacy` and a product page return 200. Title and canonical are rendered. No instant / URL-data entries in
+  `.next/dev/logs`.
+- **Not done:** the dev overlay check itself runs in the browser on client navigation, so please confirm the
+  overlay is gone there.
+
 ## 2026-11-24 — Pages redesigned with the "ALPHA" mascot images (MASCOT_PROMPTS §7)
 
 **Scope:** place the owner's 41 generated images (`E:\TheAlphaHoodImages`) by the placement map in

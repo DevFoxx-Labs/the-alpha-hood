@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ListingHeader, ListingResults } from "@/components/listing/listing-page";
+import { Suspense } from "react";
+import { DynamicMarker } from "@/components/store/dynamic-marker";
+import { ListingHeader, ListingPageSkeleton, ListingResults } from "@/components/listing/listing-page";
 import { Holding } from "@/components/store/holding";
 import { emptyQuery } from "@/lib/catalog/query";
 import { getCategoryNode, getListing, storefrontAvailable, subcategoryParams } from "@/lib/storefront";
@@ -25,10 +27,33 @@ export async function generateMetadata({ params }: PageProps<"/men/[category]/[s
   };
 }
 
+/**
+ * Instant navigation (Next 16 Cache Components): `params` are URL data, so everything that reads them streams
+ * inside <Suspense> with a same-shaped fallback; the shell around it renders immediately.
+ */
+export default function SubcategoryPage({ params, searchParams }: PageProps<"/men/[category]/[sub]">) {
+  // The marker renders in both branches: generateMetadata reads `params` even when the store isn't live yet.
+  if (!storefrontAvailable()) {
+    return (
+      <>
+        <DynamicMarker />
+        <Holding />
+      </>
+    );
+  }
+  return (
+    <>
+      <DynamicMarker />
+      <Suspense fallback={<ListingPageSkeleton />}>
+        <SubcategoryContent params={params} searchParams={searchParams} />
+      </Suspense>
+    </>
+  );
+}
+
 /** PLP-01 sub-category page, e.g. /men/jeans/baggy. */
-export default async function SubcategoryPage({ params, searchParams }: PageProps<"/men/[category]/[sub]">) {
+async function SubcategoryContent({ params, searchParams }: PageProps<"/men/[category]/[sub]">) {
   const { category, sub } = await params;
-  if (!storefrontAvailable()) return <Holding />;
   const found = await resolve(category, sub);
   if (!found) notFound();
   const { node, subcategory } = found;

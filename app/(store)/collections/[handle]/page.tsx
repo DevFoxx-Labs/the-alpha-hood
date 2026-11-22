@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ListingHeader, ListingResults } from "@/components/listing/listing-page";
+import { Suspense } from "react";
+import { DynamicMarker } from "@/components/store/dynamic-marker";
+import { ListingHeader, ListingPageSkeleton, ListingResults } from "@/components/listing/listing-page";
 import { ProductRailGallery } from "@/components/listing/product-rail-gallery";
 import { Holding } from "@/components/store/holding";
 import { emptyQuery } from "@/lib/catalog/query";
@@ -20,10 +22,33 @@ export async function generateMetadata({ params }: PageProps<"/collections/[hand
   };
 }
 
+/**
+ * Instant navigation (Next 16 Cache Components): `params` are URL data, so everything that reads them streams
+ * inside <Suspense> with a same-shaped fallback; the shell around it renders immediately.
+ */
+export default function CollectionPage({ params, searchParams }: PageProps<"/collections/[handle]">) {
+  // The marker renders in both branches: generateMetadata reads `params` even when the store isn't live yet.
+  if (!storefrontAvailable()) {
+    return (
+      <>
+        <DynamicMarker />
+        <Holding />
+      </>
+    );
+  }
+  return (
+    <>
+      <DynamicMarker />
+      <Suspense fallback={<ListingPageSkeleton />}>
+        <CollectionContent params={params} searchParams={searchParams} />
+      </Suspense>
+    </>
+  );
+}
+
 /** PLP-01 collection page, e.g. /collections/winter-drop. */
-export default async function CollectionPage({ params, searchParams }: PageProps<"/collections/[handle]">) {
+async function CollectionContent({ params, searchParams }: PageProps<"/collections/[handle]">) {
   const { handle } = await params;
-  if (!storefrontAvailable()) return <Holding />;
   const collection = await getCollectionInfo(handle);
   if (!collection) notFound();
   const scope = { kind: "collection" as const, collection: collection.handle };

@@ -127,4 +127,8 @@
   used on the 404 page instead.
 - 🟡 Homepage mascot changes not checked in a browser (1440/390/360) or with Lighthouse; the homepage renders only with
   demo data (dev), production shows the coming-soon page (now with the hood-up mascot as its LCP image).
+- 🟡 Unknown category / collection / product / help / legal URLs now render "Page not found" with
+  `<meta name="robots" content="noindex">` but HTTP **200** (soft 404): `notFound()` runs inside `<Suspense>` after
+  the shell has streamed, and `dynamicParams=false` is not supported with Cache Components. If search consoles report
+  soft-404s, return 404 for unknown handles earlier (e.g. a proxy check against the catalogue).
 

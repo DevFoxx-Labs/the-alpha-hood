@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
+import { DynamicMarker } from "@/components/store/dynamic-marker";
+import { TextPageSkeleton } from "@/components/content/text-page-skeleton";
 import { ContentView } from "@/components/content/content-view";
 import { isContentSlug, renderContentPage } from "@/lib/content/pages";
 
@@ -20,8 +23,20 @@ export async function generateMetadata({ params }: PageProps<"/help/[slug]">): P
   return { title: page.title, description: page.description, alternates: { canonical: page.path } };
 }
 
+/** Instant navigation: `params` are URL data, so the text streams inside <Suspense> with a same-width skeleton. */
+export default function HelpPage({ params }: PageProps<"/help/[slug]">) {
+  return (
+    <>
+      <DynamicMarker />
+      <Suspense fallback={<TextPageSkeleton />}>
+        <HelpContent params={params} />
+      </Suspense>
+    </>
+  );
+}
+
 /** CMS-04 help pages (shipping, FAQ). Returns & cancellation live in the Refund & Cancellation Policy. */
-export default async function HelpPage({ params }: PageProps<"/help/[slug]">) {
+async function HelpContent({ params }: Pick<PageProps<"/help/[slug]">, "params">) {
   const slug = helpSlug((await params).slug);
   if (!slug) notFound();
   // MASCOT_PROMPTS #10 "Delivery run" on Shipping; #11 "Thinking" on the FAQ.

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
+import { DynamicMarker } from "@/components/store/dynamic-marker";
 import { Breadcrumbs } from "@/components/listing/listing-page";
+import { PdpSkeleton } from "@/components/pdp/pdp-skeleton";
 import { ProductDetail } from "@/components/pdp/purchase-panel";
 import { ReviewsSection } from "@/components/pdp/reviews-section";
 import { Holding } from "@/components/store/holding";
@@ -27,10 +30,33 @@ export async function generateMetadata({ params }: PageProps<"/products/[handle]
   };
 }
 
+/**
+ * Instant navigation (Next 16 Cache Components): `params` are URL data, so the product streams inside
+ * <Suspense> with a PDP-shaped skeleton; the shell around it renders immediately.
+ */
+export default function ProductPage({ params }: PageProps<"/products/[handle]">) {
+  // The marker renders in both branches: generateMetadata reads `params` even when the store isn't live yet.
+  if (!storefrontAvailable()) {
+    return (
+      <>
+        <DynamicMarker />
+        <Holding />
+      </>
+    );
+  }
+  return (
+    <>
+      <DynamicMarker />
+      <Suspense fallback={<PdpSkeleton />}>
+        <ProductContent params={params} />
+      </Suspense>
+    </>
+  );
+}
+
 /** M4 product page (reference/03-product-page.png): PDP-01…03, 05…08, 12. */
-export default async function ProductPage({ params }: PageProps<"/products/[handle]">) {
+async function ProductContent({ params }: Pick<PageProps<"/products/[handle]">, "params">) {
   const { handle } = await params;
-  if (!storefrontAvailable()) return <Holding />;
   const data = await getProductPage(handle);
   if (!data) notFound();
   const { product, category, reviewData, firstPage, coupon } = data;
