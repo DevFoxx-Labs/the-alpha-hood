@@ -22,6 +22,10 @@ export interface DeliveryPromise {
 
 export interface ShippingAdapter {
   check(pincode: string, now?: Date): Promise<DeliveryPromise>;
+  /** Forward shipment at dispatch (ORD-01 tracking). */
+  createShipment(orderNumber: string): Promise<{ courier: string; awb: string }>;
+  /** RET-04 reverse pickup. */
+  bookPickup(returnNumber: string, input: { pincode: string; date: string; slot: "morning" | "afternoon" }): Promise<{ courier: string; awb: string }>;
 }
 
 /** Adds business days (Sundays skipped), in IST, from an order placed `now`. Dispatch cut-off 2 pm IST. */
@@ -55,8 +59,17 @@ const PREPAID_ONLY_PREFIXES = ["79", "18"];
 
 export const COD = { fee: rupees(49), maxOrderValue: rupees(5000) };
 
+const awb = () => String(Math.floor(1e11 + Math.random() * 9e11));
+
 export function createMockShipping(): ShippingAdapter {
   return {
+    async createShipment() {
+      return { courier: "Demo Courier", awb: awb() };
+    },
+    async bookPickup(_ref, { pincode }) {
+      if (!PINCODE_RE.test(pincode)) throw new Error("invalid pincode");
+      return { courier: "Demo Courier", awb: awb() };
+    },
     async check(pincode, now = new Date()) {
       if (!PINCODE_RE.test(pincode)) throw new Error("invalid pincode");
       if (UNSERVICEABLE_PREFIXES.some((p) => pincode.startsWith(p))) {
@@ -83,11 +96,10 @@ export function createMockShipping(): ShippingAdapter {
 
 export function resolveShipping(env: Env = process.env): ShippingAdapter {
   if (mockDataAllowed(env)) return createMockShipping();
-  return {
-    check: async () => {
-      throw new BackendUnavailableError("Shipping");
-    },
+  const fail = async (): Promise<never> => {
+    throw new BackendUnavailableError("Shipping");
   };
+  return { check: fail, createShipment: fail, bookPickup: fail };
 }
 
 export const shipping = resolveShipping();

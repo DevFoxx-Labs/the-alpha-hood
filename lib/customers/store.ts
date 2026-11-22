@@ -9,6 +9,7 @@ import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from
 export interface Customer {
   id: string;
   phone: string;
+  name: string | null;
   email: string | null;
   createdAt: string;
   addresses: Address[];
@@ -24,8 +25,13 @@ export const MAX_ADDRESSES = 10;
 export interface CustomerStore {
   findOrCreateByPhone(phone: string, now?: Date): Promise<{ customer: Customer; created: boolean }>;
   get(id: string): Promise<Customer | null>;
-  setEmail(id: string, email: string): Promise<void>;
+  findByPhone(phone: string): Promise<Customer | null>;
+  setEmail(id: string, email: string | null): Promise<void>;
+  setName(id: string, name: string | null): Promise<void>;
   addAddress(id: string, address: AddressInput): Promise<Address>;
+  removeAddress(id: string, addressId: string): Promise<boolean>;
+  /** DPDP erasure: removes contact details and addresses; the phone can sign up again as a new account. */
+  erase(id: string, now?: Date): Promise<void>;
   /** Called once an order is confirmed (counts, coupon usage). */
   recordOrder(id: string, couponCode: string | null): Promise<void>;
 }
@@ -40,6 +46,7 @@ export function createMemoryCustomerStore(): CustomerStore {
       const customer: Customer = {
         id: `cus_${randomToken(12)}`,
         phone,
+        name: null,
         email: null,
         createdAt: now.toISOString(),
         addresses: [],
@@ -55,9 +62,33 @@ export function createMemoryCustomerStore(): CustomerStore {
     async get(id) {
       return byId.get(id) ?? null;
     },
+    async findByPhone(phone) {
+      const id = byPhone.get(phone);
+      return id ? (byId.get(id) ?? null) : null;
+    },
     async setEmail(id, email) {
       const c = byId.get(id);
       if (c) c.email = email;
+    },
+    async setName(id, name) {
+      const c = byId.get(id);
+      if (c) c.name = name;
+    },
+    async removeAddress(id, addressId) {
+      const c = byId.get(id);
+      if (!c) return false;
+      const before = c.addresses.length;
+      c.addresses = c.addresses.filter((a) => a.id !== addressId);
+      return c.addresses.length < before;
+    },
+    async erase(id, now = new Date()) {
+      const c = byId.get(id);
+      if (!c) return;
+      byPhone.delete(c.phone);
+      c.phone = `erased:${now.toISOString()}`;
+      c.name = null;
+      c.email = null;
+      c.addresses = [];
     },
     async addAddress(id, address) {
       const c = byId.get(id);
@@ -81,13 +112,24 @@ export function resolveCustomers(env: Env = process.env): CustomerStore {
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Customers");
   };
-  return { findOrCreateByPhone: fail, get: fail, setEmail: fail, addAddress: fail, recordOrder: fail };
+  return {
+    findOrCreateByPhone: fail,
+    get: fail,
+    findByPhone: fail,
+    setEmail: fail,
+    setName: fail,
+    addAddress: fail,
+    removeAddress: fail,
+    erase: fail,
+    recordOrder: fail,
+  };
 }
 
 /** What the browser may see about the signed-in customer. */
 export function publicCustomer(c: Customer) {
   return {
     phone: `+91 ${"•".repeat(6)}${c.phone.slice(-4)}`,
+    name: c.name,
     email: c.email,
     addresses: c.addresses,
   };

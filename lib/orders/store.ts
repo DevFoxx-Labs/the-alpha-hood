@@ -12,6 +12,34 @@ import type { PaymentMethod, PriceBreakdown } from "@/lib/pricing/price-cart";
  */
 export type OrderStatus = "pending_payment" | "payment_failed" | "expired" | "confirmed" | "needs_review";
 
+/** ORD-01 fulfilment state machine (see lib/orders/lifecycle.ts for the allowed transitions). */
+export type FulfilmentStatus =
+  | "placed"
+  | "confirmed"
+  | "packed"
+  | "shipped"
+  | "out_for_delivery"
+  | "delivered"
+  | "cancelled"
+  | "rto"
+  | "returned";
+
+export interface TimelineEvent {
+  status: FulfilmentStatus | "payment_failed" | "refund" | "return_requested" | "return_completed";
+  at: string;
+  note?: string;
+}
+
+export interface Refund {
+  id: string;
+  /** Idempotency reference, e.g. `cancel:AH…` or `return:RT…` (UNIQUE per order). */
+  reference: string;
+  amount: Paise;
+  to: "source" | "upi" | "store_credit";
+  status: "processing" | "completed" | "payout_pending";
+  createdAt: string;
+}
+
 export interface OrderLine {
   lineId: string;
   productId: string;
@@ -53,6 +81,15 @@ export interface Order {
   createdAt: string;
   confirmedAt: string | null;
   notes: string[];
+  fulfilment: FulfilmentStatus;
+  timeline: TimelineEvent[];
+  tracking: { courier: string; awb: string } | null;
+  deliveredAt: string | null;
+  refunds: Refund[];
+  /** Units per line already returned or in an open return (prevents returning more than bought). */
+  returnedQty: Record<string, number>;
+  /** GST invoice, issued at dispatch (CHK-10). */
+  invoice: { number: string; issuedAt: string } | null;
 }
 
 export interface OrderStore {
@@ -61,6 +98,11 @@ export interface OrderStore {
   byIdempotency(customerId: string, key: string): Promise<Order | null>;
   byPaymentId(paymentId: string): Promise<Order | null>;
   listByStatus(status: OrderStatus): Promise<Order[]>;
+  listByCustomer(customerId: string): Promise<Order[]>;
+  /** Recent orders for dev tools. */
+  listRecent(limit: number): Promise<Order[]>;
+  /** Next invoice number in the financial year's gap-free series (GST: unique and consecutive). */
+  nextInvoiceNumber(financialYear: string): Promise<string>;
   /** Conditional update: applies only if the current status is in `from`. Returns the order or null. */
   transition(number: string, from: OrderStatus[], to: OrderStatus, patch?: (o: Order) => void): Promise<Order | null>;
   update(number: string, patch: (o: Order) => void): Promise<Order | null>;
@@ -79,6 +121,7 @@ export function createMemoryOrderStore(): OrderStore {
   const idem = new Map<string, string>();
   const payments = new Map<string, string>();
   const events = new Set<string>();
+  const invoiceSeq = new Map<string, number>();
   const clone = (o: Order): Order => structuredClone(o);
 
   return {
@@ -107,6 +150,20 @@ export function createMemoryOrderStore(): OrderStore {
     },
     async listByStatus(status) {
       return [...orders.values()].filter((o) => o.status === status).map(clone);
+    },
+    async listByCustomer(customerId) {
+      return [...orders.values()]
+        .filter((o) => o.customerId === customerId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map(clone);
+    },
+    async listRecent(limit) {
+      return [...orders.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit).map(clone);
+    },
+    async nextInvoiceNumber(fy) {
+      const n = (invoiceSeq.get(fy) ?? 0) + 1;
+      invoiceSeq.set(fy, n);
+      return `INV/${fy}/${String(n).padStart(6, "0")}`;
     },
     async transition(number, from, to, patch) {
       const o = orders.get(number);
@@ -140,7 +197,19 @@ export function resolveOrders(env: Env = process.env): OrderStore {
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Orders");
   };
-  return { create: fail, get: fail, byIdempotency: fail, byPaymentId: fail, listByStatus: fail, transition: fail, update: fail, markEvent: fail };
+  return {
+    create: fail,
+    get: fail,
+    byIdempotency: fail,
+    byPaymentId: fail,
+    listByStatus: fail,
+    listByCustomer: fail,
+    listRecent: fail,
+    nextInvoiceNumber: fail,
+    transition: fail,
+    update: fail,
+    markEvent: fail,
+  };
 }
 
 /** What the customer's browser may see (confirmation page). */

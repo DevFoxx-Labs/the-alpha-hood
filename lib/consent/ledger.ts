@@ -32,6 +32,7 @@ export interface ConsentLedger {
   append(rows: NewConsentRecord[], now?: Date): Promise<ConsentRecord[]>;
   listByVisitor(visitorId: string): Promise<ConsentRecord[]>;
   listBySubscriber(subscriberId: string): Promise<ConsentRecord[]>;
+  listByUser(userId: string): Promise<ConsentRecord[]>;
 }
 
 export function createMemoryLedger(): ConsentLedger {
@@ -51,6 +52,9 @@ export function createMemoryLedger(): ConsentLedger {
     async listBySubscriber(subscriberId) {
       return rows.filter((r) => r.subscriber_id === subscriberId).sort(byCreated);
     },
+    async listByUser(userId) {
+      return rows.filter((r) => r.user_id === userId).sort(byCreated);
+    },
   };
 }
 
@@ -58,7 +62,7 @@ function refusingLedger(): ConsentLedger {
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Consent ledger");
   };
-  return { append: fail, listByVisitor: fail, listBySubscriber: fail };
+  return { append: fail, listByVisitor: fail, listBySubscriber: fail, listByUser: fail };
 }
 
 export function resolveLedger(env: Env = process.env): ConsentLedger {

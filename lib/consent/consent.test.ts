@@ -100,7 +100,7 @@ describe("consent ledger", () => {
 
   it("is append-only: no update/delete API and rows are immutable", async () => {
     const ledger = createMemoryLedger();
-    expect(Object.keys(ledger).sort()).toEqual(["append", "listBySubscriber", "listByVisitor"]);
+    expect(Object.keys(ledger).sort()).toEqual(["append", "listBySubscriber", "listByUser", "listByVisitor"]);
     const [row] = await ledger.append([
       { user_id: null, visitor_id: "v4", subscriber_id: null, purpose: "analytics", status: "granted", method: "preferences", source: "web", notice_version: "x", ip_address: "1.1.1.1", user_agent: "" },
     ]);

@@ -90,6 +90,13 @@ export const COOKIE_INVENTORY: CookieInfo[] = [
     provider: "The Alpha Hood (first party, HTTP-only)",
   },
   {
+    name: "ah_wishlist (local storage)",
+    purpose: "The products you saved to your wishlist (product IDs only). Stays on this device.",
+    category: "necessary",
+    lifetime: "Until you remove the items or clear it",
+    provider: "The Alpha Hood (first party, this device only)",
+  },
+  {
     name: "ah_recent_searches (local storage)",
     purpose: "Your last 8 searches, shown when you open search. Stays on your device, never sent to us; clear it from the search screen.",
     category: "necessary",

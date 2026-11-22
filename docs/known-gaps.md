@@ -30,7 +30,7 @@
   updates in transactions, and a cron for `reconcilePending` every few minutes.
 - 🔴 High-tier second review (`/security-review`) of M5 not yet run; pentest of checkout/OTP/webhook before launch.
 - 🟠 No bot protection (Turnstile) on OTP send, coupon apply and place order (PRD §7) — rate limits only.
-- 🟠 No sign-out / "sign out everywhere" and no session list yet (M6 account).
+
 - 🟠 Guest cart is not merged into a signed-in customer's earlier cart (CART-04 merge on login — M6).
 - 🟠 Paid-but-out-of-stock and duplicate payments go to `needs_review` — refunds need the gateway + admin (M7).
 - 🟠 Real gateway redirect will be an external URL — extend `safeRedirect` with the gateway host allow-list.
@@ -69,3 +69,16 @@
 - 🟡 Size guide modal, mega-menu-on-hover (desktop) and mobile filter bottom sheet are M3/M4 items.
 - 🟡 Lighthouse CI + `web-vitals` RUM not set up — add once real images exist (measure LCP of the hero).
 - 🟡 No Playwright e2e yet (flows covered by route-level tests + a CDP script for now).
+
+## Accounts, orders & returns (M6)
+- 🟠 Only phone OTP sign-in exists; email OTP and Google (ACC-01) need an email provider / OAuth client — each new path
+  must record `terms_privacy` in the consent ledger like OTP sign-up does.
+- 🟠 No list of active sessions/devices and no new-device alerts yet.
+- 🟠 COD refunds to UPI are queued (`payout_pending`) — needs the gateway payout API + ops approval (M7). UPI IDs must be
+  encrypted at rest once a database exists.
+- 🟠 Return photos live in memory — production needs a private bucket, short-lived signed URLs and a purge job.
+- 🟠 Notifications are only queued (outbox) — SMS (DLT templates) / email providers and the delivery worker are pending.
+- 🟠 `/dev/orders` stands in for courier webhooks and the warehouse until M7.
+- 🟠 Account deletion keeps addresses inside past orders (tax records) — confirm with the lawyer.
+- 🟡 Wishlist and recent searches are kept on the device only (no account sync).
+- 🟡 Store credit can't be spent at checkout yet (CHK-05, P1).

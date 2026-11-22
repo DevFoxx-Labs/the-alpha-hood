@@ -57,6 +57,7 @@ export function createMockAdapter(): CommerceAdapter {
   const carts = new Map<string, StoredCart>();
   const sold = new Map<string, number>();
   const reservations = new Map<string, Reservation>();
+  const restocked = new Set<string>();
   const skuKey = (productId: string, size: string) => `${productId}::${size}`;
 
   function requireCart(cartId: string) {
@@ -311,6 +312,16 @@ export function createMockAdapter(): CommerceAdapter {
       async release(reference) {
         const r = reservations.get(reference);
         if (r && r.state === "held") r.state = "released";
+      },
+
+      async restock(reference, items) {
+        if (restocked.has(reference)) return;
+        restocked.add(reference);
+        for (const i of items) {
+          if (!Number.isInteger(i.quantity) || i.quantity < 1) continue;
+          const key = skuKey(i.productId, i.size);
+          sold.set(key, (sold.get(key) ?? 0) - i.quantity);
+        }
       },
 
       async isHeld(reference, now = new Date()) {

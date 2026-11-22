@@ -40,3 +40,12 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] CA to confirm the GST rate table (HSN classes, ₹2,500 slab) and the warehouse state; confirm shipping fee ₹79,
       COD fee ₹49 / max ₹5,000, UPI offer 5% (max ₹150), coupons and combos.
 - [ ] Turn on MFA on the gateway and SMS provider accounts.
+
+## 2026-11-23 (after M6)
+- [ ] Confirm return rules: 7-day window, ₹99 fee after the first free return, 5% store-credit bonus, non-returnable
+      categories (sunglasses, accessories, innerwear, perfumes), 24 h for damaged/wrong. Keep the Refund policy in sync.
+- [ ] Lawyer: confirm what account deletion keeps (order and invoice records with the delivery address) and the
+      store-credit forfeiture wording.
+- [ ] CA: confirm the invoice layout and numbering (INV/<FY>/<6 digits>, issued at dispatch).
+- [ ] Choose an email provider (email OTP, invoices) and a Google OAuth client if social sign-in is wanted.
+- [ ] Set `ACCOUNTS_ENABLED` on the host only once the database and SMS provider are live.

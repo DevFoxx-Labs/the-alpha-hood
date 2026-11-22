@@ -1,5 +1,59 @@
 # Change log
 
+## 2026-11-23 — M6 account, orders & returns (High-risk tier: refunds, auth, personal data, uploads)
+
+**Scope:** PRD M6 — ACC-01/02, ORD-01…04, RET-01…04. Done-when: a customer can track, cancel and request an
+exchange; refunds / store credit flow tested.
+
+**Added**
+- Account (`/account`, `/account/orders[/n[/return|/invoice]]`, `/account/addresses`, `/account/settings`, `/wishlist`):
+  phone-OTP sign-in/up (ACC-01) with the Terms/Privacy notice; overview with store credit; orders list + detail;
+  addresses; profile (name, email); notification preferences that ARE consents (each change → ledger row with user id);
+  download my data (JSON); sign out / sign out on all devices; delete account (typed confirm, refused while an order or
+  return is in progress; erases profile/addresses, withdraws consents, revokes sessions, keeps tax records).
+- ORD-01 `lib/orders/lifecycle.ts`: state machine placed → confirmed → packed → shipped → out for delivery → delivered,
+  plus cancelled / RTO / returned; timeline; courier AWB at dispatch; GST invoice with a gap-free number per Indian
+  financial year (INV/2026-27/000001) issued at dispatch; printable invoice page.
+- ORD-02 `lib/notify/outbox.ts`: transactional notifications queued per event (templates + refs only, no PII bodies).
+- ORD-03 `/track-order`: order number + phone OTP; identical response whether or not the phone matches (also during the
+  resend cooldown); verifying signs the owner in and opens the order.
+- ORD-04 cancel before packing: stock restocked, prepaid refunded in full to source once (`cancel:<order>` reference).
+- RET-01…04 `lib/returns/*`: rules (7-day window, 24 h + photos for damaged/wrong, hygiene categories, first return free
+  then ₹99, never for faults); exchange-first (same product, new size held in stock), store credit +5% bonus, refund to
+  source (prepaid) or UPI / store credit (COD); reverse pickup with date/slot; QC pass → restock + settle once (gateway
+  refund, credit ledger or exchange commit); QC fail → nothing paid; customer can cancel before pickup.
+- Store credit `lib/wallet/store-credit.ts`: append-only ledger, idempotent per reference, no negative balance.
+- Private return photos: JPEG/PNG sniffed by magic bytes, ≤ 5 MB enforced while streaming, EXIF/GPS (JPEG APPn, PNG
+  text/eXIf) stripped, random ids, owner-only reads with `nosniff` + `sandbox` CSP + `no-store`; 20/day per customer.
+- Gateway `refund()` (never above captured, idempotent per reference); inventory `restock()`; shipping
+  `createShipment` / `bookPickup`; `revokeSession` / `revokeAllSessions`; customers name / remove address / erase.
+- `ACCOUNTS_ENABLED` kill switch (fail closed; on in `.env.development`); OTP sign-in runs when checkout or accounts is on.
+- Dev tool `/dev/orders` + `/api/dev/fulfilment` (stands in for courier / warehouse until M7) — 404 unless dev pages AND
+  mock data are allowed.
+- `AlertDialog` primitive, used for every destructive action (cancel order / return, remove address, delete account).
+- DPDP: Privacy Notice (EN + HI) lists the UPI ID for COD refunds and store credit with retention; Cookie Policy lists
+  `ah_wishlist`; retention schedule updated.
+
+**Threat model (abuse case → layer)**
+- IDOR on orders, invoices, returns, photos, addresses → owner checks, 404 for others (prevent, tested).
+- Refund more than paid / twice → capped at captured − refunded, unique references, order lock (prevent, tested incl.
+  concurrent cancel).
+- Return more units than bought / outside the window / hygiene items / fake damage → server rules, photos, 24 h (prevent, tested).
+- Client-sent amounts or fees → unknown fields rejected; server computes value, fee, bonus (prevent, tested).
+- Exchange into an out-of-stock size → stock hold or refusal (prevent, tested).
+- Malicious upload (SVG/HTML/polyglot, huge file, GPS leak) → magic-byte sniff, streaming size cap, metadata strip,
+  sandboxed private serving (prevent, tested).
+- Order / phone enumeration via track-order → identical responses + decoy challenge id (prevent, tested).
+- Stolen session → sign out everywhere; deletion revokes all sessions (recover, tested).
+- Dev fulfilment tool on the live store → 404 unless dev + mock flags (prevent, tested).
+
+**Verification**
+- `pnpm typecheck` ✓ · `pnpm lint` ✓ · `pnpm test` 205/205 ✓ · `pnpm build` ✓.
+- Fixed during review: track-order returned 429 for the real phone during the OTP cooldown (enumeration leak); the
+  financial-year boundary test was wrong (23:30 IST on 31 March is still the old year).
+- **Not done:** browser walk-through at 1440/390/360 (not run, per the owner's earlier stop) and the High-tier second
+  review (`/security-review`) of M5 + M6.
+
 ## 2026-11-22 — M5 cart & checkout (High-risk tier: money, auth, personal data)
 
 **Scope:** PRD M5 — CART-01/02/04/05, CHK-01…07, 09, 10, PROMO-01…04. Reference: `reference/04-checkout.png`,

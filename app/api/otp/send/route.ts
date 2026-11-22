@@ -1,5 +1,5 @@
 import { sendOtp } from "@/lib/auth/otp";
-import { checkoutEnabled } from "@/lib/checkout/flags";
+import { signInEnabled } from "@/lib/checkout/flags";
 import { guardPublicWrite, jsonError } from "@/lib/http/guard";
 import { commerceErrorResponse, privateJson } from "@/lib/http/commerce-http";
 import { rateLimiter } from "@/lib/http/rate-limit";
@@ -11,7 +11,7 @@ import { asObject, normaliseIndianMobile, rejectUnknownFields } from "@/lib/vali
  * The demo SMS provider returns `demoCode` (development / protected previews only — never the live store).
  */
 export async function POST(request: Request) {
-  if (!checkoutEnabled()) return jsonError(503, "checkout_disabled", "Checkout is temporarily unavailable.");
+  if (!signInEnabled()) return jsonError(503, "sign_in_disabled", "Sign-in is temporarily unavailable.");
   const guard = await guardPublicWrite(request, { name: "otp-send", limit: 5, windowMs: 10 * 60_000, maxBytes: 128 });
   if (!guard.ok) return guard.response;
   const daily = rateLimiter.hit(`otp-send-day:ip:${guard.ip}`, 20, 86_400_000);

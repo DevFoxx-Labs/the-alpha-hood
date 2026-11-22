@@ -9,6 +9,16 @@ export function checkoutEnabled(env: Env = process.env): boolean {
   return env.CHECKOUT_ENABLED === "true";
 }
 
+/** Customer accounts (M6): sign-in, orders, returns, privacy actions. */
+export function accountsEnabled(env: Env = process.env): boolean {
+  return env.ACCOUNTS_ENABLED === "true";
+}
+
+/** Phone OTP sign-in is available when checkout or accounts are on. */
+export function signInEnabled(env: Env = process.env): boolean {
+  return checkoutEnabled(env) || accountsEnabled(env);
+}
+
 export function codEnabled(env: Env = process.env): boolean {
   return checkoutEnabled(env) && env.COD_ENABLED === "true";
 }

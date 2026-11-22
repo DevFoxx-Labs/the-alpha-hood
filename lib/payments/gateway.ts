@@ -24,6 +24,11 @@ export interface PaymentGateway {
   createPayment(input: { orderNumber: string; amount: Paise; method: Exclude<PaymentMethod, "cod">; upiApp?: string }): Promise<{ paymentId: string; redirectUrl: string }>;
   verifyWebhook(rawBody: string, signature: string | null, timestamp: string | null, now?: number): PaymentEvent | null;
   fetchStatus(paymentId: string): Promise<{ status: "pending" | "succeeded" | "failed"; amount: Paise } | null>;
+  /**
+   * Refund to the original payment method. Idempotent per `reference` (the gateway's idempotency key); never
+   * more than was captured in total. Returns the gateway refund id.
+   */
+  refund(paymentId: string, amount: Paise, reference: string): Promise<{ refundId: string }>;
 }
 
 export const WEBHOOK_TOLERANCE_MS = 5 * 60_000;
@@ -68,13 +73,14 @@ export interface DemoGateway extends PaymentGateway {
 }
 
 export function createDemoGateway(secret = randomBytes(32).toString("hex")): DemoGateway {
-  const payments = new Map<string, { orderNumber: string; amount: Paise; method: string; status: "pending" | "succeeded" | "failed" }>();
+  const payments = new Map<string, { orderNumber: string; amount: Paise; method: string; status: "pending" | "succeeded" | "failed"; refunded: Paise }>();
+  const refunds = new Map<string, string>();
   const hex = (n: number) => randomBytes(n).toString("hex");
   return {
     name: "demo",
     async createPayment({ orderNumber, amount, method }) {
       const paymentId = `pay_${hex(12)}`;
-      payments.set(paymentId, { orderNumber, amount, method, status: "pending" });
+      payments.set(paymentId, { orderNumber, amount, method, status: "pending", refunded: 0 });
       return { paymentId, redirectUrl: `/checkout/pay/${paymentId}` };
     },
     verifyWebhook(rawBody, signature, timestamp, now) {
@@ -84,10 +90,21 @@ export function createDemoGateway(secret = randomBytes(32).toString("hex")): Dem
       const p = payments.get(paymentId);
       return p ? { status: p.status, amount: p.amount } : null;
     },
+    async refund(paymentId, amount, reference) {
+      const existing = refunds.get(reference);
+      if (existing) return { refundId: existing };
+      const p = payments.get(paymentId);
+      if (!p || p.status !== "succeeded") throw new Error("Payment not captured");
+      if (!Number.isSafeInteger(amount) || amount <= 0 || p.refunded + amount > p.amount) throw new Error("Refund exceeds captured amount");
+      p.refunded += amount;
+      const refundId = `rfnd_${hex(12)}`;
+      refunds.set(reference, refundId);
+      return { refundId };
+    },
     describe(paymentId) {
       if (!PAYMENT_ID_RE.test(paymentId)) return null;
       const p = payments.get(paymentId);
-      return p ? { ...p } : null;
+      return p ? { orderNumber: p.orderNumber, amount: p.amount, method: p.method, status: p.status } : null;
     },
     simulate(paymentId, outcome, now = Date.now()) {
       const p = payments.get(paymentId);
@@ -111,7 +128,7 @@ export function resolveGateway(env: Env = process.env): PaymentGateway {
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Payment gateway");
   };
-  return { name: "disabled", createPayment: fail, verifyWebhook: () => null, fetchStatus: fail };
+  return { name: "disabled", createPayment: fail, verifyWebhook: () => null, fetchStatus: fail, refund: fail };
 }
 
 export function isDemoGateway(g: PaymentGateway): g is DemoGateway {

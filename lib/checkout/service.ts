@@ -8,6 +8,7 @@ import { resolveOrders, type Order, type OrderStore } from "@/lib/orders/store";
 import { resolveGateway, type PaymentEvent, type PaymentGateway } from "@/lib/payments/gateway";
 import type { PaymentMethod } from "@/lib/pricing/price-cart";
 import { findCoupon } from "@/lib/promotions/coupons";
+import { notify } from "@/lib/notify/outbox";
 import { securityEvent } from "@/lib/security/log";
 import { shipping as defaultShipping, type ShippingAdapter } from "@/lib/shipping";
 import { addressQuality } from "./address";
@@ -223,6 +224,19 @@ export async function placeOrder(deps: CheckoutDeps, input: PlaceInput): Promise
       createdAt: now.toISOString(),
       confirmedAt: input.payment === "cod" ? now.toISOString() : null,
       notes: [],
+      fulfilment: input.payment === "cod" ? "confirmed" : "placed",
+      timeline:
+        input.payment === "cod"
+          ? [
+              { status: "placed", at: now.toISOString() },
+              { status: "confirmed", at: now.toISOString() },
+            ]
+          : [{ status: "placed", at: now.toISOString() }],
+      tracking: null,
+      deliveredAt: null,
+      refunds: [],
+      returnedQty: {},
+      invoice: null,
     });
 
     // Hold stock all-or-nothing; on failure the order never becomes visible as placed.
@@ -262,6 +276,7 @@ export async function placeOrder(deps: CheckoutDeps, input: PlaceInput): Promise
 async function finaliseConfirmed(deps: CheckoutDeps, order: Order) {
   if (order.cartId) await deps.commerce.cart.clear(order.cartId);
   await deps.customers.recordOrder(order.customerId, order.couponCode);
+  await notify(order.customerId, "order_confirmed", { orderNumber: order.number });
 }
 
 /**
@@ -280,7 +295,9 @@ export async function handlePaymentEvent(deps: CheckoutDeps, event: PaymentEvent
       await deps.orders.update(order.number, (o) => {
         o.attempts.find((a) => a.paymentId === event.paymentId)!.status = "failed";
       });
-      const moved = await deps.orders.transition(order.number, ["pending_payment"], "payment_failed");
+      const moved = await deps.orders.transition(order.number, ["pending_payment"], "payment_failed", (o) =>
+        o.timeline.push({ status: "payment_failed", at: now.toISOString() }),
+      );
       if (moved) await deps.commerce.inventory.release(order.id);
       return "failed";
     }
@@ -330,6 +347,8 @@ export async function handlePaymentEvent(deps: CheckoutDeps, event: PaymentEvent
     await deps.commerce.inventory.commit(order.id);
     const confirmed = await deps.orders.transition(order.number, ["pending_payment", "payment_failed", "expired"], "confirmed", (o) => {
       o.confirmedAt = now.toISOString();
+      o.fulfilment = "confirmed";
+      o.timeline.push({ status: "confirmed", at: now.toISOString() });
     });
     if (confirmed) await finaliseConfirmed(deps, confirmed);
     return "confirmed";

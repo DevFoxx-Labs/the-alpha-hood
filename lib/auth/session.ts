@@ -32,6 +32,32 @@ export function createSession(customerId: string, store = resolveSessionStore(),
   return token;
 }
 
+export function sessionTokenFrom(request: Request): string | null {
+  const token = readCookie(request.headers.get("cookie"), SESSION_COOKIE);
+  return token && /^[A-Za-z0-9_-]{40,60}$/.test(token) ? token : null;
+}
+
+/** Sign out this browser. */
+export function revokeSession(token: string, store = resolveSessionStore()) {
+  store.sessions.delete(sha256(token));
+}
+
+/** "Sign out everywhere" / account deletion: revoke every session of a customer. Returns how many. */
+export function revokeAllSessions(customerId: string, store = resolveSessionStore()): number {
+  let n = 0;
+  for (const [hash, s] of store.sessions) {
+    if (s.customerId === customerId) {
+      store.sessions.delete(hash);
+      n++;
+    }
+  }
+  return n;
+}
+
+export function clearSessionCookie(response: NextResponse) {
+  response.cookies.set(SESSION_COOKIE, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 0 });
+}
+
 export function customerIdFromRequest(request: Request, store?: SessionStore, now = Date.now()): string | null {
   const token = readCookie(request.headers.get("cookie"), SESSION_COOKIE);
   if (!token || !/^[A-Za-z0-9_-]{40,60}$/.test(token)) return null;

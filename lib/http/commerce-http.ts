@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
+import { AccountError } from "@/lib/account/service";
 import { OtpError } from "@/lib/auth/otp";
+import { OrderActionError } from "@/lib/orders/lifecycle";
+import { ReturnError } from "@/lib/returns/service";
 import { customerIdFromRequest } from "@/lib/auth/session";
+import { accountsEnabled, checkoutEnabled } from "@/lib/checkout/flags";
 import { CheckoutError } from "@/lib/checkout/service";
 import { CommerceError } from "@/lib/commerce/types";
 import { readCookie } from "@/lib/consent/cookie";
@@ -50,9 +54,21 @@ export function commerceErrorResponse(error: unknown): Response {
     const status = error.code === "not_found" ? 404 : error.code === "out_of_stock" || error.code === "limit_exceeded" ? 409 : 422;
     return jsonError(status, error.code, error.message);
   }
+  if (error instanceof OrderActionError || error instanceof ReturnError) {
+    return jsonError(error.status, error.code, error.message);
+  }
+  if (error instanceof AccountError) return jsonError(409, error.code, error.message);
   if (error instanceof OtpError) {
     const status = error.code === "cooldown" || error.code === "limited" ? 429 : 422;
     return jsonError(status, error.code, error.message, error.retryAfterSeconds ? { "Retry-After": String(error.retryAfterSeconds) } : undefined);
   }
   return errorResponse(error);
+}
+
+/** Account area routes: accounts switched on (fail closed) + a signed-in customer. */
+export function requireAccount(request: Request): { ok: true; customerId: string } | { ok: false; response: Response } {
+  if (!accountsEnabled() && !checkoutEnabled()) {
+    return { ok: false, response: jsonError(503, "accounts_disabled", "Your account is temporarily unavailable.") };
+  }
+  return requireCustomer(request);
 }

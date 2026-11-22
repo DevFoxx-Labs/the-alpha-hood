@@ -1,6 +1,6 @@
 import { verifyOtp } from "@/lib/auth/otp";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
-import { checkoutEnabled } from "@/lib/checkout/flags";
+import { signInEnabled } from "@/lib/checkout/flags";
 import { resolveLedger } from "@/lib/consent/ledger";
 import { recordAccountConsent } from "@/lib/consent/service";
 import { existingVisitor } from "@/lib/consent/visitor";
@@ -16,7 +16,7 @@ import { asObject, normaliseEmail, rejectUnknownFields } from "@/lib/validation"
  * notice versions shown next to the button.
  */
 export async function POST(request: Request) {
-  if (!checkoutEnabled()) return jsonError(503, "checkout_disabled", "Checkout is temporarily unavailable.");
+  if (!signInEnabled()) return jsonError(503, "sign_in_disabled", "Sign-in is temporarily unavailable.");
   const guard = await guardPublicWrite(request, { name: "otp-verify", limit: 20, windowMs: 10 * 60_000, maxBytes: 512 });
   if (!guard.ok) return guard.response;
   try {

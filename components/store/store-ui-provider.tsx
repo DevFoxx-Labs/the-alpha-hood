@@ -33,6 +33,7 @@ interface StoreUI {
 }
 
 const StoreUIContext = createContext<StoreUI | null>(null);
+const WISHLIST_KEY = "ah_wishlist";
 
 async function send(url: string, method: string, body?: unknown): Promise<{ ok: boolean; data: unknown; status: number }> {
   const res = await fetch(url, {
@@ -56,6 +57,7 @@ export function StoreUIProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<PublicCartView | null>(null);
   const [cartBusy, setCartBusy] = useState(false);
   const [wishlist, setWishlist] = useState<ReadonlySet<string>>(() => new Set());
+  const wishLoaded = useRef(false);
   const loaded = useRef(false);
 
   const refreshCart = useCallback(async () => {
@@ -84,6 +86,29 @@ export function StoreUIProvider({ children }: { children: React.ReactNode }) {
     loaded.current = true;
     void refreshCart();
   }, [refreshCart]);
+
+  // Wishlist kept on this device (`ah_wishlist`, listed in the Cookie Policy). Product ids only.
+  useEffect(() => {
+    if (wishLoaded.current) {
+      try {
+        if (wishlist.size) window.localStorage.setItem(WISHLIST_KEY, JSON.stringify([...wishlist].slice(0, 200)));
+        else window.localStorage.removeItem(WISHLIST_KEY);
+      } catch {
+        // storage unavailable
+      }
+      return;
+    }
+    wishLoaded.current = true;
+    try {
+      const raw = JSON.parse(window.localStorage.getItem(WISHLIST_KEY) ?? "[]") as unknown;
+      if (Array.isArray(raw)) {
+        const ids = raw.filter((x): x is string => typeof x === "string" && /^[a-z0-9_]{1,64}$/.test(x)).slice(0, 200);
+        if (ids.length) queueMicrotask(() => setWishlist(new Set(ids)));
+      }
+    } catch {
+      // ignore corrupt storage
+    }
+  }, [wishlist]);
 
   const mutate = useCallback(async (url: string, method: string, body: unknown, failure: string) => {
     setCartBusy(true);

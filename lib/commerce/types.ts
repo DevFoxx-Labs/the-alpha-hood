@@ -194,6 +194,8 @@ export interface CommerceAdapter {
     release(reference: string): Promise<void>;
     /** True if the reservation exists and has not expired or been released. */
     isHeld(reference: string, now?: Date): Promise<boolean>;
+    /** Puts sold units back (cancellation, return after QC). Idempotent per reference. */
+    restock(reference: string, items: { productId: string; size: string; quantity: number }[]): Promise<void>;
   };
 }
 
