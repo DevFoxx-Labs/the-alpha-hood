@@ -1003,11 +1003,33 @@ export function ReportsScreen() {
               )}
             </Card>
           </div>
+          <RumCard />
         </>
       ) : !error ? (
         <div className="h-56 animate-pulse rounded-xl bg-muted" />
       ) : null}
     </div>
+  );
+}
+
+/** §7 real-user Core Web Vitals (p75, last 7 days) — green when within target. */
+function RumCard() {
+  const { data, error, reload } = useAdminData<{ rows: { route: string; device: string; metric: string; p75: number; samples: number; good: boolean }[] }>("/api/admin/rum");
+  const fmt = (metric: string, v: number) => (metric === "CLS" ? v.toFixed(2) : v >= 1000 ? `${(v / 1000).toFixed(2)} s` : `${Math.round(v)} ms`);
+  if (error) return <ErrorState message={error} onRetry={reload} />;
+  return (
+    <DataTable
+      rows={data?.rows ?? null}
+      rowKey={(r) => `${r.route}|${r.device}|${r.metric}`}
+      empty={{ title: "No speed data yet", description: "Real-visit measurements (LCP, INP, CLS) appear here as shoppers browse." }}
+      columns={[
+        { key: "r", header: "Real-user speed · route", cell: (r) => r.route },
+        { key: "d", header: "Device", cell: (r) => r.device },
+        { key: "m", header: "Metric", cell: (r) => r.metric },
+        { key: "v", header: "p75", cell: (r) => <StatusBadge status={r.good ? "ok" : "slow"} tone={r.good ? "success" : "danger"} label={fmt(r.metric, r.p75)} /> },
+        { key: "n", header: "Visits", cell: (r) => r.samples, className: "text-right" },
+      ]}
+    />
   );
 }
 

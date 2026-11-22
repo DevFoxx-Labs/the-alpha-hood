@@ -9,6 +9,8 @@ import type { ProductImage } from "@/lib/commerce/types";
 import { parseQuery } from "@/lib/catalog/query";
 import type { CatalogScope } from "@/lib/catalog/types";
 import { getBestsellers, getListing, getListingTile } from "@/lib/storefront";
+import { breadcrumbJsonLd, toJsonLd } from "@/lib/seo/json-ld";
+import { siteUrl } from "@/lib/seo/site";
 import { cn } from "@/lib/utils";
 import { ListingView } from "./listing-view";
 
@@ -58,8 +60,11 @@ export function ListingHeader({
   count,
   description,
   rail,
+  path,
 }: {
   crumbs: Crumb[];
+  /** Canonical path of this listing; when set, BreadcrumbList structured data is emitted (CMS-03). */
+  path?: string;
   title: string;
   count?: number;
   description?: string;
@@ -67,6 +72,12 @@ export function ListingHeader({
 }) {
   return (
     <header className={cn(gutter, "pt-5 lg:pt-6")}>
+      {path ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: toJsonLd(breadcrumbJsonLd(crumbs.map((c) => ({ name: c.label, url: siteUrl(c.href ?? path) })))) }}
+        />
+      ) : null}
       <Breadcrumbs crumbs={crumbs} className="px-1.5 lg:px-0" />
       <div className="mt-2 flex items-baseline gap-2.5 px-1.5 lg:px-0">
         <h1 className="font-display text-[34px] uppercase leading-none lg:text-[52px]">{title}</h1>

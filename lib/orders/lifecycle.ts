@@ -1,3 +1,4 @@
+import { queueRefund } from "@/lib/analytics/server";
 import { randomBytes } from "node:crypto";
 import type { CheckoutDeps } from "@/lib/checkout/service";
 import { notify, type Template } from "@/lib/notify/outbox";
@@ -141,6 +142,7 @@ export async function cancelOrder(
         }
       }
     });
+    for (const r of refunds) queueRefund(order, r.amount, r.reference);
     await notify(order.customerId, "order_cancelled", { orderNumber: order.number });
     if (refunds.length) await notify(order.customerId, "refund_initiated", { orderNumber: order.number });
     return updated!;

@@ -57,10 +57,52 @@ export function productJsonLd({
       worstRating: "1",
     };
   }
-  const breadcrumbLd = {
+  return [productLd, breadcrumbJsonLd(breadcrumbs)];
+}
+
+export function breadcrumbJsonLd(crumbs: { name: string; url: string }[]) {
+  return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: breadcrumbs.map((b, i) => ({ "@type": "ListItem", position: i + 1, name: b.name, item: b.url })),
+    itemListElement: crumbs.map((b, i) => ({ "@type": "ListItem", position: i + 1, name: b.name, item: b.url })),
   };
-  return [productLd, breadcrumbLd];
+}
+
+/** Homepage (CMS-03): Organization + WebSite with a sitelinks SearchAction pointing at /search. */
+export function siteJsonLd({ origin, name, description, sameAs, email, phone }: { origin: string; name: string; description: string; sameAs: string[]; email: string | null; phone: string | null }) {
+  const organization: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": `${origin}/#organization`,
+    name,
+    url: `${origin}/`,
+    logo: `${origin}/icon`,
+    description,
+  };
+  if (sameAs.length) organization.sameAs = sameAs;
+  if (email || phone) {
+    organization.contactPoint = {
+      "@type": "ContactPoint",
+      contactType: "customer service",
+      areaServed: "IN",
+      availableLanguage: ["en", "hi"],
+      ...(email ? { email } : {}),
+      ...(phone ? { telephone: phone } : {}),
+    };
+  }
+  const website = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": `${origin}/#website`,
+    name,
+    url: `${origin}/`,
+    inLanguage: "en-IN",
+    publisher: { "@id": `${origin}/#organization` },
+    potentialAction: {
+      "@type": "SearchAction",
+      target: { "@type": "EntryPoint", urlTemplate: `${origin}/search?q={search_term_string}` },
+      "query-input": "required name=search_term_string",
+    },
+  };
+  return [organization, website];
 }

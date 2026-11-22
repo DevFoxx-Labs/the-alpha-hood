@@ -1,5 +1,7 @@
 "use client";
 
+import { track } from "@/lib/analytics/client";
+import { itemFromLine } from "@/lib/analytics/events";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -102,6 +104,24 @@ export function CheckoutApp() {
     };
   }, [state, addressId, speed, payment]);
 
+  // ANL-01 checkout funnel. Values come from the server cart / quote; consent is checked inside track().
+  const began = useRef(false);
+  useEffect(() => {
+    if (!state?.enabled || began.current || state.cart.lines.length === 0) return;
+    began.current = true;
+    track("begin_checkout", { value: state.cart.pricing.total, items: state.cart.lines.map(itemFromLine), coupon: state.cart.couponCode });
+  }, [state]);
+  const shippedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!quote || !addressId || shippedFor.current === addressId) return;
+    shippedFor.current = addressId;
+    track("add_shipping_info", { value: quote.pricing.total, items: quote.cart.lines.map(itemFromLine), tier: speed });
+  }, [quote, addressId, speed]);
+  const choosePayment = (p: PaymentChoice) => {
+    setPayment(p);
+    if (p === "cod") track("cod_selected", {});
+  };
+
   if (loadError) {
     return (
       <Centered>
@@ -151,6 +171,7 @@ export function CheckoutApp() {
     setPlacing(true);
     setError(null);
     idemKey.current ??= crypto.randomUUID();
+    track("add_payment_info", { value: quote.pricing.total, items: quote.cart.lines.map(itemFromLine), paymentType: payment });
     try {
       const r = await api<{ orderNumber: string; status: string; redirectUrl: string }>("/api/checkout/place", {
         method: "POST",
@@ -247,7 +268,7 @@ export function CheckoutApp() {
           <CheckoutStep number={3} title="Payment" aside="All transactions are encrypted">
             <PaymentMethods
               value={payment}
-              onChange={setPayment}
+              onChange={choosePayment}
               upiApp={upiApp}
               onUpiApp={setUpiApp}
               prepaidOffer={`Extra ${PREPAID_OFFER.percent}% off`}

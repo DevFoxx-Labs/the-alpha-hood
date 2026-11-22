@@ -44,8 +44,10 @@ describe("consent input validation (server)", () => {
 
 describe("consent ledger", () => {
   it("optional purposes are only offered when the tracker is configured", () => {
-    expect(activeCookiePurposes({ ga4Id: null, metaPixelId: null })).toEqual([]);
-    expect(activeCookiePurposes({ ga4Id: "G-ABC1234", metaPixelId: null })).toEqual(["analytics"]);
+    const none = { ga4Id: null, metaPixelId: null, googleAdsId: null, googleAdsPurchaseLabel: null };
+    expect(activeCookiePurposes(none)).toEqual([]);
+    expect(activeCookiePurposes({ ...none, ga4Id: "G-ABC1234" })).toEqual(["analytics"]);
+    expect(activeCookiePurposes({ ...none, googleAdsId: "AW-1234567" })).toEqual(["advertising"]);
   });
 
   it("records one row per offered purpose with notice version, time, IP, UA and source", async () => {

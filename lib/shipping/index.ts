@@ -57,7 +57,7 @@ const REGIONS: Record<string, { city: string; state: string; days: number; expre
 const UNSERVICEABLE_PREFIXES = ["744", "194"];
 const PREPAID_ONLY_PREFIXES = ["79", "18"];
 
-export const COD = { fee: rupees(49), maxOrderValue: rupees(5000) };
+export const COD = { fee: STORE_CONFIG.codFee, maxOrderValue: STORE_CONFIG.codMaxOrderValue };
 
 const awb = () => String(Math.floor(1e11 + Math.random() * 9e11));
 
@@ -106,5 +106,5 @@ export const shipping = resolveShipping();
 
 /** Free standard shipping above the threshold (STORE_CONFIG). */
 export function shippingFee(subtotal: Paise): Paise {
-  return subtotal >= STORE_CONFIG.freeShippingThreshold ? 0 : rupees(79);
+  return subtotal >= STORE_CONFIG.freeShippingThreshold ? 0 : STORE_CONFIG.shippingFee;
 }

@@ -1,5 +1,107 @@
 # Change log
 
+## 2026-11-24 — M8 SEO, analytics, legal pages & performance (High-risk tier: trackers + personal data to third parties)
+
+**Scope:** PRD M8 — CMS-03, CMS-04, ANL-01, ANL-02, §7. Done-when (PRD): Lighthouse ≥ 90 mobile; events validated in
+GA4 DebugView and Meta Events Manager; legal pages live. **Status:** the code is done and tested. The Lighthouse and
+DebugView checks are not done (no IDs, no browser run) — see Verification.
+
+**Added**
+- CMS-03 SEO:
+  - `app/sitemap.ts`: home, categories, sub-categories, collections, every product, and the help and legal pages
+    (Hindi too). Canonical URLs only.
+  - `app/robots.ts`: private areas are disallowed.
+  - `lib/seo/indexing.ts` fails closed: robots disallows everything, and pages are `noindex`, unless the build is
+    production with a real `SITE_URL`, no demo data, and `ALLOW_INDEXING=true`.
+  - `lib/seo/site.ts`: `SITE_URL` is validated as a bare https origin. Root metadata gets `metadataBase`, OG/Twitter
+    defaults and `en_IN`.
+  - Structured data: Organization and WebSite (sitelinks SearchAction) on the home page; BreadcrumbList on listing,
+    help and size-guide pages.
+  - Open Graph cards and icons drawn with `next/og` (placeholders), with a per-product share card.
+  - Redirects manager `lib/seo/redirects.ts`: one list applied by `next.config`, validated at build. No external
+    targets, loops, duplicates or chains.
+- CMS-04 pages:
+  - `/help/shipping`, `/help/faq`, `/help/size-guide`, `/about` and `/contact`. The contact page has seller details,
+    GSTIN and the Grievance Officer, as the E-Commerce Rules 2020 require.
+  - Returns and cancellation redirect into the Refund & Cancellation Policy.
+  - Text lives once in `lib/content/pages.ts`. Every fee and window is filled from the same config checkout uses.
+    Shipping fee, COD fee and COD limit moved into `STORE_CONFIG`; previously they were defined twice.
+  - The footer's dead Alpha Club link was replaced with FAQ.
+- ANL-01 analytics:
+  - Event catalogue: `lib/analytics/events.ts` (GA4 e-commerce, Meta standard events and the PRD §11 custom events).
+  - Browser `track()` (`lib/analytics/client.ts`) reads the consent cookie on every call:
+    - GA4 only with analytics consent; Meta Pixel and Google Ads only with advertising consent.
+    - Scripts load only through `ConsentScript`.
+    - A purchase is counted once per device.
+    - Search terms and coupon codes that look like a phone number or email are dropped.
+  - Wired events:
+    - Browsing: view_item_list, select_item, view_item, size_selected, size_guide_open, pincode_check, search.
+    - Bag: add_to_wishlist, add_to_cart, view_cart, coupon_apply.
+    - Checkout: begin_checkout, add_shipping_info, cod_selected, add_payment_info, purchase.
+    - Returns: return_request, exchange_chosen.
+  - Server side:
+    - The consent snapshot is stored on the order at placement (`lib/analytics/attribution.ts`), holding only the
+      identifiers that consent covers.
+    - Meta Conversions API `Purchase` uses the same event id as the Pixel, so Meta counts it once. The phone is
+      SHA-256 hashed.
+    - GA4 Measurement Protocol `refund` events are sent for cancellations and returns.
+    - Events are queued and sent after the response with a 3 s timeout. Nothing is sent without the secret *and*
+      consent.
+- ANL-02 feed:
+  - `GET /feeds/products.xml` uses the Google Merchant RSS format, which Meta also reads.
+  - One item per size, grouped by product id (the same id the events send). Sale price only when below MRP; stock
+    per size.
+  - XML-escaped, rate-limited, `noindex`.
+- §7 RUM: Next's built-in `useReportWebVitals` sends LCP, INP, CLS, TTFB and FCP to `/api/rum`.
+  - The endpoint is same-origin, rate-limited and capped at 256 B.
+  - Only the metric, value, route template and device class are kept. No IP, cookie or URL.
+  - Admin Reports shows p75 against the targets.
+- DPDP: the Privacy Notice (EN + HI) now names Google Analytics 4, Google Ads and Meta Pixel + CAPI, the data each
+  gets, the consent basis, transfers outside India and retention. Cookie inventory adds `_fbc`, `_gcl_*` and
+  `ah_tracked_orders`. Both notices are now version 2026-11-24, so visitors are asked for cookie consent again.
+
+**Threat model (abuse case → layer)**
+- Tracker fires before consent / after withdrawal → consent read per event, scripts gated, withdrawal reloads and
+  deletes cookies (prevent, tested).
+- PII leaks to Google/Meta via search terms, coupons or payloads → filtered; contact data hashed and only with
+  advertising consent (prevent, tested).
+- Server events sent for shoppers who never consented → snapshot required, else nothing (prevent, tested).
+- Secret leak → CAPI token and GA4 secret are server-only env vars (never `NEXT_PUBLIC_*`), sent in the body or
+  query to the provider only, and never logged (prevent).
+- Third-party outage slows checkout → sent after the response, timeout, failures swallowed (prevent, tested).
+- Open redirect / redirect loop through the manager → validated at build (enforce, tested).
+- Preview or demo store indexed → fail-closed robots and `noindex` (prevent, tested).
+- XML injection through catalogue text in the feed → escaped (prevent, tested).
+- RUM endpoint abused to store data or flood → same-origin, rate limit, size cap, allow-listed metrics, route
+  templates only (prevent, tested).
+- XSS through JSON-LD or the tracking JSON → `toJsonLd` escaping (prevent, tested).
+
+**Verification**
+- `pnpm verify` ✓ (typecheck, lint, test 246/246, build) · `pnpm audit --prod`: no known vulnerabilities.
+- Build output includes `/sitemap.xml`, `/robots.txt`, `/icon`, `/opengraph-image`, the help, about and contact pages,
+  and `/feeds/products.xml`.
+- **Not done:**
+  - Lighthouse mobile ≥ 90 not measured, and no Lighthouse CI (needs `@lhci/cli`, owner OK).
+  - GA4 DebugView, Meta Events Manager and Google Ads validation (no IDs yet).
+  - Browser walk-through at 1440/390/360 not run.
+  - `/security-review` of M5–M8 not run.
+
+## 2026-11-24 — Fix: production build failed on `/account/orders/[number]` (GLB-04)
+
+**Fixed**
+- The Vercel build (commit `7ebcf01`) failed with `CLIENT_HOOK_DYNAMIC`. `MobileTabBar` calls `usePathname()`, and
+  on a dynamic-param route without `generateStaticParams` the pathname is only known at runtime. The bar sat
+  outside any `<Suspense>` in `app/(store)/layout.tsx`, so it blocked the prerendered shell. It is now wrapped in
+  `<Suspense fallback={null}>`, the same pattern as `CheckoutHeader`. The bar is `position: fixed`, so there is no
+  layout shift. Static routes still prerender it.
+
+**Threat model**
+- No change to data, auth or money. Layout only.
+
+**Verification**
+- `pnpm typecheck` ✓ · `pnpm lint` ✓ · `pnpm test` 219/219 ✓ · `pnpm build` ✓ (all routes generated).
+- **Not done:** visual check at 390 / 360 px of the tab bar on an order-detail page.
+
 ## 2026-11-24 — Admin 2-step setup by QR code (ADM-08)
 
 **Added**

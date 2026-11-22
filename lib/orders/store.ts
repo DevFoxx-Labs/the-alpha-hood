@@ -1,3 +1,4 @@
+import type { Attribution } from "@/lib/analytics/attribution";
 import { randomBytes } from "node:crypto";
 import type { Address } from "@/lib/checkout/address";
 import type { Paise } from "@/lib/format";
@@ -92,6 +93,8 @@ export interface Order {
   invoice: { number: string; issuedAt: string } | null;
   /** ADM-03 on hold (e.g. high-risk COD awaiting confirmation): can't be packed. */
   hold?: { reason: string; by: string; at: string } | null;
+  /** ANL-01 consent snapshot at placement; null = no analytics/ads consent → no server events. */
+  attribution?: Attribution | null;
 }
 
 export interface OrderStore {
@@ -223,7 +226,7 @@ export function publicOrder(o: Order) {
     paymentMethod: o.paymentMethod,
     paymentStatus: o.paymentMethod === "cod" ? "cod" : (lastAttempt?.status ?? "pending"),
     canRetryPayment: o.paymentMethod !== "cod" && (o.status === "payment_failed" || o.status === "expired"),
-    lines: o.lines.map((l) => ({ title: l.title, colour: l.colour, size: l.size, quantity: l.quantity, image: l.image, net: l.net, handle: l.handle })),
+    lines: o.lines.map((l) => ({ productId: l.productId, title: l.title, colour: l.colour, size: l.size, quantity: l.quantity, image: l.image, net: l.net, handle: l.handle })),
     totals: {
       mrpTotal: o.pricing.mrpTotal,
       savings: o.pricing.savings,

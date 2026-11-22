@@ -16,6 +16,8 @@ import { useStoreUI } from "@/components/store/store-ui-provider";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { track } from "@/lib/analytics/client";
+import { itemFromProduct } from "@/lib/analytics/events";
 import type { SizeChart } from "@/lib/catalog/size-charts";
 import type { Product } from "@/lib/commerce/types";
 import { formatINR, type Paise } from "@/lib/format";
@@ -69,6 +71,11 @@ export function ProductDetail({
   const delivery = useDelivery();
   const freeShipping = product.price >= freeShippingThreshold;
 
+  // ANL-01 view_item, once per product shown (consent is checked inside track()).
+  useEffect(() => {
+    track("view_item", { item: itemFromProduct(product) });
+  }, [product]);
+
   useEffect(() => {
     const el = ctaRef.current;
     if (!el) return;
@@ -99,7 +106,7 @@ export function ProductDetail({
   const wishButton = (cls?: string) => (
     <button
       type="button"
-      onClick={() => toggleWishlist(product.id)}
+      onClick={() => toggleWishlist(product.id, itemFromProduct(product))}
       aria-pressed={wished}
       aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
       className={cn("grid shrink-0 place-items-center border border-black bg-white", cls)}
@@ -158,8 +165,16 @@ export function ProductDetail({
               onChange={(s) => {
                 setSize(s);
                 setSizeError(false);
+                track("size_selected", { productId: product.id, size: s });
               }}
-              onSizeGuide={sizeChart ? () => setGuideOpen(true) : undefined}
+              onSizeGuide={
+                sizeChart
+                  ? () => {
+                      setGuideOpen(true);
+                      track("size_guide_open", { productId: product.id });
+                    }
+                  : undefined
+              }
             />
           ) : (
             <p className="text-[12px] font-bold uppercase tracking-[0.12em]">One size</p>

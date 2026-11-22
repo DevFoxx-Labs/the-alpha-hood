@@ -1,3 +1,5 @@
+import type { Attribution } from "@/lib/analytics/attribution";
+import { queuePurchase } from "@/lib/analytics/server";
 import { loadCartView, priceLines } from "@/lib/cart/service";
 import { commerce as defaultCommerce } from "@/lib/commerce";
 import { CommerceError, type CommerceAdapter } from "@/lib/commerce/types";
@@ -122,6 +124,8 @@ export interface PlaceInput {
   idempotencyKey: string;
   /** The total the shopper saw; if the server total differs, the order is refused (no surprise charges). */
   expectedTotal: Paise;
+  /** ANL-01 consent snapshot from the request (lib/analytics/attribution.ts). */
+  attribution?: Attribution | null;
   now?: Date;
 }
 
@@ -220,6 +224,7 @@ export async function placeOrder(deps: CheckoutDeps, input: PlaceInput): Promise
       delivery: { speed: q.speed, by: (q.speed === "express" ? q.promise.express?.by : q.promise.standardBy) ?? null },
       couponCode: pricing.coupon?.ok ? pricing.coupon.code : null,
       codRisk,
+      attribution: input.attribution ?? null,
       idempotencyKey: input.idempotencyKey,
       createdAt: now.toISOString(),
       confirmedAt: input.payment === "cod" ? now.toISOString() : null,
@@ -277,6 +282,7 @@ async function finaliseConfirmed(deps: CheckoutDeps, order: Order) {
   if (order.cartId) await deps.commerce.cart.clear(order.cartId);
   await deps.customers.recordOrder(order.customerId, order.couponCode);
   await notify(order.customerId, "order_confirmed", { orderNumber: order.number });
+  queuePurchase(order, deps.env ?? process.env);
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { nextRedirects } from "./lib/seo/redirects";
 
 // Baseline security headers. A full CSP (nonce-based) is tracked in docs/known-gaps.md.
 const securityHeaders = [
@@ -25,6 +26,10 @@ const nextConfig: NextConfig = {
         as: "*.css",
       },
     },
+  },
+  // CMS-03 redirects manager (lib/seo/redirects.ts). Permanent = 308, treated like a 301 by search engines.
+  async redirects() {
+    return nextRedirects();
   },
   async headers() {
     return [

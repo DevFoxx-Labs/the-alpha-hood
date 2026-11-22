@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { track } from "@/lib/analytics/client";
+import { itemFromLine } from "@/lib/analytics/events";
 import { FavouriteIcon, ShoppingBag02Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { formatDeliveryDate, useDelivery } from "@/components/pdp/use-delivery";
@@ -23,6 +26,12 @@ import { priceRows } from "./price-rows";
 export function BagView() {
   const { cart, lines, itemCount, removeLine, toggleWishlist, wishlist, cartBusy } = useStoreUI();
   const delivery = useDelivery();
+  const viewed = useRef(false);
+  useEffect(() => {
+    if (!cart || viewed.current || cart.lines.length === 0) return;
+    viewed.current = true;
+    track("view_cart", { value: cart.pricing.total, items: cart.lines.map(itemFromLine) });
+  }, [cart]);
 
   if (!cart) {
     return (
@@ -87,7 +96,7 @@ export function BagView() {
                     type="button"
                     disabled={cartBusy}
                     onClick={async () => {
-                      if (!wishlist.has(line.productId)) toggleWishlist(line.productId);
+                      if (!wishlist.has(line.productId)) toggleWishlist(line.productId, itemFromLine(line));
                       await removeLine(line.id);
                     }}
                     className="inline-flex items-center gap-1 font-semibold underline-offset-2 hover:underline"

@@ -58,3 +58,18 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] Decide where products / coupons are edited (Shopify / Medusa admin) — the store admin shows them read-only.
 - [ ] OK to add `recharts` (~100 KB, admin only) for report charts? Plain bars are used until then.
 - [ ] Choose a courier aggregator (Shiprocket / Delhivery) so shipping and delivery updates come by webhook.
+
+## 2026-11-24 (after M8)
+- [ ] Lawyer: review the updated Privacy Notice (Google Analytics, Google Ads, Meta Pixel + Conversions API, transfers
+      outside India, retention) and the Cookie Policy — both now version 2026-11-24 (visitors are asked again).
+- [ ] Create GA4, Google Ads and Meta Pixel accounts (MFA on each); give the public IDs (`GA4_MEASUREMENT_ID`,
+      `GOOGLE_ADS_ID` + purchase label, `META_PIXEL_ID`) and put `GA4_API_SECRET` and `META_CAPI_TOKEN` in the host's
+      secret store. Then validate in GA4 DebugView and Meta Events Manager (use `META_TEST_EVENT_CODE`, remove after).
+- [ ] Set GA4 data retention to 14 months (the Privacy Notice says so) and turn off Google signals unless wanted.
+- [ ] Merchant Center + Meta Commerce Manager: add `https://<domain>/feeds/products.xml` as a scheduled feed once real
+      product photos exist; set shipping and returns in Merchant Center to match /help/shipping.
+- [ ] Brand assets: logo (for the icon, Organization data and OG images) and a favicon.
+- [ ] Review the draft About / FAQ / Shipping copy.
+- [ ] OK to add `@lhci/cli` (dev only) for the Lighthouse CI gate? Lighthouse mobile ≥ 90 is unmeasured until then.
+- [ ] At launch: set `SITE_URL`, then `ALLOW_INDEXING=true`, and submit `/sitemap.xml` in Search Console.
+

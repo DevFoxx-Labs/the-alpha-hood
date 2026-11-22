@@ -10,6 +10,7 @@ import { useStoreUI } from "@/components/store/store-ui-provider";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { track } from "@/lib/analytics/client";
 import { formatINR } from "@/lib/format";
 import type { publicOrder } from "@/lib/orders/store";
 import { api, ApiError, safeRedirect } from "./api";
@@ -46,6 +47,20 @@ export function OrderConfirmation() {
       cancelled = true;
     };
   }, [number, polls, refreshCart]);
+
+  // ANL-01 purchase: only once the order is confirmed (paid, or COD placed); once per device per order.
+  // Meta dedupes against the server Conversions API event by the same event id (lib/analytics/server.ts).
+  useEffect(() => {
+    if (order?.status !== "confirmed") return;
+    track("purchase", {
+      orderNumber: order.number,
+      value: order.totals.total,
+      tax: order.totals.gst,
+      shipping: order.totals.shipping + order.totals.expressFee,
+      paymentType: order.paymentMethod,
+      items: order.lines.map((l) => ({ id: l.productId, name: l.title, variant: l.size, quantity: l.quantity, price: Math.round(l.net / Math.max(1, l.quantity)) })),
+    });
+  }, [order]);
 
   useEffect(() => {
     if (order?.status !== "pending_payment" || polls >= MAX_POLLS) return;

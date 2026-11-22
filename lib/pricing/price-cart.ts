@@ -1,5 +1,5 @@
 import { STORE_CONFIG } from "@/lib/config/store";
-import { rupees, type Paise } from "@/lib/format";
+import type { Paise } from "@/lib/format";
 import { automaticUnitDiscount, PREPAID_OFFER, type AutomaticDiscount, AUTOMATIC_DISCOUNTS } from "@/lib/promotions/automatic";
 import { applyCombos, COMBOS, type Combo, type ComboApplication, type ComboResult } from "@/lib/promotions/combos";
 import { evaluateCoupon, type Coupon } from "@/lib/promotions/coupons";
@@ -13,8 +13,8 @@ import { gstClassFor, inclusiveTax, isIntraState, rateFor, splitTax } from "./gs
  * express and COD fees. Free shipping is judged on the goods value after combos and coupon (before the
  * prepaid offer, so choosing UPI never adds a shipping fee).
  */
-export const SHIPPING_FEE: Paise = rupees(79);
-export const COD_FEE: Paise = rupees(49);
+export const SHIPPING_FEE: Paise = STORE_CONFIG.shippingFee;
+export const COD_FEE: Paise = STORE_CONFIG.codFee;
 
 export type PaymentMethod = "upi" | "card" | "netbanking" | "wallet" | "cod";
 export const PAYMENT_METHODS: PaymentMethod[] = ["upi", "card", "netbanking", "wallet", "cod"];

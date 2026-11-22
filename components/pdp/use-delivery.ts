@@ -1,5 +1,6 @@
 "use client";
 
+import { track } from "@/lib/analytics/client";
 import { useCallback, useEffect, useState } from "react";
 import type { DeliveryPromise } from "@/lib/shipping";
 
@@ -25,6 +26,7 @@ export function useDelivery() {
     if (!res.ok) throw new Error(String(res.status));
     const data = (await res.json()) as DeliveryPromise;
     setPromise(data);
+    track("pincode_check", { serviceable: data.serviceable });
     try {
       window.localStorage.setItem(PINCODE_KEY, pincode);
     } catch {

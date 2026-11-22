@@ -17,6 +17,7 @@ export default async function MenPage({ searchParams }: PageProps<"/men">) {
   return (
     <>
       <ListingHeader
+        path="/men"
         crumbs={[{ label: "Home", href: "/" }, { label: "Men" }]}
         title="Men"
         count={base.scopeTotal}

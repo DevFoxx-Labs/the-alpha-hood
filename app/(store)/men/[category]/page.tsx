@@ -30,6 +30,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps<"
   return (
     <>
       <ListingHeader
+        path={`/men/${node.handle}`}
         crumbs={[{ label: "Home", href: "/" }, { label: "Men", href: "/men" }, { label: node.title }]}
         title={node.title}
         count={base?.scopeTotal}

@@ -8,6 +8,11 @@ export const STORE_CONFIG = {
   name: "The Alpha Hood",
   tagline: "Built for the ones who lead.",
   freeShippingThreshold: rupees(999),
+  /** Standard shipping below the free-shipping threshold. */
+  shippingFee: rupees(79),
+  /** Cash-on-delivery handling fee and the largest order COD is offered for. */
+  codFee: rupees(49),
+  codMaxOrderValue: rupees(5000),
   /** CART-01: max quantity per SKU. */
   maxQtyPerSku: 5,
   returnWindowDays: 7,

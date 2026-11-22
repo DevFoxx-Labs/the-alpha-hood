@@ -34,6 +34,7 @@ export default async function CollectionPage({ params, searchParams }: PageProps
   return (
     <>
       <ListingHeader
+        path={`/collections/${collection.handle}`}
         crumbs={[{ label: "Home", href: "/" }, { label: collection.title }]}
         title={collection.title}
         count={base?.scopeTotal}

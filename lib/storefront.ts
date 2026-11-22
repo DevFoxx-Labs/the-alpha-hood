@@ -169,3 +169,27 @@ export async function productParams(): Promise<{ handle: string }[]> {
   const all = [...a.products, ...b.products].map((p) => ({ handle: p.handle }));
   return all.length ? all : [{ handle: "placeholder" }];
 }
+
+// ── SEO & feeds (M8) ──────────────────────────────────────────────────────────────────────────────
+
+/** Every product, paging through the adapter (sitemap + Merchant / Meta feeds). Capped as a safety net. */
+export async function getAllProducts(max = 5000): Promise<Product[]> {
+  "use cache";
+  cacheLife("minutes");
+  if (!storefrontAvailable()) return [];
+  const out: Product[] = [];
+  for (let offset = 0; offset < max; offset += 60) {
+    const { products, total } = await commerce.listProducts({ limit: 60, offset });
+    out.push(...products);
+    if (products.length === 0 || out.length >= total) break;
+  }
+  return out;
+}
+
+export async function getSitemapData() {
+  "use cache";
+  cacheLife("hours");
+  if (!storefrontAvailable()) return null;
+  const [products, tree, collections] = await Promise.all([getAllProducts(), commerce.listCategoryTree(), commerce.listCollections()]);
+  return { products, tree, collections };
+}

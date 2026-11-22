@@ -3,6 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PublicCartView } from "@/lib/cart/service";
+import { track } from "@/lib/analytics/client";
+import { type AnalyticsItem, itemFromProduct } from "@/lib/analytics/events";
 import type { Product } from "@/lib/commerce/types";
 import { showBagToast, showMessageToast } from "./toast";
 
@@ -29,7 +31,8 @@ interface StoreUI {
   applyCoupon: (code: string) => Promise<{ ok: boolean; message?: string }>;
   removeCoupon: () => Promise<void>;
   wishlist: ReadonlySet<string>;
-  toggleWishlist: (productId: string) => void;
+  /** `item` (when known) is reported as add_to_wishlist analytics on add. */
+  toggleWishlist: (productId: string, item?: AnalyticsItem) => void;
 }
 
 const StoreUIContext = createContext<StoreUI | null>(null);
@@ -57,6 +60,10 @@ export function StoreUIProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<PublicCartView | null>(null);
   const [cartBusy, setCartBusy] = useState(false);
   const [wishlist, setWishlist] = useState<ReadonlySet<string>>(() => new Set());
+  const wishlistRef = useRef(wishlist);
+  useEffect(() => {
+    wishlistRef.current = wishlist;
+  }, [wishlist]);
   const wishLoaded = useRef(false);
   const loaded = useRef(false);
 
@@ -136,6 +143,7 @@ export function StoreUIProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       showBagToast({ title: product.title, size, image: product.images[0] }, () => setCartOpen(true));
+      track("add_to_cart", { item: itemFromProduct(product, { size, quantity: 1 }) });
       return true;
     },
     [mutate, setCartOpen],
@@ -157,13 +165,21 @@ export function StoreUIProvider({ children }: { children: React.ReactNode }) {
     [mutate],
   );
 
-  const applyCoupon = useCallback((code: string) => mutate("/api/cart/coupon", "POST", { code }, "This coupon can't be used."), [mutate]);
+  const applyCoupon = useCallback(
+    async (code: string) => {
+      const r = await mutate("/api/cart/coupon", "POST", { code }, "This coupon can't be used.");
+      track("coupon_apply", { code, success: r.ok });
+      return r;
+    },
+    [mutate],
+  );
 
   const removeCoupon = useCallback(async () => {
     await mutate("/api/cart/coupon", "DELETE", {}, "Couldn't remove the coupon.");
   }, [mutate]);
 
-  const toggleWishlist = useCallback((productId: string) => {
+  const toggleWishlist = useCallback((productId: string, item?: AnalyticsItem) => {
+    if (item && !wishlistRef.current.has(productId)) track("add_to_wishlist", { item });
     setWishlist((current) => {
       const next = new Set(current);
       if (next.has(productId)) next.delete(productId);

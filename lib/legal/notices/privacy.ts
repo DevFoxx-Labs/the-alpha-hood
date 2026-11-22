@@ -7,8 +7,8 @@ import type { Notice } from "../types";
  */
 export const PRIVACY_NOTICE: Notice = {
   slug: "privacy",
-  version: "2026-11-22",
-  lastUpdated: "2026-11-22",
+  version: "2026-11-24",
+  lastUpdated: "2026-11-24",
   text: {
     en: {
       title: "Privacy Notice",
@@ -51,7 +51,8 @@ export const PRIVACY_NOTICE: Notice = {
                 ["Messages to support, privacy requests and grievances", "Answer you and keep a record of how we handled it", "Your consent; and legal obligations"],
                 ["Email or WhatsApp number for offers (optional)", "Send you offers and new drops", "Optional consent — off by default"],
                 ["IP address, browser/device type, a random visitor ID cookie", "Keep the site secure, stop abuse, and keep proof of your consent choices", "Necessary to provide a secure service and to prove consent"],
-                ["Analytics and advertising cookies (optional)", "Measure and improve the store; show relevant ads elsewhere", "Optional consent — off by default. Not in use today; see the Cookie Policy"],
+                ["Analytics data (optional): pages and products viewed, search terms, bag, checkout and order events (items, sizes, value, order number), a cookie ID, device and browser type", "Measure and improve the store (Google Analytics)", "Optional consent (Analytics cookies) — off by default"],
+                ["Advertising data (optional): the same shopping events, ad-click and cookie IDs, IP address, browser type, and for purchases your mobile number in hashed (one-way encoded) form", "Measure which of our ads work and show you relevant ads on other sites (Google Ads, Meta)", "Optional consent (Advertising cookies) — off by default"],
               ],
             },
             {
@@ -77,7 +78,9 @@ export const PRIVACY_NOTICE: Notice = {
                 ["Courier and logistics partners", "Deliver orders, pick up returns, show tracking", "To be confirmed before launch"],
                 ["SMS, email and WhatsApp providers", "OTPs and order updates; offers only if you opted in", "To be confirmed before launch"],
                 ["Error monitoring", "Find and fix technical faults (no payment data)", "To be confirmed before launch"],
-                ["Analytics and advertising partners", "Only if you accept those cookies", "Not in use today"],
+                ["Google Analytics 4", "Site analytics — only if you accept Analytics cookies", "Google LLC (used once switched on; listed in the Cookie Policy as \"In use\")"],
+                ["Google Ads", "Ad measurement — only if you accept Advertising cookies", "Google LLC (used once switched on)"],
+                ["Meta Pixel and Conversions API", "Ad measurement and audiences on Facebook and Instagram — only if you accept Advertising cookies", "Meta Platforms Ireland Ltd (used once switched on)"],
               ],
             },
             {
@@ -96,7 +99,7 @@ export const PRIVACY_NOTICE: Notice = {
           blocks: [
             {
               type: "p",
-              text: "Some providers may store or process data outside India. We will not transfer personal data to any country or territory that the Central Government has restricted under section 16 of the DPDP Act.",
+              text: "Some providers may store or process data outside India — for example, Google and Meta process analytics and advertising data in the United States and other countries, only if you accept those cookies. We will not transfer personal data to any country or territory that the Central Government has restricted under section 16 of the DPDP Act.",
             },
           ],
         },
@@ -118,6 +121,7 @@ export const PRIVACY_NOTICE: Notice = {
                 ["Privacy requests and grievances", "3 years after the request is closed."],
                 ["Security and access logs", "At least 1 year, as the DPDP Rules require, then deleted."],
                 ["Visitor ID and consent cookies", "12 months and 6 months respectively (see the Cookie Policy)."],
+                ["Analytics and advertising data", "Google Analytics keeps event data for 14 months. Google Ads and Meta keep it under their own terms. Withdrawing consent stops new data at once; past data can be deleted on request."],
               ],
             },
           ],
@@ -274,7 +278,8 @@ export const PRIVACY_NOTICE: Notice = {
                 ["सहायता संदेश, गोपनीयता अनुरोध और शिकायतें", "आपको उत्तर देना और उसका रिकॉर्ड रखना", "आपकी सहमति; और कानूनी दायित्व"],
                 ["ऑफ़र के लिए ईमेल या WhatsApp नंबर (वैकल्पिक)", "ऑफ़र और नए ड्रॉप की जानकारी भेजना", "वैकल्पिक सहमति — शुरुआत में बंद"],
                 ["IP पता, ब्राउज़र/डिवाइस का प्रकार, एक रैंडम विज़िटर ID कुकी", "साइट को सुरक्षित रखना, दुरुपयोग रोकना और आपकी सहमति का प्रमाण रखना", "सुरक्षित सेवा देने और सहमति प्रमाणित करने के लिए आवश्यक"],
-                ["एनालिटिक्स और विज्ञापन कुकीज़ (वैकल्पिक)", "स्टोर को मापना और बेहतर बनाना; अन्य जगह प्रासंगिक विज्ञापन दिखाना", "वैकल्पिक सहमति — शुरुआत में बंद। अभी उपयोग में नहीं; कुकी नीति देखें"],
+                ["एनालिटिक्स डेटा (वैकल्पिक): देखे गए पेज और उत्पाद, खोज शब्द, बैग, चेकआउट और ऑर्डर की घटनाएँ (सामान, साइज़, राशि, ऑर्डर नंबर), एक कुकी ID, डिवाइस और ब्राउज़र का प्रकार", "स्टोर को मापना और बेहतर बनाना (Google Analytics)", "वैकल्पिक सहमति (एनालिटिक्स कुकीज़) — शुरुआत में बंद"],
+                ["विज्ञापन डेटा (वैकल्पिक): वही खरीदारी घटनाएँ, विज्ञापन-क्लिक और कुकी ID, IP पता, ब्राउज़र का प्रकार, और खरीदारी पर आपका मोबाइल नंबर हैश (एकतरफ़ा कूटबद्ध) रूप में", "हमारे कौन-से विज्ञापन काम करते हैं यह मापना और अन्य साइटों पर प्रासंगिक विज्ञापन दिखाना (Google Ads, Meta)", "वैकल्पिक सहमति (विज्ञापन कुकीज़) — शुरुआत में बंद"],
               ],
             },
             {
@@ -300,7 +305,9 @@ export const PRIVACY_NOTICE: Notice = {
                 ["कूरियर और लॉजिस्टिक्स साझेदार", "ऑर्डर पहुँचाना, रिटर्न उठाना, ट्रैकिंग दिखाना", "लॉन्च से पहले तय किया जाएगा"],
                 ["SMS, ईमेल और WhatsApp प्रदाता", "OTP और ऑर्डर अपडेट; ऑफ़र केवल तब जब आपने सहमति दी हो", "लॉन्च से पहले तय किया जाएगा"],
                 ["एरर मॉनिटरिंग", "तकनीकी खराबियाँ ढूँढना और ठीक करना (भुगतान डेटा नहीं)", "लॉन्च से पहले तय किया जाएगा"],
-                ["एनालिटिक्स और विज्ञापन साझेदार", "केवल तब जब आप वे कुकीज़ स्वीकार करें", "अभी उपयोग में नहीं"],
+                ["Google Analytics 4", "साइट एनालिटिक्स — केवल तब जब आप एनालिटिक्स कुकीज़ स्वीकार करें", "Google LLC (चालू होने पर उपयोग; कुकी नीति में \"उपयोग में\" दिखेगा)"],
+                ["Google Ads", "विज्ञापन मापन — केवल तब जब आप विज्ञापन कुकीज़ स्वीकार करें", "Google LLC (चालू होने पर उपयोग)"],
+                ["Meta Pixel और Conversions API", "Facebook और Instagram पर विज्ञापन मापन और ऑडियंस — केवल तब जब आप विज्ञापन कुकीज़ स्वीकार करें", "Meta Platforms Ireland Ltd (चालू होने पर उपयोग)"],
               ],
             },
             {
@@ -319,7 +326,7 @@ export const PRIVACY_NOTICE: Notice = {
           blocks: [
             {
               type: "p",
-              text: "कुछ प्रदाता डेटा को भारत के बाहर संग्रहीत या संसाधित कर सकते हैं। हम DPDP अधिनियम की धारा 16 के तहत केंद्र सरकार द्वारा प्रतिबंधित किसी भी देश या क्षेत्र में व्यक्तिगत डेटा नहीं भेजेंगे।",
+              text: "कुछ प्रदाता डेटा को भारत के बाहर संग्रहीत या संसाधित कर सकते हैं — उदाहरण के लिए, Google और Meta एनालिटिक्स और विज्ञापन डेटा को अमेरिका और अन्य देशों में संसाधित करते हैं, केवल तब जब आप वे कुकीज़ स्वीकार करें। हम DPDP अधिनियम की धारा 16 के तहत केंद्र सरकार द्वारा प्रतिबंधित किसी भी देश या क्षेत्र में व्यक्तिगत डेटा नहीं भेजेंगे।",
             },
           ],
         },
@@ -341,6 +348,7 @@ export const PRIVACY_NOTICE: Notice = {
                 ["गोपनीयता अनुरोध और शिकायतें", "अनुरोध बंद होने के 3 वर्ष बाद तक।"],
                 ["सुरक्षा और एक्सेस लॉग", "DPDP नियमों के अनुसार कम से कम 1 वर्ष, फिर हटा दिए जाते हैं।"],
                 ["विज़िटर ID और सहमति कुकीज़", "क्रमशः 12 महीने और 6 महीने (कुकी नीति देखें)।"],
+                ["एनालिटिक्स और विज्ञापन डेटा", "Google Analytics घटना डेटा 14 महीने तक रखता है। Google Ads और Meta इसे अपनी शर्तों के अनुसार रखते हैं। सहमति वापस लेते ही नया डेटा तुरंत रुक जाता है; पुराना डेटा अनुरोध पर हटाया जा सकता है।"],
               ],
             },
           ],

@@ -38,6 +38,7 @@ export default async function SubcategoryPage({ params, searchParams }: PageProp
   return (
     <>
       <ListingHeader
+        path={`/men/${found.node.handle}/${found.subcategory.handle}`}
         crumbs={[
           { label: "Home", href: "/" },
           { label: "Men", href: "/men" },

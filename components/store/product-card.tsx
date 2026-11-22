@@ -1,5 +1,7 @@
 "use client";
 
+import { track } from "@/lib/analytics/client";
+import { itemFromProduct } from "@/lib/analytics/events";
 import { Add01Icon, FavouriteIcon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { useState } from "react";
@@ -50,8 +52,13 @@ export function ProductCard({
   showSwatches = true,
   showMrp = true,
   className,
+  listName,
+  index,
 }: {
   product: Product;
+  /** ANL-01 select_item: the list this card is shown in (e.g. "Category: jeans"). */
+  listName?: string;
+  index?: number;
   showSwatches?: boolean;
   showMrp?: boolean;
   className?: string;
@@ -75,7 +82,14 @@ export function ProductCard({
   };
 
   return (
-    <article className={cn("group/card relative min-w-0", className)}>
+    <article
+      className={cn("group/card relative min-w-0", className)}
+      onClickCapture={(e) => {
+        if (listName && (e.target as HTMLElement).closest("a[href]")) {
+          track("select_item", { listName, item: itemFromProduct(product, { listName, index }) });
+        }
+      }}
+    >
       <div className="relative">
         <Link href={href} tabIndex={-1} aria-hidden="true" className="block">
           <div className={cn("relative aspect-[3/4] overflow-hidden bg-soft", soldOut && "opacity-60")}>
@@ -101,7 +115,7 @@ export function ProductCard({
 
         <button
           type="button"
-          onClick={() => toggleWishlist(product.id)}
+          onClick={() => toggleWishlist(product.id, itemFromProduct(product))}
           aria-pressed={wished}
           aria-label={wished ? `Remove ${product.title} from wishlist` : `Add ${product.title} to wishlist`}
           className="absolute right-1.5 top-1.5 z-10 grid size-9 place-items-center"

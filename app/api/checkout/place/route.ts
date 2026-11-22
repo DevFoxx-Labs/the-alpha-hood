@@ -1,3 +1,5 @@
+import { attributionFrom } from "@/lib/analytics/attribution";
+import { NOTICES } from "@/lib/legal";
 import { parseAddressId, parseAmount, parseIdempotencyKey, parsePayment, parseSpeed, parseUpiApp } from "@/lib/checkout/parse";
 import { defaultDeps, placeOrder } from "@/lib/checkout/service";
 import { cartIdFrom, commerceErrorResponse, privateJson, requireCustomer } from "@/lib/http/commerce-http";
@@ -29,6 +31,7 @@ export async function POST(request: Request) {
       upiApp: parseUpiApp(input.upiApp),
       expectedTotal: parseAmount(input.expectedTotal),
       idempotencyKey: parseIdempotencyKey(request),
+      attribution: attributionFrom(request, NOTICES.cookies.version),
     });
     return privateJson(result, { status: 201 });
   } catch (error) {

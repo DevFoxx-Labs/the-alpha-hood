@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { ProductCard } from "@/components/store/product-card";
+import { track } from "@/lib/analytics/client";
+import { itemFromProduct } from "@/lib/analytics/events";
 import {
   AppliedChips,
   FilterBarChip,
@@ -88,6 +90,15 @@ export function ListingView({
   const setSort = (s: string) => go({ ...optimistic, sort: s as SortKey, page: 1 });
 
   const hasMore = result.products.length < result.total;
+  const listName = search ? "Search results" : `Listing ${basePath}`;
+
+  // ANL-01 view_item_list (and `search` on /search) each time a new set of results is shown.
+  const searchTerm = baseParams.q ?? "";
+  useEffect(() => {
+    track("view_item_list", { listName, items: result.products.map((p, i) => itemFromProduct(p, { listName, index: i })) });
+    if (search && searchTerm) track("search", { query: searchTerm, results: result.total });
+  }, [result, listName, search, searchTerm]);
+
   const nextPage = { ...query, page: query.page + 1 };
 
   // PLP-04: infinite scroll on mobile (Load more stays as the fallback and on desktop).
@@ -110,7 +121,7 @@ export function ListingView({
     return () => io.disconnect();
   }, [hasMore, pending, query, go]);
 
-  const cards = result.products.map((p) => <ProductCard key={p.id} product={p} />);
+  const cards = result.products.map((p, i) => <ProductCard key={p.id} product={p} listName={listName} index={i} />);
   if (tile && cards.length > TILE_AT + 1 && filterCount === 0) {
     cards.splice(TILE_AT, 0, <ListingTile key="tile" tile={tile} />);
   }

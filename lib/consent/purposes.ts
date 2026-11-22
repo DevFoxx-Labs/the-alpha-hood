@@ -124,6 +124,27 @@ export const COOKIE_INVENTORY: CookieInfo[] = [
     lifetime: "3 months",
     provider: "Meta (third party)",
   },
+  {
+    name: "_fbc",
+    purpose: "Meta Pixel: remembers the Meta ad you clicked to reach us, to measure that ad.",
+    category: "advertising",
+    lifetime: "3 months",
+    provider: "Meta (third party)",
+  },
+  {
+    name: "_gcl_au, _gcl_aw",
+    purpose: "Google Ads: links a purchase to the Google ad you clicked, to measure that ad.",
+    category: "advertising",
+    lifetime: "3 months",
+    provider: "Google (third party)",
+  },
+  {
+    name: "ah_tracked_orders (local storage)",
+    purpose: "Order numbers already reported to analytics/ads from this device, so a purchase is counted once. Only written if you accepted analytics or advertising.",
+    category: "analytics",
+    lifetime: "Until you clear it (last 20 orders)",
+    provider: "The Alpha Hood (first party, this device only)",
+  },
 ];
 
 /** Cookie name prefixes to delete immediately when a purpose is withdrawn. */
@@ -136,6 +157,6 @@ export const PURPOSE_COOKIE_PREFIXES: Record<CookiePurpose, string[]> = {
 export function activeCookiePurposes(tracking: TrackingConfig): CookiePurpose[] {
   const active: CookiePurpose[] = [];
   if (tracking.ga4Id) active.push("analytics");
-  if (tracking.metaPixelId) active.push("advertising");
+  if (tracking.metaPixelId || tracking.googleAdsId) active.push("advertising");
   return active;
 }

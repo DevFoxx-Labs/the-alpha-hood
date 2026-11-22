@@ -9,6 +9,7 @@ import { STORE_CONFIG } from "@/lib/config/store";
 import { formatINR } from "@/lib/format";
 import { LEGAL_CONFIG } from "@/lib/legal/config";
 import { productJsonLd, toJsonLd } from "@/lib/seo/json-ld";
+import { SITE_ORIGIN } from "@/lib/seo/site";
 import { getProductPage, productParams, storefrontAvailable } from "@/lib/storefront";
 
 export const generateStaticParams = productParams;
@@ -42,7 +43,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
     ...(sub ? [{ label: sub.title, href: `/men/${product.category}/${sub.handle}` }] : []),
     { label: product.title.split(" — ")[0] },
   ];
-  const base = process.env.SITE_URL?.replace(/\/$/, "") ?? "";
+  const base = SITE_ORIGIN;
   const ld = productJsonLd({
     product,
     url: `${base}/products/${product.handle}`,

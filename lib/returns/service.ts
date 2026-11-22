@@ -1,3 +1,4 @@
+import { queueRefund } from "@/lib/analytics/server";
 import { randomBytes } from "node:crypto";
 import type { CheckoutDeps } from "@/lib/checkout/service";
 import { CommerceError } from "@/lib/commerce/types";
@@ -411,11 +412,13 @@ async function recordRefund(
   now: Date,
   id = `rf_${randomBytes(8).toString("hex")}`,
 ) {
+  let added = false;
   await deps.orders.update(order.number, (o) => {
     if (o.refunds.some((x) => x.reference === reference)) return;
+    added = true;
     o.refunds.push({ id, reference, amount, to, status, createdAt: now.toISOString() });
     o.timeline.push({ status: "refund", at: now.toISOString(), note: to === "store_credit" ? "Store credit issued" : to === "upi" ? "Refund to UPI queued" : "Refund to original payment method" });
-  });
+  });  if (added) queueRefund(order, amount, reference);
 }
 
 /** What the customer sees (UPI ID masked). */

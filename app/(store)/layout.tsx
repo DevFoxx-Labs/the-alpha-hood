@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Logo } from "@/components/store/logo";
 import { MenuDrawer } from "@/components/store/menu-drawer";
 import { MiniCart } from "@/components/store/mini-cart";
@@ -44,7 +45,11 @@ export default async function StoreLayout({ children }: LayoutProps<"/">) {
       <MiniCart upsell={shell.upsell} />
       <main id="main">{children}</main>
       <SiteFooter content={shell.footer} />
-      <MobileTabBar />
+      {/* usePathname() is runtime data on dynamic-param routes (e.g. /account/orders/[number]); the bar is
+          position:fixed, so a null fallback causes no layout shift. */}
+      <Suspense fallback={null}>
+        <MobileTabBar />
+      </Suspense>
     </>
   );
 }

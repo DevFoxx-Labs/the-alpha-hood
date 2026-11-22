@@ -165,6 +165,7 @@ export function mockFooter(env: Record<string, string | undefined>): FooterConte
           { label: "Returns & exchanges", href: "/legal/refund-cancellation" },
           { label: "Shipping", href: "/help/shipping" },
           { label: "Size guide", href: "/help/size-guide" },
+          { label: "FAQ", href: "/help/faq" },
           { label: "Contact us", href: "/contact" },
         ],
       },
@@ -172,7 +173,6 @@ export function mockFooter(env: Record<string, string | undefined>): FooterConte
         title: "Company",
         links: [
           { label: "About us", href: "/about" },
-          { label: "Alpha Club", href: "/alpha-club" },
           { label: "Grievance officer", href: "/grievance" },
           { label: "Privacy & your data", href: "/privacy" },
         ],

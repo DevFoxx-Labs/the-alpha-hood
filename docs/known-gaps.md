@@ -7,8 +7,8 @@
   (`lib/legal/config.ts`, env) and every text needs lawyer review (Privacy, Terms, Refund, Cookie; Hindi translation too).
 - 🔴 **No production persistence** for the consent ledger, newsletter list and grievance inbox — they fail closed (503)
   in production. Needs the database from the platform decision (PRD §4) with an append-only `consent_records` table.
-- 🔴 **No staff inbox / notifications for privacy requests** — requests can't be worked yet (M7 admin). Also needs an
-  email/SMS provider to send the acknowledgement and identity-check OTP.
+- 🟠 Privacy requests are worked in `/admin/privacy` (M7); the acknowledgement message and identity-check OTP still need
+  an email/SMS provider.
 - 🟠 Newsletter double opt-in (confirmation message before any offer) when the email/WhatsApp provider is added;
   unsubscribe link in every message.
 - 🟠 Account paths (M6): `terms_privacy` ledger row at every sign-up path, "Your consents" per user across devices,
@@ -21,8 +21,9 @@
 ## Security
 - 🟠 Rate limiter is in-memory per instance — move to a shared store (Redis/Upstash) before multi-instance hosting.
 - 🟠 `clientIp` trusts the first `X-Forwarded-For` hop — correct only behind our CDN/host; confirm with hosting choice.
-- 🟠 No Content-Security-Policy yet (baseline headers only, `next.config.ts`). Add a nonce-based CSP (allow-list
-  tracker domains only once consented scripts exist).
+- 🟠 No Content-Security-Policy yet (baseline headers only, `next.config.ts`). Add a nonce-based CSP; tracker hosts to
+  allow-list (M8): `www.googletagmanager.com`, `www.google-analytics.com`, `*.google.com` / `googleadservices.com`
+  (Ads), `connect.facebook.net`, `www.facebook.com`.
 - 🟠 Semgrep (SAST) not in CI yet; ZAP baseline needs a staging URL.
 - 🔴 **No real payment gateway, SMS provider or database.** Checkout refuses to run on the live store until they're
   configured (demo gateway/SMS only with `ALLOW_MOCK_PAYMENTS`); carts, orders, customers and sessions are in memory.
@@ -57,17 +58,19 @@
 - 🟠 Help, account, wishlist, track-order, gift cards and Alpha Club routes still
   404. Category, collection and search links now resolve (M3).
 - 🟠 Search is in-process over the mock catalogue — choose the hosted engine (Algolia / Typesense / Meilisearch or
-  platform search) and load `SYNONYM_GROUPS` into it; add the `search{query,results}` analytics event in M8.
-- 🟡 Single-filter landing pages are `noindex` like every filtered URL — revisit with SEO in M8.
+  platform search) and load `SYNONYM_GROUPS` into it.
+- 🟡 Single-filter landing pages are `noindex` like every filtered URL — make chosen ones (e.g. "black oversized tees")
+  real collection pages with their own copy instead of indexing filter URLs.
 - 🟡 PLP card hover shows the same placeholder art (second photo needed for the hover swap).
 - 🟠 Homepage offers/claims (ALPHA10, combos, "up to 40%", COD, payment chips) are demo copy — publish only live offers.
 - 🟠 UPI app tiles are neutral placeholders; real brand logos need licensed assets.
 - 🟠 GST rate table, warehouse state, COD fee/limit, shipping fee, prepaid offer and coupons/combos are DEMO values.
-- 🟡 Purchase analytics event (fire once) arrives with analytics in M8; Hood Coins (CHK-05) and one-click checkout
+- 🟡 Hood Coins (CHK-05) and one-click checkout
   (CHK-08) are P1.
 - 🟡 HOME-07/09/10 (Shop the Look, Alpha Club band, #WearTheHood) are P1 (M9) — not on the homepage yet.
 - 🟡 Size guide modal, mega-menu-on-hover (desktop) and mobile filter bottom sheet are M3/M4 items.
-- 🟡 Lighthouse CI + `web-vitals` RUM not set up — add once real images exist (measure LCP of the hero).
+- 🟠 Lighthouse CI not set up and Lighthouse mobile not measured (the M8 "≥ 90" gate is unverified). RUM is live
+  (`/api/rum` → admin Reports). Needs `@lhci/cli` (owner OK) and real images to measure the hero LCP.
 - 🟡 No Playwright e2e yet (flows covered by route-level tests + a CDP script for now).
 
 ## Accounts, orders & returns (M6)
@@ -94,3 +97,18 @@
 - 🟡 Reports chart uses plain CSS bars (`recharts` not installed — needs the owner's OK to add the package).
 - 🟡 No notification bell feed in the admin topbar yet (counts only).
 - 🟡 Missing negative tests: admin ticket reuse, COD payout marked paid twice, production setup without/with a wrong token.
+
+## SEO, analytics & feeds (M8)
+- 🔴 Trackers not validated: GA4 DebugView, Meta Events Manager (test events) and Google Ads conversions need the real
+  IDs and a browser session — not done. Nothing loads until IDs are set, so the store is safe meanwhile.
+- 🟠 Product feed has no `image_link` until real product photos exist (Merchant Center / Meta reject items without one);
+  placeholder art and the generated OG cards must not be used as feed images.
+- 🟠 Server-side event outbox and RUM samples are in memory (lost on restart) — durable outbox / table with the database.
+- 🟠 Help, About and FAQ copy is draft (owner + lawyer review); returns & cancellation pages redirect into the Refund &
+  Cancellation Policy. Gift Cards and Alpha Club merch tiles still link to pages that don't exist yet (M9, P1).
+- 🟠 Icon / Organization logo / OG images are generated placeholders (`lib/seo/og.tsx`) — replace with brand assets;
+  `app/favicon.ico` is still the framework default.
+- 🟡 Google product categories in the feed are mapped by category handle — check against the platform's final
+  category list.
+- 🟡 Server-side GA4 purchase is not sent (browser `purchase` only, to avoid double counting); Google Ads enhanced
+  conversions and Meta CAPI for other events (AddToCart etc.) are not built.

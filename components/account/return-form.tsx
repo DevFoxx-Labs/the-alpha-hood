@@ -1,5 +1,6 @@
 "use client";
 
+import { track } from "@/lib/analytics/client";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -117,6 +118,8 @@ export function ReturnForm({ number }: { number: string }) {
           slot,
         },
       });
+      track("return_request", { reason });
+      if (resolution === "exchange") track("exchange_chosen", {});
       router.push(`/account/orders/${number}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't submit your request.");
