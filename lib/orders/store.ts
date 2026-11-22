@@ -90,6 +90,8 @@ export interface Order {
   returnedQty: Record<string, number>;
   /** GST invoice, issued at dispatch (CHK-10). */
   invoice: { number: string; issuedAt: string } | null;
+  /** ADM-03 on hold (e.g. high-risk COD awaiting confirmation): can't be packed. */
+  hold?: { reason: string; by: string; at: string } | null;
 }
 
 export interface OrderStore {

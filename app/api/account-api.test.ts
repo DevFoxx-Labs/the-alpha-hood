@@ -11,7 +11,8 @@ import { POST as linePOST } from "./cart/lines/route";
 import { POST as addressPOST } from "./checkout/addresses/route";
 import { POST as placePOST } from "./checkout/place/route";
 import { POST as quotePOST } from "./checkout/quote/route";
-import { GET as devGET, POST as devPOST } from "./dev/fulfilment/route";
+import { defaultDeps } from "@/lib/checkout/service";
+import { advanceFulfilment } from "@/lib/orders/lifecycle";
 import { POST as cancelPOST } from "./orders/[number]/cancel/route";
 import { GET as invoiceGET } from "./orders/[number]/invoice/route";
 import { GET as orderGET } from "./orders/[number]/route";
@@ -52,7 +53,11 @@ async function codOrder(phone: string) {
   return { session, cookie, address, number: placed.orderNumber as string };
 }
 
-const advance = (number: string, to: string) => devPOST(req("/api/dev/fulfilment", "POST", { kind: "order", number, to }));
+/** Courier / warehouse steps (the admin panel drives these in production; see admin-api.test.ts). */
+const advance = async (number: string, to: "packed" | "shipped" | "delivered") => {
+  await advanceFulfilment(defaultDeps(), number, to);
+  return { status: 200 };
+};
 
 let clock = Date.parse("2026-11-23T05:00:00Z");
 /** Moves time past the 30 s OTP resend cooldown between sign-ins of the same phone. */
@@ -146,7 +151,7 @@ describe("orders, tracking, cancellation, invoice, returns", () => {
   it("invoice only after dispatch; return request on a delivered order; photo upload is type-checked and private", async () => {
     const { number, session, address } = await codOrder("9700000013");
     expect((await invoiceGET(req(`/api/orders/${number}/invoice`, "GET", undefined, { cookie: session }), p({ number }))).status).toBe(409);
-    for (const to of ["packed", "shipped", "delivered"]) expect((await advance(number, to)).status).toBe(200);
+    for (const to of ["packed", "shipped", "delivered"] as const) expect((await advance(number, to)).status).toBe(200);
     const inv = await (await invoiceGET(req(`/api/orders/${number}/invoice`, "GET", undefined, { cookie: session }), p({ number }))).json();
     expect(inv.invoice.number).toMatch(/^INV\/\d{4}-\d{2}\/\d{6}$/);
     expect(inv.invoice.lines[0].cgst + inv.invoice.lines[0].sgst + inv.invoice.lines[0].igst).toBeGreaterThan(0);
@@ -195,7 +200,7 @@ describe("DPDP rights: export and delete", () => {
     const { session, number } = await codOrder("9700000021");
     expect((await deletePOST(req("/api/account/delete", "POST", { confirm: "yes" }, { cookie: session }))).status).toBe(422);
     expect((await deletePOST(req("/api/account/delete", "POST", { confirm: "DELETE" }, { cookie: session }))).status).toBe(409);
-    for (const to of ["packed", "shipped", "delivered"]) await advance(number, to);
+    for (const to of ["packed", "shipped", "delivered"] as const) await advance(number, to);
     const me = await (await meGET(req("/api/account/me", "GET", undefined, { cookie: session }))).json();
     expect(me.customer).toBeTruthy();
     const res = await deletePOST(req("/api/account/delete", "POST", { confirm: "DELETE" }, { cookie: session }));
@@ -206,15 +211,5 @@ describe("DPDP rights: export and delete", () => {
     const fresh = await signIn("9700000021");
     expect((await (await ordersGET(req("/api/account/orders", "GET", undefined, { cookie: fresh }))).json()).orders).toEqual([]);
     expect(resolveLedger()).toBeTruthy();
-  });
-});
-
-describe("dev fulfilment tool", () => {
-  it("is 404 in production and refuses invalid transitions", async () => {
-    const { number } = await codOrder("9700000030");
-    expect((await advance(number, "delivered")).status).toBe(409);
-    vi.stubEnv("NODE_ENV", "production");
-    expect((await devGET()).status).toBe(404);
-    expect((await advance(number, "packed")).status).toBe(404);
   });
 });

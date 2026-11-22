@@ -324,6 +324,29 @@ export function createMockAdapter(): CommerceAdapter {
         }
       },
 
+      async adjust(productId, size, delta) {
+        if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 10_000) throw new CommerceError("invalid_input", "Invalid adjustment");
+        const product = MOCK_PRODUCTS.find((p) => p.id === productId);
+        if (!product || !product.sizes.some((s) => s.label === size)) throw new CommerceError("not_found", "SKU not found");
+        const key = skuKey(productId, size);
+        const onHand = stockOf(productId, size) - (sold.get(key) ?? 0);
+        if (onHand + delta < 0) throw new CommerceError("invalid_input", "Stock can't go below zero");
+        sold.set(key, (sold.get(key) ?? 0) - delta);
+        return onHand + delta;
+      },
+
+      async snapshot(now = new Date()) {
+        const t = now.getTime();
+        return MOCK_PRODUCTS.flatMap((p) =>
+          p.sizes.map((s) => {
+            const key = skuKey(p.id, s.label);
+            const onHand = stockOf(p.id, s.label) - (sold.get(key) ?? 0);
+            const available = availableNow(p.id, s.label, t);
+            return { productId: p.id, size: s.label, onHand, held: Math.max(0, onHand - available), available };
+          }),
+        );
+      },
+
       async isHeld(reference, now = new Date()) {
         const r = reservations.get(reference);
         return !!r && r.state === "held" && r.expiresAt > now.getTime();

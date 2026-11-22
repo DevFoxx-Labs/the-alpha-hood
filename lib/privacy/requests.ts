@@ -26,7 +26,9 @@ export interface PrivacyRequestInput {
 
 export interface PrivacyRequest extends PrivacyRequestInput {
   reference: string;
-  status: "received";
+  status: "received" | "acknowledged" | "in_progress" | "resolved" | "rejected";
+  /** Staff notes / response log (append-only). */
+  log?: { at: string; by: string; status: string; note: string }[];
   createdAt: string;
   acknowledgeBy: string;
   resolveBy: string;
@@ -35,6 +37,9 @@ export interface PrivacyRequest extends PrivacyRequestInput {
 export interface GrievanceInbox {
   create(input: PrivacyRequestInput, now: Date): Promise<PrivacyRequest>;
   countRecentByContact(contact: string, sinceMs: number, now: Date): Promise<number>;
+  list(): Promise<PrivacyRequest[]>;
+  get(reference: string): Promise<PrivacyRequest | null>;
+  setStatus(reference: string, status: PrivacyRequest["status"], by: string, note: string, now?: Date): Promise<PrivacyRequest | null>;
 }
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -63,6 +68,20 @@ export function createMemoryInbox(): GrievanceInbox {
       const since = now.getTime() - sinceMs;
       return items.filter((r) => r.contact === contact && Date.parse(r.createdAt) >= since).length;
     },
+    async list() {
+      return [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((r) => structuredClone(r));
+    },
+    async get(reference) {
+      const r = items.find((x) => x.reference === reference);
+      return r ? structuredClone(r) : null;
+    },
+    async setStatus(reference, status, by, note, now = new Date()) {
+      const r = items.find((x) => x.reference === reference);
+      if (!r) return null;
+      r.status = status;
+      r.log = [...(r.log ?? []), { at: now.toISOString(), by, status, note }];
+      return structuredClone(r);
+    },
   };
 }
 
@@ -71,7 +90,7 @@ export function resolveInbox(env: Env = process.env): GrievanceInbox {
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Grievance inbox");
   };
-  return { create: fail, countRecentByContact: fail };
+  return { create: fail, countRecentByContact: fail, list: fail, get: fail, setStatus: fail };
 }
 
 function parseContact(value: unknown, field: string): { contact: string; kind: "email" | "phone" } {

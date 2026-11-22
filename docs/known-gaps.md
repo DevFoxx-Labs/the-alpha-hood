@@ -78,7 +78,19 @@
   encrypted at rest once a database exists.
 - 🟠 Return photos live in memory — production needs a private bucket, short-lived signed URLs and a purge job.
 - 🟠 Notifications are only queued (outbox) — SMS (DLT templates) / email providers and the delivery worker are pending.
-- 🟠 `/dev/orders` stands in for courier webhooks and the warehouse until M7.
+- 🟠 Courier webhooks (shipped / delivered / NDR / RTO) not connected — staff advance orders in `/admin`; NDR handling pending.
 - 🟠 Account deletion keeps addresses inside past orders (tax records) — confirm with the lawyer.
 - 🟡 Wishlist and recent searches are kept on the device only (no account sync).
 - 🟡 Store credit can't be spent at checkout yet (CHK-05, P1).
+
+## Admin & ops (M7)
+- 🔴 Staff, sessions, audit log and TOTP secrets live in memory (dev only, refused in production like every mock store).
+  With the database: TOTP secrets encrypted at rest (envelope key in the secret store), audit log in an append-only table.
+- 🟠 Products, prices, images, coupons and combos are read-only in `/admin` — edited in the commerce platform's admin
+  once Shopify / Medusa is chosen (PRD §4).
+- 🟠 COD UPI payouts are recorded by hand (UTR) — needs the gateway payout API and a two-person approval above a limit.
+- 🟠 No new-device / new-IP alert for staff sign-ins, and no WebAuthn (phishing-resistant MFA) yet.
+- 🟠 Admin rate limits are per process (in memory) — move to the shared store with the database.
+- 🟡 Reports chart uses plain CSS bars (`recharts` not installed — needs the owner's OK to add the package).
+- 🟡 No notification bell feed in the admin topbar yet (counts only).
+- 🟡 Missing negative tests: admin ticket reuse, COD payout marked paid twice, production setup without/with a wrong token.

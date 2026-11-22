@@ -69,6 +69,7 @@ export async function advanceFulfilment(deps: CheckoutDeps, orderNumber: string,
       throw new OrderActionError("invalid_transition", `Can't move an order from ${order.fulfilment} to ${to}.`, 409);
     }
     if (to === "cancelled") throw new OrderActionError("invalid_transition", "Use cancelOrder for cancellations.", 409);
+    if (to === "packed" && order.hold) throw new OrderActionError("invalid_transition", `Order is on hold: ${order.hold.reason}`, 409);
 
     const at = now.toISOString();
     let tracking = order.tracking;
@@ -79,6 +80,7 @@ export async function advanceFulfilment(deps: CheckoutDeps, orderNumber: string,
       invoice ??= { number: await deps.orders.nextInvoiceNumber(financialYear(now)), issuedAt: at };
     }
     if (to === "rto") {
+      await deps.customers.recordRto(order.customerId);
       await deps.commerce.inventory.restock(`rto:${order.number}`, order.lines.map((l) => ({ productId: l.productId, size: l.size, quantity: l.quantity })));
     }
     const updated = await deps.orders.update(order.number, (o) => {
@@ -98,11 +100,19 @@ export async function advanceFulfilment(deps: CheckoutDeps, orderNumber: string,
  * ORD-04 cancellation by the customer (before packing). Stock goes back; prepaid orders are refunded in full
  * to the original method (idempotent reference `cancel:<order>`); COD orders have nothing to refund.
  */
-export async function cancelOrder(deps: CheckoutDeps, customerId: string, orderNumber: string, now = new Date()): Promise<Order> {
+export async function cancelOrder(
+  deps: CheckoutDeps,
+  customerId: string | null,
+  orderNumber: string,
+  now = new Date(),
+  by: { staff: string; reason: string } | null = null,
+): Promise<Order> {
   return deps.locks.run(`order:${orderNumber}`, async () => {
     const order = await deps.orders.get(orderNumber);
-    if (!order || order.customerId !== customerId) throw new OrderActionError("order_not_found", "Order not found.", 404);
-    if (!canCustomerCancel(order)) {
+    // Customers: their own order, before packing. Staff (ADM-03): any confirmed order not yet shipped.
+    if (!order || (by === null && order.customerId !== customerId)) throw new OrderActionError("order_not_found", "Order not found.", 404);
+    const allowed = by ? order.status === "confirmed" && (order.fulfilment === "confirmed" || order.fulfilment === "packed") : canCustomerCancel(order);
+    if (!allowed) {
       throw new OrderActionError("not_cancellable", "This order can no longer be cancelled. You can return it after delivery.", 409);
     }
 
@@ -122,7 +132,8 @@ export async function cancelOrder(deps: CheckoutDeps, customerId: string, orderN
 
     const updated = await deps.orders.update(order.number, (o) => {
       o.fulfilment = "cancelled";
-      o.timeline.push({ status: "cancelled", at: now.toISOString(), note: "Cancelled by you" });
+      o.timeline.push({ status: "cancelled", at: now.toISOString(), note: by ? `Cancelled by The Alpha Hood: ${by.reason}` : "Cancelled by you" });
+      o.hold = null;
       for (const r of refunds) {
         if (!o.refunds.some((x) => x.reference === r.reference)) {
           o.refunds.push(r);
@@ -130,8 +141,8 @@ export async function cancelOrder(deps: CheckoutDeps, customerId: string, orderN
         }
       }
     });
-    await notify(customerId, "order_cancelled", { orderNumber: order.number });
-    if (refunds.length) await notify(customerId, "refund_initiated", { orderNumber: order.number });
+    await notify(order.customerId, "order_cancelled", { orderNumber: order.number });
+    if (refunds.length) await notify(order.customerId, "refund_initiated", { orderNumber: order.number });
     return updated!;
   });
 }

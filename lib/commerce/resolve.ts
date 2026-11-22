@@ -48,6 +48,6 @@ function refusingAdapter(message: string): CommerceAdapter {
     searchCatalog: fail,
     suggest: fail,
     cart: { get: fail, create: fail, addLine: fail, updateLine: fail, removeLine: fail, setCoupon: fail, refreshLine: fail, clear: fail },
-    inventory: { available: fail, reserve: fail, commit: fail, release: fail, isHeld: fail, restock: fail },
+    inventory: { available: fail, reserve: fail, commit: fail, release: fail, isHeld: fail, restock: fail, adjust: fail, snapshot: fail },
   };
 }

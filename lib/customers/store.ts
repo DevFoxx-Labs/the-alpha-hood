@@ -34,6 +34,11 @@ export interface CustomerStore {
   erase(id: string, now?: Date): Promise<void>;
   /** Called once an order is confirmed (counts, coupon usage). */
   recordOrder(id: string, couponCode: string | null): Promise<void>;
+  /** ADM-06 staff search (phone digits, name or email; capped). */
+  search(query: string, limit?: number): Promise<Customer[]>;
+  setCodBlocked(id: string, blocked: boolean): Promise<void>;
+  /** CHK-07 RTO history (courier returned the parcel). */
+  recordRto(id: string): Promise<void>;
 }
 
 export function createMemoryCustomerStore(): CustomerStore {
@@ -98,6 +103,29 @@ export function createMemoryCustomerStore(): CustomerStore {
       c.addresses.push(saved);
       return saved;
     },
+    async search(query, limit = 50) {
+      const q = query.trim().toLowerCase().slice(0, 80);
+      const digits = q.replace(/\D/g, "");
+      const all = [...byId.values()].filter((c) => !c.phone.startsWith("erased:"));
+      const hits = q
+        ? all.filter(
+            (c) =>
+              (digits.length >= 4 && c.phone.includes(digits)) ||
+              (c.name ?? "").toLowerCase().includes(q) ||
+              (c.email ?? "").includes(q) ||
+              c.id === q,
+          )
+        : all;
+      return hits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, Math.min(limit, 100));
+    },
+    async setCodBlocked(id, blocked) {
+      const c = byId.get(id);
+      if (c) c.codBlocked = blocked;
+    },
+    async recordRto(id) {
+      const c = byId.get(id);
+      if (c) c.rtoCount += 1;
+    },
     async recordOrder(id, couponCode) {
       const c = byId.get(id);
       if (!c) return;
@@ -122,6 +150,9 @@ export function resolveCustomers(env: Env = process.env): CustomerStore {
     removeAddress: fail,
     erase: fail,
     recordOrder: fail,
+    search: fail,
+    setCodBlocked: fail,
+    recordRto: fail,
   };
 }
 

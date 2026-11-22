@@ -1,5 +1,78 @@
 # Change log
 
+## 2026-11-24 — Admin 2-step setup by QR code (ADM-08)
+
+**Added**
+- The authenticator enrolment step at `/admin/login` shows a QR code of the `otpauth://` URI (scan with Google /
+  Microsoft Authenticator, 1Password or any TOTP app). The setup key and the "open on this device" link stay under
+  "Can't scan? Enter the key instead".
+- Dependency `qrcode.react` 4.2.0 (owner approved, 2026-11-24): ~15 KB, no dependencies, draws a React SVG (no raw
+  HTML), loaded only on the admin sign-in page.
+
+**Threat model**
+- Secret leaked to a QR web service → the QR is drawn in the browser from the enrolment response; nothing leaves the
+  device (prevent).
+- Secret cached or re-shown → enrolment response is `no-store` and returned only once per ticket, before TOTP is on
+  (prevent, existing tests).
+- Shoulder-surfing during setup → same exposure as the typed key; the code is only shown on the first sign-in (accepted).
+
+**Verification**
+- The rendered QR was decoded with OpenCV's QR detector: it returns the exact `otpauth://` URI (57×57 modules, long
+  email address).
+- `pnpm verify` ✓ (typecheck, lint, test 219/219, build) · `pnpm audit --prod`: no known vulnerabilities.
+- **Not done:** scanning with a phone in a real browser (not run).
+
+## 2026-11-23 — M7 admin & ops (High-risk tier: admin powers, refunds, personal data)
+
+**Scope:** PRD M7 — ADM-01…08. Done-when: staff can run the day (confirm, pack, ship, RTO, returns QC, COD payouts,
+stock, customers, privacy inbox, reports) from `/admin`, every action role-checked on the server and audited.
+
+**Added**
+- Staff auth (ADM-08) `lib/admin/{crypto,staff,auth}.ts`: scrypt passwords (≥ 12 chars), **mandatory TOTP** (RFC 6238,
+  ±1 step, replay-protected) on every sign-in; password → 5-min single-use ticket → code → `ah_admin` cookie
+  (HttpOnly, SameSite=Strict, 12 h absolute / 30 min idle, token stored as SHA-256). Lockout after 5 failures (15 min),
+  constant-time dummy hash for unknown emails. First owner via `/admin/setup` only while no staff exist (production
+  also needs `ADMIN_SETUP_TOKEN`); everyone else via one-time 24 h invite links. Role change / disable / MFA reset
+  revoke that person's sessions.
+- RBAC `lib/admin/permissions.ts`: owner, store manager, catalog editor, support, warehouse, marketing, finance;
+  permission map checked by `requireStaff` on each of the 28 `/api/admin/*` routes; refund / credit limits per role.
+- Append-only audit log `lib/admin/audit.ts` (actor, action, record, details, IP) for every staff mutation; `/admin/audit`.
+- Ops `lib/admin/ops.ts` reusing the M6 services (no second copy of a rule): orders list/search/filters, hold / release
+  (incl. high-risk COD confirmation), pack → ship (AWB + GST invoice) → out for delivery → delivered / RTO, staff
+  cancel until packed; printable shipping label and daily courier manifest; returns pickup + QC pass/fail; COD UPI
+  payout queue with UTR; stock adjustments with reason; customers (masked phone/email, COD block, store-credit
+  adjustments); privacy/grievance inbox with acknowledge / in progress / resolved / rejected and 48 h / 30 day dates;
+  reports (orders, revenue, AOV, COD share, RTO, GST, by day, categories, return reasons) + orders CSV (formula-injection
+  safe); read-only products and promotions.
+- Admin UI (`/admin`, admin-panel-design): dark sidebar from one role-keyed `NAV_CONFIG`, topbar, mobile bottom tab bar,
+  light/dark scoped to `#admin-root`, PageHeader → URL filters (350 ms search) → card, DataTable with empty / loading /
+  error states, sonner toasts, AlertDialog for every destructive action, Hugeicons only. 16 screens + sign-in / setup /
+  invite. `noindex` (metadata + `X-Robots-Tag`) and `Cache-Control: no-store` on `/admin`.
+- Store extensions: inventory `adjust` / `snapshot`; customers `search` / `setCodBlocked` / `recordRto`; orders `hold`,
+  `listByCustomer`, `listRecent`; privacy requests `list` / `get` / `setStatus` with a status log.
+- Removed the dev stand-ins `/dev/orders` and `/api/dev/fulfilment` (the admin panel replaces them).
+
+**Threat model (abuse case → layer)**
+- Stolen staff password → mandatory TOTP, lockout, generic errors (prevent, tested).
+- TOTP replay / ticket reuse → last-used step stored (tested), ticket single-use + 5 min (prevent; ticket reuse not yet
+  covered by a test).
+- Lower role calls a higher-role endpoint (BFLA) → `requireStaff(permission)` on every route; guard test fails if an
+  admin route lacks it (prevent + enforce, tested).
+- CSRF on admin writes → SameSite=Strict + same-origin check + JSON-only bodies (prevent, tested).
+- Support refunds / credits a large amount → per-role money limits on the server (prevent, tested).
+- Double payout / double QC settlement → idempotent references, order lock (prevent; QC settle-once tested in M6,
+  payout-twice not yet covered by a test).
+- Insider misuse → append-only audit log, masked customer data, role-limited screens (detect).
+- Owner takeover via setup page after launch → refused once any staff exists (prevent, tested); production also needs
+  the setup token (not yet covered by a test).
+- CSV export opened in Excel runs formulas → cells starting `= + - @` escaped (prevent, tested).
+- Disabled / demoted staff keeps a session → sessions revoked on change (recover, tested).
+
+**Verification**
+- `pnpm verify` ✓ (typecheck, lint, test 219/219, build) · `pnpm audit --prod`: no known vulnerabilities.
+- **Not done:** browser walk-through at 1440/390/360 (not run, per the owner's earlier stop) and the High-tier second
+  review (`/security-review`) of M5–M7.
+
 ## 2026-11-23 — M6 account, orders & returns (High-risk tier: refunds, auth, personal data, uploads)
 
 **Scope:** PRD M6 — ACC-01/02, ORD-01…04, RET-01…04. Done-when: a customer can track, cancel and request an

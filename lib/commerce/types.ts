@@ -196,6 +196,10 @@ export interface CommerceAdapter {
     isHeld(reference: string, now?: Date): Promise<boolean>;
     /** Puts sold units back (cancellation, return after QC). Idempotent per reference. */
     restock(reference: string, items: { productId: string; size: string; quantity: number }[]): Promise<void>;
+    /** ADM-02 manual stock correction (warehouse count); result never below zero. Returns the new on-hand. */
+    adjust(productId: string, size: string, delta: number): Promise<number>;
+    /** ADM-02 per-SKU view: on hand (stock − sold), held by checkouts/exchanges, available. */
+    snapshot(now?: Date): Promise<{ productId: string; size: string; onHand: number; held: number; available: number }[]>;
   };
 }
 

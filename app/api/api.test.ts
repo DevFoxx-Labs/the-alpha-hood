@@ -70,6 +70,9 @@ describe("public write guards (CSRF, size, content type)", () => {
       if (WEBHOOKS.some((w) => r.endsWith(w))) {
         expect(src, r).toContain("verifyWebhook(");
         expect(src, r).toContain("rateLimiter.hit(");
+      } else if (src.includes("adminWrite(")) {
+        // Admin writes: adminWrite = guardPublicWrite + requireStaff + permission (lib/admin/http.ts).
+        expect(src, r).not.toContain("guardPublicWrite(request, { name: \"admin-\"");
       } else if (src.includes("guardPublicUpload(")) {
         // Binary uploads: same-origin + rate limit + size cap, binary instead of JSON.
         expect(src, r).toContain("requireAccount(");

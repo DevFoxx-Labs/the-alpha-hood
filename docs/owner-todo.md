@@ -49,3 +49,12 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] CA: confirm the invoice layout and numbering (INV/<FY>/<6 digits>, issued at dispatch).
 - [ ] Choose an email provider (email OTP, invoices) and a Google OAuth client if social sign-in is wanted.
 - [ ] Set `ACCOUNTS_ENABLED` on the host only once the database and SMS provider are live.
+
+## 2026-11-23 (after M7)
+- [ ] Production: set `ADMIN_SETUP_TOKEN` (≥ 32 random chars) in the host's secret store, create the owner at
+      `/admin/setup`, set up the authenticator, then delete the token from the host.
+- [ ] Confirm the staff roles and money limits (support: refunds up to ₹5,000, no credit; store manager: refunds up to
+      ₹10,000, credit up to ₹2,000; finance and owner: no limit).
+- [ ] Decide where products / coupons are edited (Shopify / Medusa admin) — the store admin shows them read-only.
+- [ ] OK to add `recharts` (~100 KB, admin only) for report charts? Plain bars are used until then.
+- [ ] Choose a courier aggregator (Shiprocket / Delhivery) so shipping and delivery updates come by webhook.
