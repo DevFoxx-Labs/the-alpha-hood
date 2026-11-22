@@ -1,5 +1,37 @@
 # Change log
 
+## 2026-11-24 — Brand logo kit wired in (before M9)
+
+**Added**
+- The owner's logo kit (v1), complete, in `docs/brand/logo-kit/` (SVG, PNG and PDF masters, the brand sheet and its
+  usage rules, README). Web copies:
+  - `public/brand/logo/` (SVG lockups and marks, plus PNG marks);
+  - `public/brand/icons/` (brand icons, not used yet);
+  - `public/brand/social/`;
+  - `public/icons/` (Android and maskable PNGs).
+  The SVGs were checked first: path data only, no scripts or external references.
+- Favicon and app icons through Next.js file conventions: `app/favicon.ico` (16/32/48 px), `app/icon.svg`,
+  `app/apple-icon.png` (180 px), and `app/manifest.ts` (192/512/maskable, theme #0A0A0A). The generated placeholders
+  `app/icon.tsx` and `app/apple-icon.tsx` were removed.
+- Share image: `app/opengraph-image.png` (the kit's 1200×630) with alt text. Per-product cards now carry the real
+  lockup, read from `assets/brand/`.
+- `components/store/logo.tsx` now uses the kit lockup everywhere the logo appears:
+  - header, the "coming soon" header, 404, checkout and menu drawer use `primary-horizontal_color`;
+  - the footer uses `_color-on-dark`;
+  - the "coming soon" page also shows a large on-dark mark.
+  Width and height are set on every image, so nothing shifts while loading.
+- Admin: the sidebar uses the on-dark lockup (the mark when collapsed). The mobile topbar and the sign-in card follow
+  the light/dark theme.
+- Organization structured data logo: `/brand/logo/mark_color@600.png`.
+- DESIGN.md §1 and CLAUDE.md now record the final logo and its usage rules.
+
+**Verification**
+- `pnpm verify` ✓ (typecheck, lint, test 246/246, build).
+- The built HTML has `favicon.ico`, `icon.svg`, `apple-touch-icon`, `manifest.webmanifest`, `og:image`
+  (1200×630) and the header logo `<img>` with width and height.
+- **Not done:** visual check in a browser at 1440/390/360 (not run). The footer logo only renders when CMS footer
+  content exists (dev / mock data).
+
 ## 2026-11-24 — M8 SEO, analytics, legal pages & performance (High-risk tier: trackers + personal data to third parties)
 
 **Scope:** PRD M8 — CMS-03, CMS-04, ANL-01, ANL-02, §7. Done-when (PRD): Lighthouse ≥ 90 mobile; events validated in

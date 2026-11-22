@@ -76,7 +76,7 @@ export function siteJsonLd({ origin, name, description, sameAs, email, phone }: 
     "@id": `${origin}/#organization`,
     name,
     url: `${origin}/`,
-    logo: `${origin}/icon`,
+    logo: `${origin}/brand/logo/mark_color@600.png`,
     description,
   };
   if (sameAs.length) organization.sameAs = sameAs;

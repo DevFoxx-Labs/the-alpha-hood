@@ -18,6 +18,8 @@ shadcn/ui-style primitives on `radix-ui` in `components/ui` · store components 
   No lucide/other icon sets, no ad-hoc SVG icons. Icon-only buttons need `aria-label`. (DESIGN.md §0 mentions
   lucide-react; the owner's standing rule overrides it.)
 - **Design:** square corners; red only for price/sale/urgency; volt only on dark/tiles; Anton display + Inter UI.
+- **Brand assets:** logo kit in `docs/brand/logo-kit/` (masters, usage rules); use only those files via `components/store/logo.tsx`
+  / `public/brand/` — never redraw or recolour the logo.
 - **Commerce only through `lib/commerce`** (adapter interface). The mock adapter and `/dev/*` pages fail closed in
   production (`resolveCommerce`, `devPagesEnabled`).
 - **Money:** integer paise everywhere (`lib/format.ts`); the server computes every price/total — client state is display only.

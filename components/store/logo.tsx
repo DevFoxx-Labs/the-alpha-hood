@@ -2,20 +2,28 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /**
- * Proposed logo (DESIGN.md §1): hood-pentagon mark with an "A" + Anton wordmark (+0.2em tracking).
- * Placeholder until the final logo — keep the slot sizes (header 64 px, mark 28 px).
+ * Brand logo from the logo kit (docs/brand/logo-kit, web copies in /public/brand/logo). Usage rules from the
+ * brand sheet: horizontal lockup by default, never stretched / rotated / recoloured, clear space = the "A"
+ * height, minimum 120 px wide for the lockup and 16 px for the mark. Width and height are always set (no CLS).
+ *
+ * Variants: `color` (black mark + wordmark, yellow eyes) on light backgrounds; `color-on-dark` on black.
  */
-export function LogoMark({ className }: { className?: string }) {
+const LOCKUP = { w: 1072, h: 360 } as const;
+
+export function LogoMark({ tone = "dark", size = 28, className }: { tone?: "dark" | "light"; size?: number; className?: string }) {
   return (
-    <span
+    // Plain <img>: a static SVG that the image optimiser can't improve (it would only add a request hop).
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={tone === "light" ? "/brand/logo/mark_color-on-dark.svg" : "/brand/logo/mark_color.svg"}
+      alt=""
       aria-hidden="true"
-      className={cn(
-        "grid size-7 shrink-0 place-items-center bg-black pt-[3px] font-display text-[18px] leading-none text-white [clip-path:polygon(50%_0,100%_28%,100%_100%,0_100%,0_28%)]",
-        className,
-      )}
-    >
-      A
-    </span>
+      width={size}
+      height={size}
+      decoding="async"
+      // Size comes from the width/height attributes; a className (e.g. `lg:size-40`) can override it.
+      className={cn("shrink-0 select-none", className)}
+    />
   );
 }
 
@@ -28,36 +36,26 @@ export function Logo({
 }: {
   href?: string;
   tone?: "dark" | "light";
-  /** Always use the small mobile size (e.g. inside drawers). */
+  /** Always use the small mobile size (e.g. inside drawers and checkout). */
   compact?: boolean;
   className?: string;
   onClick?: () => void;
 }) {
+  const src = tone === "light" ? "/brand/logo/primary-horizontal_color-on-dark.svg" : "/brand/logo/primary-horizontal_color.svg";
   return (
-    <Link
-      href={href}
-      onClick={onClick}
-      aria-label="The Alpha Hood — home"
-      className={cn(
-        "inline-flex items-center gap-2 font-display uppercase leading-none",
-        !compact && "lg:gap-2.5",
-        tone === "light" ? "text-white" : "text-black",
-        className,
-      )}
-    >
-      <LogoMark
-        className={cn(
-          "size-5 text-[13px]",
-          !compact && "lg:size-7 lg:text-[18px]",
-          tone === "light" && "bg-white text-black",
-        )}
+    <Link href={href} onClick={onClick} aria-label="The Alpha Hood — home" className={cn("inline-flex shrink-0 items-center", className)}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        width={LOCKUP.w}
+        height={LOCKUP.h}
+        fetchPriority={tone === "dark" && !compact ? "high" : undefined}
+        decoding="async"
+        draggable={false}
+        // Header slot is 64 px: lockup 40 px tall on mobile (≈ 120 px wide, the kit's minimum), 48 px on desktop.
+        className={cn("h-10 w-auto select-none", !compact && "lg:h-12")}
       />
-      <span
-        aria-hidden="true"
-        className={cn("whitespace-nowrap text-[16px] tracking-[0.19em]", !compact && "lg:text-[24px] lg:tracking-[0.2em]")}
-      >
-        {compact ? null : <span className="hidden lg:inline">The </span>}Alpha Hood
-      </span>
     </Link>
   );
 }

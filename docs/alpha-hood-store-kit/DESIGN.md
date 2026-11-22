@@ -21,7 +21,7 @@ Compare with the reference PNGs at 1440px and 390px. Use lucide-react icons. The
 ## 1. Brand & personality
 - **Name:** The Alpha Hood. **Tagline:** *Built for the ones who lead.*
 - **Personality:** bold, confident, urban, a little loud, never cheap. Monochrome with punchy accents, big condensed headlines, and lots of photography.
-- **Logo (proposal):** the wordmark **THE ALPHA HOOD** in a condensed heavy typeface (Anton), all caps, letter-spacing +0.2em, plus a **mark**: a black "hood" pentagon (a house/hood shape: a square with a pointed top) with a white **A** inside. Use the mark alone for the favicon, app icon and small spaces, the wordmark + mark in the header, and the wordmark only on tags/packaging. Replace with the final logo when ready (keep the same slot sizes: header height 64 px, mark 28 px).
+- **Logo (final, kit v1 — 2026-11-24):** the hooded-wolf mark with an "A", plus the Anton wordmark. Masters in `docs/brand/logo-kit/` (SVG / PNG / PDF, brand sheet with usage rules); web copies in `public/brand/`. Header and light backgrounds: `primary-horizontal_color`; black backgrounds (footer, admin sidebar): `primary-horizontal_color-on-dark`; small spaces: the mark. Favicon, app icons, manifest and the share image come from the kit (`app/favicon.ico`, `app/icon.svg`, `app/apple-icon.png`, `app/opengraph-image.png`, `public/icons/`). Rules: don't stretch, rotate, recolour or place on busy backgrounds; clear space = the "A" height; minimum 16 px (mark) / 120 px wide (lockup). Kit colours: Alpha Black #0A0A0A, White, Wolf-eye Yellow #F5C80B, Alpha Red #E4002B. Slot sizes unchanged (header 64 px).
 
 ## 2. Design tokens
 

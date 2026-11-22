@@ -17,7 +17,13 @@ function AuthCard({ title, description, children }: { title: string; description
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4 py-10">
       <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-sm">
-        <p className="text-xs font-bold tracking-widest text-muted-foreground">THE ALPHA HOOD · ADMIN</p>
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/logo/primary-horizontal_color.svg" alt="The Alpha Hood" width={119} height={40} className="h-10 w-auto dark:hidden" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/logo/primary-horizontal_color-on-dark.svg" alt="The Alpha Hood" width={119} height={40} className="hidden h-10 w-auto dark:block" />
+          <span className="ml-auto text-xs font-bold tracking-widest text-muted-foreground">ADMIN</span>
+        </div>
         <h1 className="mt-2 text-xl font-semibold">{title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         <div className="mt-6">{children}</div>

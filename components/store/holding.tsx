@@ -1,8 +1,11 @@
+import { LogoMark } from "./logo";
+
 /** Shown in production until a real commerce platform + CMS are configured (never demo data). */
 export function Holding() {
   return (
     <section className="on-dark grid min-h-[70dvh] place-items-center bg-black px-6 text-center text-white">
       <div className="flex flex-col items-center gap-5">
+        <LogoMark tone="light" size={112} className="lg:size-40" />
         <h1 className="font-display text-[62px] uppercase leading-[0.86] text-volt lg:text-[148px]">
           Coming
           <br />

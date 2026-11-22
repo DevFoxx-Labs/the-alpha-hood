@@ -68,8 +68,15 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] Set GA4 data retention to 14 months (the Privacy Notice says so) and turn off Google signals unless wanted.
 - [ ] Merchant Center + Meta Commerce Manager: add `https://<domain>/feeds/products.xml` as a scheduled feed once real
       product photos exist; set shipping and returns in Merchant Center to match /help/shipping.
-- [ ] Brand assets: logo (for the icon, Organization data and OG images) and a favicon.
+- [x] Brand assets: logo kit received 2026-11-24 and wired in (favicon, icons, header/footer/admin, share image).
 - [ ] Review the draft About / FAQ / Shipping copy.
 - [ ] OK to add `@lhci/cli` (dev only) for the Lighthouse CI gate? Lighthouse mobile ≥ 90 is unmeasured until then.
 - [ ] At launch: set `SITE_URL`, then `ALLOW_INDEXING=true`, and submit `/sitemap.xml` in Search Console.
+
+## 2026-11-24 (logo kit)
+- [ ] Colours: switch the site's yellow accent to the kit's Wolf-eye Yellow #F5C80B and black to #0A0A0A? (today
+      `volt` #F4E04D and `ink` #111111 — small visible change).
+- [ ] Brand icons (bag, wishlist, delivery, returns, Alpha Club): use them in the UI instead of Hugeicons, or only as
+      brand art (e.g. the Alpha Club badge in M9)?
+- [ ] Before trademark filing: designer review of the master SVG and a trademark search (kit README).
 

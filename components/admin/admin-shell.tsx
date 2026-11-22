@@ -144,8 +144,16 @@ export function AdminShell({ title, children }: { title: string; children: React
               isCollapsed ? "w-14" : "w-56",
             )}
           >
-            <Link href="/admin" className="flex items-center justify-center px-4 py-[13px] font-bold tracking-wide text-sidebar-foreground">
-              {isCollapsed ? "AH" : "THE ALPHA HOOD"}
+            <Link href="/admin" aria-label="The Alpha Hood admin — dashboard" className="flex h-[57px] items-center justify-center px-3">
+              {/* Sidebar is always dark → the on-dark brand files. Fixed sizes, no layout shift. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={isCollapsed ? "/brand/logo/mark_color-on-dark.svg" : "/brand/logo/primary-horizontal_color-on-dark.svg"}
+                alt=""
+                width={isCollapsed ? 28 : 107}
+                height={isCollapsed ? 28 : 36}
+                className={isCollapsed ? "size-7" : "h-9 w-auto"}
+              />
             </Link>
             <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2">
               {nav.map((item, idx) =>
@@ -193,8 +201,12 @@ export function AdminShell({ title, children }: { title: string; children: React
 
             {/* Mobile topbar */}
             <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-3 md:hidden">
-              <Link href="/admin" className="text-sm font-bold tracking-wide">
-                THE ALPHA HOOD
+              <Link href="/admin" aria-label="The Alpha Hood admin — dashboard" className="flex items-center">
+                {/* Topbar follows the admin theme: colour mark on light, on-dark mark in dark mode. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/brand/logo/primary-horizontal_color.svg" alt="" width={95} height={32} className="h-8 w-auto dark:hidden" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/brand/logo/primary-horizontal_color-on-dark.svg" alt="" width={95} height={32} className="hidden h-8 w-auto dark:block" />
               </Link>
               <div className="flex items-center gap-1">
                 <button type="button" onClick={toggleTheme} aria-label="Toggle theme" className="rounded-md p-1.5 text-muted-foreground">

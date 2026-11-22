@@ -106,8 +106,11 @@
 - 🟠 Server-side event outbox and RUM samples are in memory (lost on restart) — durable outbox / table with the database.
 - 🟠 Help, About and FAQ copy is draft (owner + lawyer review); returns & cancellation pages redirect into the Refund &
   Cancellation Policy. Gift Cards and Alpha Club merch tiles still link to pages that don't exist yet (M9, P1).
-- 🟠 Icon / Organization logo / OG images are generated placeholders (`lib/seo/og.tsx`) — replace with brand assets;
-  `app/favicon.ico` is still the framework default.
+- 🟡 Brand icons from the logo kit (bag, wishlist, delivery, returns, Alpha Club) are in `public/brand/icons/` but not
+  used in the UI: the icon rule is Hugeicons only. Owner to decide (e.g. Alpha Club badge in M9 as a brand asset).
+- 🟡 Logo kit colours differ slightly from DESIGN.md tokens (kit yellow #F5C80B vs `volt` #F4E04D; kit black #0A0A0A
+  vs `ink` #111111). Tokens unchanged until the owner decides.
+- 🟡 Logo SVGs are ~22 KB gzipped each (traced paths). Fine for now; a designer-cleaned master would be lighter.
 - 🟡 Google product categories in the feed are mapped by category handle — check against the platform's final
   category list.
 - 🟡 Server-side GA4 purchase is not sent (browser `purchase` only, to avoid double counting); Google Ads enhanced
