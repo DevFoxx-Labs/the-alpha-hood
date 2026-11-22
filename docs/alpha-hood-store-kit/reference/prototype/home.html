@@ -1,0 +1,140 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="store.css"><style>
+body{width:1440px}
+.hero{position:relative;height:640px;background:#151515;overflow:hidden;display:flex;align-items:center}
+.hero .bg{position:absolute;inset:0;background:radial-gradient(70% 90% at 75% 50%,#3a3a38 0%,#151515 70%)}
+.hero .stripes{position:absolute;left:0;right:0;bottom:0;height:220px;background:repeating-linear-gradient(100deg,transparent 0 60px,rgba(255,255,255,.06) 60px 120px);transform:skewY(-4deg) translateY(40px)}
+.hero .fig{position:absolute;right:140px;bottom:-20px;width:460px;height:660px;background:transparent}
+.hero .fig svg.g{width:100%!important;height:100%!important;top:50%!important;filter:drop-shadow(0 30px 40px rgba(0,0,0,.5))}
+.hero .tx{position:relative;margin-left:120px;color:#fff}
+.hero .tx .k{font:600 13px var(--sans);letter-spacing:4px;text-transform:uppercase;color:#bdbdbd}
+.hero .tx h1{font:400 148px/0.86 var(--display);text-transform:uppercase;color:#F4E04D;margin:16px 0 14px;letter-spacing:1px}
+.hero .tx p{font:400 22px var(--sans);color:#e5e5e5;margin-bottom:30px}
+.hero .tx .btn{background:#fff;color:#000;border-color:#fff}
+.dots{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:8px}.dots i{width:28px;height:3px;background:rgba(255,255,255,.35)}.dots i:first-child{background:#fff}
+.arr{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.12);color:#fff;display:flex;align-items:center;justify-content:center}
+.sec{padding:64px 40px 0}
+.cats{display:grid;grid-template-columns:repeat(6,1fr);gap:18px;margin-top:34px}
+.ct{text-align:center}.ct b{font:600 14px var(--sans);letter-spacing:1.4px;text-transform:uppercase;display:block;margin-bottom:12px}
+.ct .ph{aspect-ratio:1/1.12;background:#fff}
+.shopall{display:inline-block;margin-top:18px;font:600 12px var(--sans);letter-spacing:1.4px;border-bottom:1.5px solid #000;padding-bottom:2px}
+.promo{margin-top:64px;height:300px;background:#EFEFED;display:grid;grid-template-columns:1fr 360px 1fr;align-items:center;overflow:hidden}
+.promo .a{font:400 76px/0.88 var(--display);text-transform:uppercase;text-align:right;padding-right:30px}
+.promo .b{font:400 78px/0.9 var(--display);text-transform:uppercase;padding-left:30px}
+.promo .b span{color:var(--accent)}
+.promo .m{height:300px}
+.tri{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:4px}
+.tl{position:relative;height:620px;overflow:hidden}
+.tl .ph{position:absolute;inset:0}
+.tl .ov{position:absolute;left:0;right:0;bottom:0;padding:120px 28px 28px;background:linear-gradient(transparent,rgba(0,0,0,.55));color:#fff;display:flex;justify-content:space-between;align-items:flex-end;z-index:2}
+.tl h3{font:400 54px/0.88 var(--display);text-transform:uppercase}
+.tl small{font:600 11px var(--sans);letter-spacing:1.6px;text-transform:uppercase;text-align:right;max-width:120px;line-height:1.4}
+.offers{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;padding:40px 40px 0}
+.of{position:relative;height:300px;background:#E9E9E6;overflow:hidden}
+.of .ph{position:absolute;left:0;top:0;bottom:0;width:58%;background:transparent}
+.of .t{position:absolute;right:18px;bottom:28px;text-align:right;font:400 30px/0.95 var(--display);text-transform:uppercase}
+.of .t b{display:block;font-size:40px;color:var(--accent);font-weight:400}
+.of.dk{background:#1a1a1a;color:#fff}
+.tabs{display:flex;gap:26px;margin:22px 0 22px;border-bottom:1px solid var(--line);font:500 13px var(--sans);letter-spacing:1px;text-transform:uppercase}
+.tabs span{padding-bottom:12px;color:var(--ink-2)}.tabs .on{color:#000;font-weight:700;border-bottom:2px solid #000}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:26px 18px}
+.look{display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:center;background:var(--soft);margin:72px 40px 0;padding:40px}
+.look .big{height:560px;position:relative}
+.hot{position:absolute;width:28px;height:28px;border-radius:50%;background:#fff;box-shadow:0 0 0 6px rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font:700 13px var(--sans);z-index:3}
+.lk{display:grid;grid-template-columns:110px 1fr auto;gap:16px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+.lk .ph{height:130px}
+.lk b{font:500 14px var(--sans);display:block}.lk span{font:700 14px var(--sans)}
+.club{margin:72px 40px 0;background:#0A0A0A;color:#fff;display:grid;grid-template-columns:1.2fr 1fr;padding:56px;gap:40px;align-items:center}
+.club h2{font:400 64px/0.9 var(--display);text-transform:uppercase}.club h2 span{color:#F4E04D}
+.club p{font:400 16px/1.6 var(--sans);color:#cfcfcf;margin:16px 0 26px;max-width:520px}
+.perks{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.perks div{border:1px solid #2c2c2c;padding:18px;font:500 14px/1.4 var(--sans);color:#e5e5e5;display:flex;gap:12px;align-items:flex-start}
+.perks svg.i{color:#F4E04D}
+.ugc{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-top:26px}
+.ugc .ph{aspect-ratio:1;position:relative}
+.trust{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:72px 40px 0}
+.trust > div{padding:28px 24px;display:flex;gap:14px;align-items:center;border-right:1px solid var(--line)}.trust > div:last-child{border:0}
+.trust b{font:700 13px var(--sans);letter-spacing:1px;text-transform:uppercase;display:block}.trust span{font:400 13px var(--sans);color:var(--ink-2)}
+.trust svg.i{width:28px;height:28px}
+.seo{padding:56px 40px 0}
+.seo h6{font:700 12px var(--sans);letter-spacing:1.4px;margin:18px 0 10px}
+.seo p{font:400 13px/2 var(--sans);color:var(--ink-2)}.seo p a{margin-right:6px}.seo p a::after{content:" |";color:#ccc}
+footer{background:#0A0A0A;color:#bdbdbd;margin-top:64px;padding:56px 40px 28px}
+.fg{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1.3fr;gap:30px;padding-bottom:40px;border-bottom:1px solid #262626}
+footer h6{font:700 12px var(--sans);letter-spacing:1.6px;color:#fff;margin-bottom:16px}
+footer a{display:block;font:400 14px/2.1 var(--sans)}
+footer .wm{color:#fff}footer .wm .mk{background:#fff;color:#000}
+.nl{display:flex;border-bottom:1px solid #555;margin-top:12px}.nl span{flex:1;padding:12px 0;font:400 14px var(--sans);color:#777}.nl b{font:700 12px var(--sans);letter-spacing:1.4px;color:#fff;align-self:center}
+.apps{display:flex;gap:10px;margin-top:18px}.apps span{border:1px solid #444;padding:8px 14px;font:600 12px var(--sans);color:#fff;display:flex;gap:6px;align-items:center}
+.pay{display:flex;gap:8px}.pay span{border:1px solid #333;padding:5px 9px;font:700 10.5px var(--sans);color:#ddd}
+.fb{display:flex;justify-content:space-between;align-items:center;padding-top:22px;font:400 12.5px var(--sans)}
+.storebtn{position:fixed}
+</style></head><body>
+<div class="ann"><span><b>FLAT 10% OFF</b> ON YOUR FIRST ORDER · CODE ALPHA10</span><i></i><span>FREE SHIPPING ABOVE ₹999</span><i></i><span>EASY 7-DAY RETURNS & EXCHANGES</span><i></i><span>COD AVAILABLE</span></div>
+<header class="hdr"><div class="l"><svg class="i" style="width:22px;height:22px" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M4 5h16" /> <path d="M4 12h16" /> <path d="M4 19h16" /> </svg><a>Menu</a><a>New In</a><a>Bestsellers</a><a style="color:var(--accent)">Sale</a></div>
+  <div class="wm"><span class="mk">A</span><div>THE ALPHA HOOD</div></div>
+  <div class="r"><a><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /> </svg></a><a><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" /> </svg></a><a><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" /> </svg></a><a><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="8" r="5" /> <path d="M20 21a8 8 0 0 0-16 0" /> </svg></a><a><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M16 10a4 4 0 0 1-8 0" /> <path d="M3.103 6.034h17.794" /> <path d="M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z" /> </svg><span class="ct">2</span></a></div></header>
+
+<section class="hero"><div class="bg"></div><div class="stripes"></div>
+  <div class="fig" data-look="#1c1c1c,#2d3f5a,#B98563" data-bg="transparent"></div>
+  <div class="tx"><div class="k">Winter Drop · 2026</div><h1>Own<br>the cold</h1><p>Layers built for the streets. Puffers, knits & heavyweight hoodies.</p><a class="btn">Shop the drop <svg class="i" style="width:18px;height:18px" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /> </svg></a></div>
+  <span class="arr" style="left:24px"><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m15 18-6-6 6-6" /> </svg></span><span class="arr" style="right:24px"><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m9 18 6-6-6-6" /> </svg></span>
+  <div class="dots"><i></i><i></i><i></i><i></i></div></section>
+
+<section class="sec"><div class="h-thin">Shop by</div><div class="h-sec" style="font-size:40px">Category</div><div class="ul"></div>
+  <div class="cats">
+    <div class="ct"><b>Oversized Tees</b><div data-g="oversized" data-c="#1b1b1b"></div></div>
+    <div class="ct"><b>Shirts</b><div data-g="check" data-c="#5c6670"></div></div>
+    <div class="ct"><b>Jeans</b><div data-g="baggy" data-c="#8fb3d1"></div></div>
+    <div class="ct"><b>Hoodies</b><div data-g="hoodie" data-c="#3a3a3c"></div></div>
+    <div class="ct"><b>Jackets</b><div data-g="puffer" data-c="#202020"></div></div>
+    <div class="ct"><b>Cargos</b><div data-g="cargo" data-c="#59603f"></div></div>
+  </div><a class="shopall">SHOP ALL</a></section>
+
+<section class="promo"><div class="a">Last call<br>on bestsellers</div><div class="m" data-look="#2d3f5a,#c8b99b,#C9946B" data-bg="#EFEFED"></div><div class="b">Up to <span>40%</span><br>off</div></section>
+<div class="tri">
+  <div class="tl"><div data-look="#5a1f2a,#1b1b1b,#B98563" data-bg="#7d8085"></div><div class="ov"><h3>Puffer<br>season</h3><small>Warmth with an attitude</small></div></div>
+  <div class="tl"><div data-look="#111,#c8b99b,#C9946B" data-bg="#b9b8b2"></div><div class="ov"><h3>Smart<br>casuals</h3><small>Monday to Friday, sorted</small></div></div>
+  <div class="tl"><div data-look="#e8e1cf,#2d3f5a,#8D5B3E" data-bg="#d7cfc2"></div><div class="ov"><h3>Knit<br>club</h3><small>Texture that talks</small></div></div>
+</div>
+
+<div class="offers">
+  <div class="of"><div data-g="trouser" data-c="#c8b99b" data-bg="transparent"></div><div class="t">Any 2<br>bottoms<b>₹2,999</b></div></div>
+  <div class="of dk"><div data-g="hoodie" data-c="#4a4a4a" data-bg="transparent"></div><div class="t">Combo<br>hoodies<b>2 for ₹2,499</b></div></div>
+  <div class="of"><div data-g="shades" data-c="#1b1b1b" data-bg="transparent"></div><div class="t">Sunglasses<br>starting<b>₹999</b></div></div>
+  <div class="of"><div data-g="oversized" data-c="#f2f0ea" data-bg="transparent"></div><div class="t">Any 3<br>tees<b>₹1,999</b></div></div>
+</div>
+
+<section class="sec"><div style="display:flex;justify-content:space-between;align-items:flex-end"><div class="h-sec" style="font-size:40px">Trending</div><a class="shopall">VIEW ALL</a></div>
+  <div class="tabs"><span class="on">All</span><span>Shirts</span><span>Jackets</span><span>Jeans</span><span>Sweaters</span><span>Trousers</span><span>T-Shirts</span><span>Hoodies</span><span>Shoes</span></div>
+  <div class="grid4" data-grid="0,8"></div></section>
+
+<section class="look"><div class="big" data-look="#3a3a3c,#59603f,#B98563" data-bg="#dcdcd8"><span class="hot" style="left:47%;top:34%">1</span><span class="hot" style="left:52%;top:66%">2</span><span class="hot" style="left:40%;top:92%">3</span></div>
+  <div><div class="cap" style="color:var(--accent)">Shop the look</div><div class="h-sec" style="font-size:52px;margin:10px 0 18px">The weekend<br>uniform</div>
+    <div class="lk"><div data-g="hoodie" data-c="#3a3a3c"></div><div><b>Essential Zip Hoodie — Charcoal</b><span>₹1,699</span></div><a class="btn sm out">Add</a></div>
+    <div class="lk"><div data-g="cargo" data-c="#59603f"></div><div><b>Relaxed Cargo Pants — Olive</b><span>₹1,899</span></div><a class="btn sm out">Add</a></div>
+    <div class="lk"><div data-g="sneaker" data-c="#2a2a2a"></div><div><b>Retro Low-Top Sneakers</b><span>₹2,499</span></div><a class="btn sm out">Add</a></div>
+    <a class="btn" style="width:100%;margin-top:20px">Add full look · ₹6,097 <span style="opacity:.7;font-weight:500">save 10%</span></a></div></section>
+
+<section class="sec"><div style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="h-thin">Fresh</div><div class="h-sec" style="font-size:40px">New arrivals</div><div class="ul"></div></div><a class="shopall">VIEW ALL</a></div>
+  <div class="grid4" data-grid="8,4" style="margin-top:28px"></div></section>
+
+<section class="club"><div><div class="cap" style="color:#F4E04D">Membership</div><h2 style="margin-top:12px">Join the <span>Alpha Club</span></h2><p>Free to join. Earn Hood Coins on every order, unlock early access to drops, birthday rewards and 30-day returns.</p><a class="btn" style="background:#F4E04D;color:#000;border-color:#F4E04D">Join free</a></div>
+  <div class="perks"><div><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M13.744 17.736a6 6 0 1 1-7.48-7.48" /> <path d="M15 6h1v4" /> <path d="m6.134 14.768.866-.5 2 3.464" /> <circle cx="16" cy="8" r="6" /> </svg>5% back as Hood Coins on every order</div><div><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z" /> </svg>Early access to every drop</div><div><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /> </svg>30-day easy returns</div><div><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 7v14" /> <path d="M20 11v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8" /> <path d="M7.5 7a1 1 0 0 1 0-5A4.8 8 0 0 1 12 7a4.8 8 0 0 1 4.5-5 1 1 0 0 1 0 5" /> <rect x="3" y="7" width="18" height="4" rx="1" /> </svg>Birthday month reward</div></div></section>
+
+<section class="sec"><div style="display:flex;justify-content:space-between;align-items:flex-end"><div class="h-sec" style="font-size:40px">#WearTheHood</div><span class="cap">Tag @thealphahood to get featured</span></div>
+  <div class="ugc"><div data-look="#1b1b1b,#8fb3d1,#B98563" data-bg="#cfc9bf"></div><div data-look="#5c6670,#1b1b1b,#C9946B" data-bg="#a9b0b8"></div><div data-look="#e8e1cf,#c8b99b,#8D5B3E" data-bg="#e3ddd0"></div><div data-look="#202020,#59603f,#B98563" data-bg="#8e9088"></div><div data-look="#7a5230,#2d3f5a,#C9946B" data-bg="#d6c8b4"></div><div data-look="#2f4a3a,#e8e1cf,#8D5B3E" data-bg="#c4cbc0"></div></div></section>
+
+<section class="trust"><div><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" /> <path d="M15 18H9" /> <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14" /> <circle cx="17" cy="18" r="2" /> <circle cx="7" cy="18" r="2" /> </svg><div><b>Free shipping</b><span>On orders above ₹999</span></div></div><div><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="20" height="12" x="2" y="6" rx="2" /> <circle cx="12" cy="12" r="2" /> <path d="M6 12h.01M18 12h.01" /> </svg><div><b>Cash on delivery</b><span>On eligible pincodes</span></div></div><div><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /> <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /> <path d="M16 16h5v5" /> </svg><div><b>7-day returns</b><span>Easy exchanges & refunds</span></div></div><div><svg class="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /> <path d="m9 12 2 2 4-4" /> </svg><div><b>Secure payments</b><span>UPI, cards, wallets, EMI</span></div></div></section>
+
+<section class="seo"><div class="cap">More about shopping at The Alpha Hood</div>
+  <h6>TOP CATEGORIES</h6><p><a>T-Shirts</a><a>Oversized T-Shirts</a><a>Shirts</a><a>Jeans</a><a>Baggy Jeans</a><a>Cargo Pants</a><a>Trousers</a><a>Hoodies</a><a>Sweaters</a><a>Jackets</a><a>Co-ords</a><a>Shorts</a><a>Sneakers</a><a>Sunglasses</a><a>Accessories</a></p>
+  <h6>POPULAR SEARCHES</h6><p><a>black oversized t-shirt</a><a>baggy jeans for men</a><a>korean trousers</a><a>linen shirts</a><a>check shirts</a><a>puffer jacket men</a><a>streetwear india</a><a>polo t-shirts</a><a>cargo pants men</a><a>white sneakers</a></p></section>
+
+<footer><div class="fg"><div><div class="wm"><span class="mk">A</span><div>THE ALPHA HOOD</div></div><p style="font:400 14px/1.6 var(--sans);margin-top:16px;max-width:300px">Streetwear & everyday menswear, designed in India. Built for the ones who lead.</p><div class="apps"><span><svg class="i" style="width:14px;height:14px" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" /> </svg>Google Play</span><span><svg class="i" style="width:14px;height:14px" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 6.528V3a1 1 0 0 1 1-1h0" /> <path d="M18.237 21A15 15 0 0 0 22 11a6 6 0 0 0-10-4.472A6 6 0 0 0 2 11a15.1 15.1 0 0 0 3.763 10 3 3 0 0 0 3.648.648 5.5 5.5 0 0 1 5.178 0A3 3 0 0 0 18.237 21" /> </svg>App Store</span></div></div>
+  <div><h6>SHOP</h6><a>New In</a><a>Bestsellers</a><a>T-Shirts</a><a>Jeans</a><a>Sale</a></div>
+  <div><h6>HELP</h6><a>Track order</a><a>Returns & exchanges</a><a>Shipping</a><a>Size guide</a><a>Contact us</a></div>
+  <div><h6>COMPANY</h6><a>About us</a><a>Alpha Club</a><a>Stores</a><a>Careers</a><a>Privacy policy</a><a>Terms</a></div>
+  <div><h6>GET 10% OFF YOUR FIRST ORDER</h6><div class="nl"><span>Enter your email or WhatsApp number</span><b>JOIN →</b></div><div style="display:flex;gap:14px;margin-top:22px;color:#fff"><span style="width:34px;height:34px;border:1px solid #444;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 11px Inter">IG</span><span style="width:34px;height:34px;border:1px solid #444;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 11px Inter">YT</span><span style="width:34px;height:34px;border:1px solid #444;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 11px Inter">FB</span><span style="width:34px;height:34px;border:1px solid #444;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 11px Inter">X</span></div></div></div>
+  <div class="fb"><span>© 2026 The Alpha Hood. All rights reserved.</span><div class="pay"><span>UPI</span><span>VISA</span><span>MASTERCARD</span><span>RUPAY</span><span>COD</span></div></div></footer>
+<script src="products.js"></script><script src="garments.js"></script>
+</body></html>

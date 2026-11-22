@@ -1,0 +1,49 @@
+/* The Alpha Hood — design tokens */
+:root{
+  --black:#0A0A0A; --ink:#111111; --ink-2:#4A4A4A; --muted:#8A8A8A; --line:#E6E6E6; --line-2:#F0F0F0;
+  --bg:#FFFFFF; --soft:#F4F4F2; --soft-2:#ECECEA; --accent:#E4002B; --accent-tint:#FDE8EC; --sale:#E4002B;
+  --gold:#C9A227; --green:#1F8A4C; --coupon:#FBEDEA;
+  --display:Anton,"Archivo Black",Impact,sans-serif; --sans:Inter,system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+svg.i{width:20px;height:20px;stroke-width:1.6;flex:none}
+.num{font-variant-numeric:tabular-nums}
+/* announcement + header */
+.ann{background:var(--black);color:#fff;height:34px;display:flex;align-items:center;justify-content:center;gap:28px;font:500 11.5px var(--sans);letter-spacing:1.4px;text-transform:uppercase}
+.ann b{color:#fff;font-weight:700}.ann i{width:4px;height:4px;border-radius:50%;background:#666;display:block}
+.hdr{height:64px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 40px;border-bottom:1px solid var(--line);background:#fff}
+.hdr .l{display:flex;align-items:center;gap:26px;font:600 12.5px var(--sans);letter-spacing:1.2px;text-transform:uppercase}
+.hdr .r{display:flex;align-items:center;gap:22px;justify-content:flex-end}
+.hdr .r a{position:relative}.hdr .r .ct{position:absolute;top:-6px;right:-8px;background:var(--black);color:#fff;font:700 9.5px var(--sans);width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.wm{font:400 24px/1 var(--display);letter-spacing:5px;text-transform:uppercase;display:flex;align-items:center;gap:10px}
+.wm small{font:600 8.5px var(--sans);letter-spacing:3px;display:block;text-align:center;margin-top:3px;color:var(--ink-2)}
+.wm .mk{width:28px;height:28px;background:var(--black);color:#fff;display:flex;align-items:center;justify-content:center;font:400 18px/1 var(--display);letter-spacing:0;clip-path:polygon(50% 0,100% 28%,100% 100%,0 100%,0 28%)}
+/* type */
+.disp{font:400 64px/0.92 var(--display);text-transform:uppercase;letter-spacing:.5px}
+.h-sec{font:400 34px/1 var(--display);text-transform:uppercase;letter-spacing:.5px}
+.h-thin{font:300 34px/1 var(--sans);text-transform:uppercase;letter-spacing:-.5px}
+.ul{height:3px;width:200px;background:var(--accent);margin-top:12px}
+.cap{font:600 11.5px var(--sans);letter-spacing:1.4px;text-transform:uppercase}
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 26px;background:var(--black);color:#fff;font:700 13px var(--sans);letter-spacing:1.6px;text-transform:uppercase;border:1.5px solid var(--black);white-space:nowrap}
+.btn.out{background:#fff;color:var(--black)}
+.btn.sm{height:36px;padding:0 14px;font-size:11.5px}
+/* product image placeholder */
+.ph{position:relative;overflow:hidden;background:var(--soft)}
+.ph svg.g{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);width:74%;height:74%;filter:drop-shadow(0 18px 18px rgba(0,0,0,.12))}
+.ph.model svg.g{width:92%;height:92%;top:56%}
+/* product card */
+.pc{position:relative}
+.pc .ph{aspect-ratio:3/4}
+.pc .wl{position:absolute;top:10px;right:10px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;z-index:2}
+.pc .wl svg.i{width:19px;height:19px}
+.pc .tag{position:absolute;top:10px;left:10px;background:#fff;font:700 9.5px var(--sans);letter-spacing:1.2px;padding:4px 7px;text-transform:uppercase;z-index:2}
+.pc .tag.r{background:var(--accent);color:#fff}
+.pc .nm{font:400 13px/1.35 var(--sans);margin-top:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:26px}
+.pc .pr{display:flex;align-items:center;gap:8px;margin-top:4px;font:700 13.5px var(--sans)}
+.pc .pr s{font-weight:400;color:var(--muted);font-size:12.5px}.pc .pr .off{color:var(--sale);font-weight:700;font-size:12px}
+.pc .add{position:absolute;right:0;bottom:2px;width:26px;height:26px;display:flex;align-items:center;justify-content:center}
+.sw{display:flex;gap:4px;margin-top:7px}.sw i{width:11px;height:11px;display:block;border:1px solid rgba(0,0,0,.15)}
+.rt{display:inline-flex;align-items:center;gap:3px;background:#fff;font:700 10.5px var(--sans);padding:3px 6px;position:absolute;left:10px;bottom:10px;z-index:2}

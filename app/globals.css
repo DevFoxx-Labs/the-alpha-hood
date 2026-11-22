@@ -1,26 +1,192 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * The Alpha Hood — design tokens (DESIGN.md §2).
+ * The UI is ~90% black/white/grey. Red (`accent`) only for price/discount/sale/urgency and the
+ * section underline. Yellow (`volt`) only on dark backgrounds or as a tile fill. No UI gradients.
+ * Corners are square everywhere except avatars, toggles, UPI app icons and phone-style elements.
+ */
+@theme {
+  /* 2.1 Colour */
+  --color-black: #0a0a0a;
+  --color-ink: #111111;
+  --color-ink-2: #4a4a4a;
+  --color-muted: #8a8a8a;
+  --color-line: #e6e6e6;
+  --color-line-2: #f0f0f0;
+  --color-white: #ffffff;
+  --color-soft: #f4f4f2;
+  --color-soft-2: #ececea;
+  --color-accent: #e4002b;
+  --color-accent-tint: #fde8ec;
+  --color-coupon: #fbedea;
+  --color-volt: #f4e04d;
+  --color-green: #1f8a4c;
+  --color-green-tint: #edf7f0;
+  --color-checkout: #f7f7f5;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* shadcn/ui semantic mapping (DESIGN.md §2.4) */
+  --color-background: #ffffff;
+  --color-foreground: #111111;
+  --color-primary: #0a0a0a;
+  --color-primary-foreground: #ffffff;
+  --color-destructive: #e4002b;
+  --color-border: #e6e6e6;
+  --color-input: #cfcfcf;
+  --color-ring: #0a0a0a;
+  --color-muted-foreground: #8a8a8a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #111111;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* 2.3 Motion */
+  --ease-out-store: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-shimmer: shimmer 1.2s linear infinite;
+
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* 2.2 Typography — next/font variables are set on <html> in app/layout.tsx */
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-anton), "Arial Narrow", Impact, sans-serif;
+}
+
+:root {
+  --radius: 0px;
+}
+
+/* Text styles from the DESIGN.md §2.2 table (mobile first, desktop from lg = 1024 px) */
+@utility type-label {
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  @media (width >= 64rem) {
+    font-size: 12.5px;
+  }
+}
+
+@utility type-button {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  @media (width >= 64rem) {
+    font-size: 13px;
+  }
+}
+
+@utility type-section {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  @media (width >= 64rem) {
+    font-size: 40px;
+  }
+}
+
+@utility type-section-lead {
+  font-family: var(--font-sans);
+  font-weight: 300;
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: -0.5px;
+  text-transform: uppercase;
+  @media (width >= 64rem) {
+    font-size: 34px;
+  }
+}
+
+@utility type-body {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--color-ink-2);
+  @media (width >= 64rem) {
+    font-size: 14px;
+    line-height: 1.7;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+
+  /* DESIGN.md §7: square buttons still need a visible focus. White outline on dark surfaces. */
+  :focus-visible {
+    outline: 2px solid var(--color-black);
+    outline-offset: 2px;
+  }
+  .on-dark :focus-visible {
+    outline-color: var(--color-white);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* HOME-01 hero: placeholder diagonal stripes (prototype) and the progress dash fill. */
+@layer components {
+  .hero-stripes {
+    background-image: repeating-linear-gradient(
+      115deg,
+      transparent 0 46px,
+      rgb(255 255 255 / 0.05) 46px 92px
+    );
+    mask-image: linear-gradient(to top, #000 0%, transparent 70%);
+  }
+  .hero-progress {
+    transform: scaleX(0);
+    transform-origin: left;
+    animation-name: hero-progress;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+  }
+  @keyframes hero-progress {
+    to {
+      transform: scaleX(1);
+    }
+  }
 }
