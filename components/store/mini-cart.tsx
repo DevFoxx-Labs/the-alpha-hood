@@ -5,36 +5,41 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import type { CartLine, Product, SizeOption } from "@/lib/commerce/types";
+import type { Product, SizeOption } from "@/lib/commerce/types";
 import { STORE_CONFIG } from "@/lib/config/store";
 import { formatINR } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { FreeShippingBar } from "./free-shipping-bar";
 import { GarmentArt } from "./garment-art";
 import { Price } from "./price";
-import { useStoreUI } from "./store-ui-provider";
+import { type BagLine, useStoreUI } from "./store-ui-provider";
 
 /**
  * GLB-06 / DESIGN.md §3 MiniCart drawer: right drawer 420 px — "YOUR BAG (n)", free-shipping progress,
- * line items, an upsell row, subtotal, VIEW BAG (outline) + CHECKOUT (black).
+ * line items, an upsell row, subtotal, VIEW BAG (outline) + CHECKOUT (black). Lines and amounts come from
+ * the server cart (re-validated on open — CART-05).
  */
 function InlineSelect({
   label,
   value,
   options,
   onChange,
+  disabled,
 }: {
   label: string;
   value: string;
   options: { value: string; label: string; disabled?: boolean }[];
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="relative inline-flex items-center border border-line">
       <span className="sr-only">{label}</span>
       <select
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="h-8 appearance-none bg-transparent py-0 pl-2 pr-6 text-[11.5px] font-semibold outline-none"
+        className="h-8 appearance-none bg-transparent py-0 pl-2 pr-6 text-[11.5px] font-semibold outline-none disabled:opacity-50"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value} disabled={o.disabled}>
@@ -47,27 +52,51 @@ function InlineSelect({
   );
 }
 
-function LineItem({ line, sizes }: { line: CartLine; sizes?: SizeOption[] }) {
-  const { updateLine, removeLine } = useStoreUI();
-  const sizeOptions = (sizes ?? [{ label: line.size, stock: 1 }]).map((s) => ({
+export function lineStatusText(line: BagLine): string | null {
+  if (line.status === "unavailable") return "Sold out — remove it to continue";
+  if (line.status === "quantity_reduced") return `Only ${line.available} left — quantity updated`;
+  if (line.status === "price_changed") return `Price changed from ${formatINR(line.previousPrice ?? line.price)}`;
+  return null;
+}
+
+export function LineItem({ line, onNavigate, children }: { line: BagLine; onNavigate?: () => void; children?: React.ReactNode }) {
+  const { updateLine, removeLine, cartBusy } = useStoreUI();
+  const sizes: SizeOption[] = line.sizes.length ? line.sizes : [{ label: line.size, stock: 1 }];
+  const sizeOptions = sizes.map((s) => ({
     value: s.label,
     label: `Size ${s.label}${s.stock === 0 ? " · sold out" : ""}`,
     disabled: s.stock === 0 && s.label !== line.size,
   }));
-  const qtyOptions = Array.from({ length: STORE_CONFIG.maxQtyPerSku }, (_, i) => ({
-    value: String(i + 1),
-    label: `Qty ${i + 1}`,
-  }));
+  const maxQty = Math.max(1, Math.min(STORE_CONFIG.maxQtyPerSku, line.available || line.quantity));
+  const qtyOptions = Array.from({ length: maxQty }, (_, i) => ({ value: String(i + 1), label: `Qty ${i + 1}` }));
+  const unavailable = line.status === "unavailable";
+  const note = lineStatusText(line);
+  const image = <GarmentArt image={line.image} className="h-28" />;
 
   return (
-    <li className="grid grid-cols-[88px_1fr] gap-3 border-b border-line-2 px-4 py-3">
-      <GarmentArt image={line.image} className="h-28" />
+    <li className={cn("grid grid-cols-[88px_1fr] gap-3 border-b border-line-2 px-4 py-3", unavailable && "opacity-70")}>
+      {line.handle ? (
+        <Link href={`/products/${line.handle}`} onClick={onNavigate} tabIndex={-1} aria-hidden="true">
+          {image}
+        </Link>
+      ) : (
+        image
+      )}
       <div className="min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-[13px] font-medium leading-snug">{line.title}</p>
+          <p className="text-[13px] font-medium leading-snug">
+            {line.handle ? (
+              <Link href={`/products/${line.handle}`} onClick={onNavigate} className="hover:underline">
+                {line.title}
+              </Link>
+            ) : (
+              line.title
+            )}
+          </p>
           <button
             type="button"
             onClick={() => removeLine(line.id)}
+            disabled={cartBusy}
             aria-label={`Remove ${line.title} from bag`}
             className="-mr-1.5 -mt-1 grid size-8 shrink-0 place-items-center text-ink-2 hover:text-ink"
           >
@@ -75,35 +104,42 @@ function LineItem({ line, sizes }: { line: CartLine; sizes?: SizeOption[] }) {
           </button>
         </div>
         <Price price={line.price} mrp={line.mrp} size="line" className="mt-1" />
-        <div className="mt-2 flex gap-1.5">
-          <InlineSelect
-            label={`Size for ${line.title}`}
-            value={line.size}
-            options={sizeOptions}
-            onChange={(size) => updateLine(line.id, { size })}
-          />
-          <InlineSelect
-            label={`Quantity for ${line.title}`}
-            value={String(line.quantity)}
-            options={qtyOptions}
-            onChange={(q) => updateLine(line.id, { quantity: Number(q) })}
-          />
-        </div>
+        {note ? (
+          <p role="status" className="mt-1.5 text-[11.5px] font-semibold text-accent">
+            {note}
+          </p>
+        ) : null}
+        {!unavailable ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <InlineSelect
+              label={`Size for ${line.title}`}
+              value={line.size}
+              options={sizeOptions}
+              disabled={cartBusy}
+              onChange={(size) => updateLine(line.id, { size })}
+            />
+            <InlineSelect
+              label={`Quantity for ${line.title}`}
+              value={String(line.quantity)}
+              options={qtyOptions}
+              disabled={cartBusy}
+              onChange={(q) => updateLine(line.id, { quantity: Number(q) })}
+            />
+          </div>
+        ) : null}
+        {children}
       </div>
     </li>
   );
 }
 
-export function MiniCart({
-  sizesByProduct = {},
-  upsell = [],
-}: {
-  sizesByProduct?: Record<string, SizeOption[]>;
-  upsell?: Product[];
-}) {
-  const { cartOpen, setCartOpen, lines, itemCount } = useStoreUI();
-  const subtotal = lines.reduce((sum, l) => sum + l.price * l.quantity, 0);
+export function MiniCart({ upsell = [] }: { upsell?: Product[] }) {
+  const { cartOpen, setCartOpen, lines, itemCount, cart } = useStoreUI();
+  const pricing = cart?.pricing;
+  const goods = pricing ? pricing.sellingTotal - pricing.automaticDiscount - pricing.comboDiscount - pricing.couponDiscount : 0;
   const close = () => setCartOpen(false);
+  const blocked = lines.some((l) => l.status === "unavailable");
+  const nudge = pricing?.comboProgress[0];
 
   return (
     <Sheet open={cartOpen} onOpenChange={setCartOpen}>
@@ -132,10 +168,18 @@ export function MiniCart({
         ) : (
           <>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-              <FreeShippingBar subtotal={subtotal} threshold={STORE_CONFIG.freeShippingThreshold} className="mx-4 my-3" />
+              <FreeShippingBar subtotal={goods} threshold={STORE_CONFIG.freeShippingThreshold} className="mx-4 my-3" />
+              {nudge ? (
+                <p className="mx-4 mb-2 bg-soft px-3 py-2 text-[12px]">
+                  Add {nudge.need} more for <b>{nudge.title.toLowerCase()}</b>.{" "}
+                  <Link href={`/collections/${nudge.collection}`} onClick={close} className="underline underline-offset-2">
+                    Shop combo
+                  </Link>
+                </p>
+              ) : null}
               <ul>
                 {lines.map((line) => (
-                  <LineItem key={line.id} line={line} sizes={sizesByProduct[line.productId]} />
+                  <LineItem key={line.id} line={line} onNavigate={close} />
                 ))}
               </ul>
 
@@ -162,9 +206,12 @@ export function MiniCart({
             <div className="shrink-0 border-t border-line px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-3">
               <div className="mb-3 flex items-baseline justify-between">
                 <span className="text-[12px] font-semibold uppercase tracking-[0.12em]">Subtotal</span>
-                <span className="tabular text-[17px] font-bold">{formatINR(subtotal)}</span>
+                <span className="tabular text-[17px] font-bold">{formatINR(goods)}</span>
               </div>
-              <p className="-mt-2 mb-3 text-[11.5px] text-muted">Shipping and coupons are applied at checkout.</p>
+              <p className="-mt-2 mb-3 text-[11.5px] text-muted">
+                {pricing && pricing.comboDiscount > 0 ? `Includes combo savings of ${formatINR(pricing.comboDiscount)}. ` : ""}
+                Shipping and payment offers are applied at checkout.
+              </p>
               <div className="grid grid-cols-2 gap-2">
                 <Button asChild variant="outline">
                   <Link href="/bag" onClick={close}>
@@ -172,8 +219,8 @@ export function MiniCart({
                   </Link>
                 </Button>
                 <Button asChild>
-                  <Link href="/checkout" onClick={close}>
-                    Checkout
+                  <Link href={blocked ? "/bag" : "/checkout"} onClick={close}>
+                    {blocked ? "Review bag" : "Checkout"}
                   </Link>
                 </Button>
               </div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Badge, LowStockNote } from "@/components/store/badges";
-import { CheckoutStep, DoneLine, PaymentPanel } from "@/components/store/checkout-blocks";
+import { CheckoutStep, DoneLine, PaymentMethods, type PaymentChoice } from "@/components/store/checkout-blocks";
 import { ColourPicker } from "@/components/store/colour-picker";
 import { CouponBox } from "@/components/store/coupon-box";
 import { DeliveryCheck } from "@/components/store/delivery-check";
@@ -126,7 +126,6 @@ export function ComponentShowcase({
     set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const chips = [...sizes.map((s) => `Size: ${s}`), ...fits, ...colours];
 
-  const sizesByProduct = Object.fromEntries(products.map((p) => [p.id, p.sizes]));
   const upsell = products.filter((p) => ["shades", "cap", "tee"].includes(p.images[0].art)).slice(0, 3);
 
   // Demo lines for the order summary (display only — real totals come from the server in M5).
@@ -151,7 +150,7 @@ export function ComponentShowcase({
     <div className="pb-24 lg:pb-0">
       <SiteHeader announcements={announcements} links={headerLinks} />
       <MenuDrawer menu={menu} />
-      <MiniCart sizesByProduct={sizesByProduct} upsell={upsell} />
+      <MiniCart upsell={upsell} />
 
       <div className="border-b border-line bg-soft px-4 py-6 lg:px-10">
         <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted">Dev only · M0 + M1 · not indexed</p>
@@ -535,7 +534,7 @@ export function ComponentShowcase({
               </RadioGroup>
             </CheckoutStep>
             <CheckoutStep number={3} title="Payment" aside="All transactions are encrypted">
-              <PaymentPanel payLabel={`Pay ${formatINR(toPay)} securely`} />
+              <DemoPayment payLabel={`Pay ${formatINR(toPay)} securely`} />
             </CheckoutStep>
           </div>
           <OrderSummary
@@ -584,4 +583,22 @@ export function ComponentShowcase({
 function MenuButton() {
   const { setMenuOpen } = useStoreUI();
   return <Button onClick={() => setMenuOpen(true)}>Open menu drawer</Button>;
+}
+
+/** Showcase-only wrapper: local state, the pay button just shows a toast (nothing is charged). */
+function DemoPayment({ payLabel }: { payLabel: string }) {
+  const [method, setMethod] = useState<PaymentChoice>("upi");
+  const [app, setApp] = useState("gpay");
+  return (
+    <PaymentMethods
+      value={method}
+      onChange={setMethod}
+      upiApp={app}
+      onUpiApp={setApp}
+      prepaidOffer="Extra 5% off"
+      cod={{ allowed: true, reasons: [], feeLabel: "₹49" }}
+      payLabel={payLabel}
+      onPay={() => showMessageToast("Demo only — nothing is charged on /dev/components")}
+    />
+  );
 }

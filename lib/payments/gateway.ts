@@ -1,0 +1,119 @@
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { mockPaymentsAllowed } from "@/lib/checkout/flags";
+import type { Paise } from "@/lib/format";
+import { BackendUnavailableError, devSingleton, type Env } from "@/lib/mock-guard";
+import type { PaymentMethod } from "@/lib/pricing/price-cart";
+
+/**
+ * Payment gateway (CHK-04/06) — Razorpay / Cashfree / PayU pending (PRD §9). Card, UPI, netbanking and wallet
+ * details are entered on the gateway's hosted page: no card data ever reaches our servers (PCI).
+ *
+ * Webhooks: HMAC-SHA256 over `${timestamp}.${rawBody}`, constant-time compare, ±5 min timestamp window
+ * (replay), event ids de-duplicated by the handler. Fails closed when no gateway is configured.
+ */
+export interface PaymentEvent {
+  id: string;
+  type: "payment.succeeded" | "payment.failed";
+  paymentId: string;
+  orderNumber: string;
+  amount: Paise;
+}
+
+export interface PaymentGateway {
+  readonly name: string;
+  createPayment(input: { orderNumber: string; amount: Paise; method: Exclude<PaymentMethod, "cod">; upiApp?: string }): Promise<{ paymentId: string; redirectUrl: string }>;
+  verifyWebhook(rawBody: string, signature: string | null, timestamp: string | null, now?: number): PaymentEvent | null;
+  fetchStatus(paymentId: string): Promise<{ status: "pending" | "succeeded" | "failed"; amount: Paise } | null>;
+}
+
+export const WEBHOOK_TOLERANCE_MS = 5 * 60_000;
+const PAYMENT_ID_RE = /^pay_[a-f0-9]{24}$/;
+const ORDER_RE = /^AH[0-9A-Z]{8}$/;
+
+function sign(secret: string, timestamp: string, body: string) {
+  return createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
+}
+
+export function parseEvent(raw: unknown): PaymentEvent | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const e = raw as Record<string, unknown>;
+  if (typeof e.id !== "string" || !/^evt_[a-f0-9]{24}$/.test(e.id)) return null;
+  if (e.type !== "payment.succeeded" && e.type !== "payment.failed") return null;
+  if (typeof e.paymentId !== "string" || !PAYMENT_ID_RE.test(e.paymentId)) return null;
+  if (typeof e.orderNumber !== "string" || !ORDER_RE.test(e.orderNumber)) return null;
+  if (!Number.isSafeInteger(e.amount) || (e.amount as number) < 0) return null;
+  return { id: e.id, type: e.type, paymentId: e.paymentId, orderNumber: e.orderNumber, amount: e.amount as number };
+}
+
+export function verifySignedBody(secret: string, rawBody: string, signature: string | null, timestamp: string | null, now = Date.now()) {
+  if (!secret || !signature || !timestamp || !/^\d{10,16}$/.test(timestamp) || !/^[a-f0-9]{64}$/.test(signature)) return null;
+  if (Math.abs(now - Number(timestamp)) > WEBHOOK_TOLERANCE_MS) return null;
+  const expected = Buffer.from(sign(secret, timestamp, rawBody), "hex");
+  const given = Buffer.from(signature, "hex");
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
+  try {
+    return parseEvent(JSON.parse(rawBody));
+  } catch {
+    return null;
+  }
+}
+
+// ── Demo gateway (development / protected previews only) ─────────────────────────────────────────
+
+export interface DemoGateway extends PaymentGateway {
+  /** What the demo "bank page" shows. */
+  describe(paymentId: string): { orderNumber: string; amount: Paise; method: string; status: string } | null;
+  /** Simulates the customer finishing payment and the gateway sending a signed webhook. */
+  simulate(paymentId: string, outcome: "succeeded" | "failed", now?: number): { rawBody: string; signature: string; timestamp: string } | null;
+}
+
+export function createDemoGateway(secret = randomBytes(32).toString("hex")): DemoGateway {
+  const payments = new Map<string, { orderNumber: string; amount: Paise; method: string; status: "pending" | "succeeded" | "failed" }>();
+  const hex = (n: number) => randomBytes(n).toString("hex");
+  return {
+    name: "demo",
+    async createPayment({ orderNumber, amount, method }) {
+      const paymentId = `pay_${hex(12)}`;
+      payments.set(paymentId, { orderNumber, amount, method, status: "pending" });
+      return { paymentId, redirectUrl: `/checkout/pay/${paymentId}` };
+    },
+    verifyWebhook(rawBody, signature, timestamp, now) {
+      return verifySignedBody(secret, rawBody, signature, timestamp, now);
+    },
+    async fetchStatus(paymentId) {
+      const p = payments.get(paymentId);
+      return p ? { status: p.status, amount: p.amount } : null;
+    },
+    describe(paymentId) {
+      if (!PAYMENT_ID_RE.test(paymentId)) return null;
+      const p = payments.get(paymentId);
+      return p ? { ...p } : null;
+    },
+    simulate(paymentId, outcome, now = Date.now()) {
+      const p = payments.get(paymentId);
+      if (!p || p.status !== "pending") return null;
+      p.status = outcome;
+      const rawBody = JSON.stringify({
+        id: `evt_${hex(12)}`,
+        type: outcome === "succeeded" ? "payment.succeeded" : "payment.failed",
+        paymentId,
+        orderNumber: p.orderNumber,
+        amount: p.amount,
+      });
+      const timestamp = String(now);
+      return { rawBody, signature: sign(secret, timestamp, rawBody), timestamp };
+    },
+  };
+}
+
+export function resolveGateway(env: Env = process.env): PaymentGateway {
+  if (mockPaymentsAllowed(env)) return devSingleton("demo_gateway", () => createDemoGateway());
+  const fail = async (): Promise<never> => {
+    throw new BackendUnavailableError("Payment gateway");
+  };
+  return { name: "disabled", createPayment: fail, verifyWebhook: () => null, fetchStatus: fail };
+}
+
+export function isDemoGateway(g: PaymentGateway): g is DemoGateway {
+  return g.name === "demo" && "simulate" in g;
+}

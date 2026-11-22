@@ -1,5 +1,4 @@
 import { CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
-import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import type { ProductImage } from "@/lib/commerce/types";
 import { GarmentArt } from "./garment-art";
@@ -14,13 +13,16 @@ export function ReviewSummary({
   count,
   distribution,
   fit,
+  footer,
 }: {
   average: number;
   count: number;
   /** Percent per star, index 0 = 5★ … 4 = 1★. */
   distribution: [number, number, number, number, number];
-  /** 0 = runs small, 0.5 = true to size, 1 = runs large. */
-  fit: number;
+  /** 0 = runs small, 0.5 = true to size, 1 = runs large; null hides the meter. */
+  fit: number | null;
+  /** e.g. the "verified buyers only" note or a WRITE A REVIEW button (M6). */
+  footer?: React.ReactNode;
 }) {
   return (
     <div className="max-w-[320px]">
@@ -45,6 +47,7 @@ export function ReviewSummary({
           </li>
         ))}
       </ul>
+      {fit !== null ? (
       <div className="mt-5">
         <p className="text-[12px] font-semibold">How it fits</p>
         <div className="relative mt-3 h-px bg-line" aria-hidden="true">
@@ -59,9 +62,8 @@ export function ReviewSummary({
           Fit: {fit < 0.4 ? "runs small" : fit > 0.6 ? "runs large" : "true to size"}
         </p>
       </div>
-      <Button variant="outline" className="mt-5 w-full">
-        Write a review
-      </Button>
+      ) : null}
+      {footer ? <div className="mt-5">{footer}</div> : null}
     </div>
   );
 }

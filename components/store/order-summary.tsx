@@ -2,6 +2,7 @@ import { Cancel01Icon, DeliveryTruck01Icon, RefreshIcon, Shield01Icon, Ticket01I
 import { Icon } from "@/components/ui/icon";
 import { Switch } from "@/components/ui/switch";
 import type { CartLine } from "@/lib/commerce/types";
+import { STORE_CONFIG } from "@/lib/config/store";
 import { formatINR, type Paise } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { GarmentArt } from "./garment-art";
@@ -33,7 +34,7 @@ export function OrderSummary({
   rows: SummaryRow[];
   toPay: Paise;
   saving: Paise;
-  coupon?: { code: string; amount: Paise };
+  coupon?: { code: string; amount: Paise; onRemove?: () => void };
   coins?: { count: number; amount: Paise };
   className?: string;
 }) {
@@ -67,9 +68,11 @@ export function OrderSummary({
             <Icon icon={Ticket01Icon} size={17} />
             <span className="flex-1">{coupon.code} applied</span>
             <span className="tabular text-ink">−{formatINR(coupon.amount)}</span>
-            <button type="button" aria-label={`Remove coupon ${coupon.code}`} className="grid size-6 place-items-center text-ink">
-              <Icon icon={Cancel01Icon} size={14} />
-            </button>
+            {coupon.onRemove ? (
+              <button type="button" onClick={coupon.onRemove} aria-label={`Remove coupon ${coupon.code}`} className="grid size-6 place-items-center text-ink">
+                <Icon icon={Cancel01Icon} size={14} />
+              </button>
+            ) : null}
           </p>
         ) : null}
         {coins ? (
@@ -103,7 +106,7 @@ export function OrderSummary({
       <ul className="flex flex-wrap justify-around gap-2 border-t border-line px-4 py-3 text-[11.5px] text-ink-2">
         <li className="flex items-center gap-1.5">
           <Icon icon={RefreshIcon} size={15} />
-          7-day returns
+          {STORE_CONFIG.returnWindowDays}-day returns
         </li>
         <li className="flex items-center gap-1.5">
           <Icon icon={Shield01Icon} size={15} />
@@ -111,7 +114,7 @@ export function OrderSummary({
         </li>
         <li className="flex items-center gap-1.5">
           <Icon icon={DeliveryTruck01Icon} size={15} />
-          Free shipping
+          Free size exchange
         </li>
       </ul>
     </aside>

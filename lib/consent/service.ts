@@ -144,3 +144,31 @@ export function publicHistory(records: ConsentRecord[]) {
     created_at: r.created_at,
   }));
 }
+
+/**
+ * Required consent at account creation (DPDP rule §2–3): one-tap OTP sign-up shows "By continuing you agree
+ * to the Terms and Privacy Notice" next to the button; this records it with the notice versions shown.
+ */
+export async function recordAccountConsent(
+  ledger: ConsentLedger,
+  input: { userId: string; visitorId: string | null; ctx: RequestContext; now?: Date },
+): Promise<ConsentRecord> {
+  const [record] = await ledger.append(
+    [
+      {
+        user_id: input.userId,
+        visitor_id: input.visitorId,
+        subscriber_id: null,
+        purpose: "terms_privacy",
+        status: "granted",
+        method: "signup_notice",
+        source: input.ctx.source,
+        notice_version: noticeVersion(["terms", "privacy"]),
+        ip_address: input.ctx.ip,
+        user_agent: input.ctx.userAgent,
+      },
+    ],
+    input.now,
+  );
+  return record;
+}

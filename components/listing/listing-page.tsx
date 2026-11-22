@@ -28,6 +28,29 @@ export interface RailItem {
 
 const gutter = "mx-auto max-w-[1440px] px-2.5 lg:px-10";
 
+export function Breadcrumbs({ crumbs, className }: { crumbs: Crumb[]; className?: string }) {
+  return (
+  <nav aria-label="Breadcrumb" className={className}>
+      <ol className="flex flex-wrap items-center gap-1 text-[12px] text-ink-2">
+        {crumbs.map((c, i) => (
+          <li key={c.label} className="flex items-center gap-1">
+            {i > 0 ? <span aria-hidden="true">/</span> : null}
+            {c.href ? (
+              <Link href={c.href} className="hover:text-ink hover:underline">
+                {c.label}
+              </Link>
+            ) : (
+              <span aria-current="page" className="font-semibold text-ink">
+                {c.label}
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
 /** PLP-01 header: breadcrumbs, Anton H1 + muted style count, optional sub-category image rail. */
 export function ListingHeader({
   crumbs,
@@ -44,24 +67,7 @@ export function ListingHeader({
 }) {
   return (
     <header className={cn(gutter, "pt-5 lg:pt-6")}>
-      <nav aria-label="Breadcrumb" className="px-1.5 lg:px-0">
-        <ol className="flex flex-wrap items-center gap-1 text-[12px] text-ink-2">
-          {crumbs.map((c, i) => (
-            <li key={c.label} className="flex items-center gap-1">
-              {i > 0 ? <span aria-hidden="true">/</span> : null}
-              {c.href ? (
-                <Link href={c.href} className="hover:text-ink hover:underline">
-                  {c.label}
-                </Link>
-              ) : (
-                <span aria-current="page" className="font-semibold text-ink">
-                  {c.label}
-                </span>
-              )}
-            </li>
-          ))}
-        </ol>
-      </nav>
+      <Breadcrumbs crumbs={crumbs} className="px-1.5 lg:px-0" />
       <div className="mt-2 flex items-baseline gap-2.5 px-1.5 lg:px-0">
         <h1 className="font-display text-[34px] uppercase leading-none lg:text-[52px]">{title}</h1>
         {count !== undefined ? <span className="tabular text-[13px] text-ink-2 lg:text-[16px]">{count} styles</span> : null}

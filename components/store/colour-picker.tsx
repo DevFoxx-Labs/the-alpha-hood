@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useId } from "react";
 import type { Colour, GarmentKind } from "@/lib/commerce/types";
 import { cn } from "@/lib/utils";
@@ -18,7 +19,8 @@ export function ColourPicker({
 }: {
   colours: Colour[];
   value: string;
-  onChange: (name: string) => void;
+  /** Button mode (showcase). Omit when every colour has a `handle` — the picker then renders links. */
+  onChange?: (name: string) => void;
   art: GarmentKind;
   className?: string;
 }) {
@@ -28,9 +30,31 @@ export function ColourPicker({
       <p id={labelId} className="mb-2.5 text-[11.5px] font-bold uppercase tracking-[0.12em] lg:text-[12px]">
         Colour <span className="font-medium normal-case tracking-normal text-ink-2">· {value}</span>
       </p>
-      <div role="radiogroup" aria-labelledby={labelId} className="flex flex-wrap gap-2.5">
+      <div role={onChange ? "radiogroup" : "list"} aria-labelledby={labelId} className="flex flex-wrap gap-2.5">
         {colours.map((c) => {
           const selected = c.name === value;
+          const thumb = <GarmentArt image={{ art, colour: c.hex, alt: "" }} className="h-20 w-[62px]" />;
+          const ring = cn(
+            "outline-offset-2 transition-[outline-color]",
+            selected ? "outline-2 outline-black [outline-style:solid]" : "hover:outline-1 hover:outline-line hover:[outline-style:solid]",
+          );
+          if (!onChange && c.handle) {
+            return (
+              <Link
+                key={c.name}
+                role="listitem"
+                href={`/products/${c.handle}`}
+                replace
+                scroll={false}
+                aria-current={selected ? "true" : undefined}
+                aria-label={c.name}
+                title={c.name}
+                className={ring}
+              >
+                {thumb}
+              </Link>
+            );
+          }
           return (
             <button
               key={c.name}
@@ -39,7 +63,7 @@ export function ColourPicker({
               aria-checked={selected}
               aria-label={c.name}
               title={c.name}
-              onClick={() => onChange(c.name)}
+              onClick={() => onChange?.(c.name)}
               className={cn(
                 "outline-offset-2 transition-[outline-color]",
                 selected ? "outline-2 outline-black [outline-style:solid]" : "hover:outline-1 hover:outline-line hover:[outline-style:solid]",

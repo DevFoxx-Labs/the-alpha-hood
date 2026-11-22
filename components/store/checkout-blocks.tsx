@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Calendar03Icon,
   CheckmarkCircle02Icon,
   CreditCardIcon,
   BankIcon,
@@ -13,13 +12,12 @@ import {
 import { Tabs as TabsPrimitive } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 /**
  * DESIGN.md §3 Checkout blocks: white boxes with a 1 px line border on #F7F7F5, numbered black circles,
  * payment = left method list (active: 3 px black left border; UPI shows "EXTRA 5% OFF" in green) +
- * right panel. Presentational for M1 — no payment logic, nothing is submitted. M5 wires the gateway.
+ * right panel. Controlled components; the checkout page (M5) owns the state and talks to the server.
  */
 export function CheckoutStep({
   number,
@@ -62,23 +60,59 @@ export function DoneLine({ children }: { children: React.ReactNode }) {
 }
 
 const METHODS = [
-  { id: "upi", label: "UPI", icon: SmartPhone01Icon, offer: "Extra 5% off" },
-  { id: "card", label: "Credit / Debit card", icon: CreditCardIcon },
-  { id: "netbanking", label: "Net banking", icon: BankIcon },
-  { id: "wallets", label: "Wallets", icon: Wallet01Icon },
-  { id: "emi", label: "EMI / Pay later", icon: Calendar03Icon },
-  { id: "cod", label: "Cash on delivery", icon: Money03Icon },
+  { id: "upi", label: "UPI", icon: SmartPhone01Icon, hint: "GPay, PhonePe, Paytm or any UPI app" },
+  { id: "card", label: "Credit / Debit card", icon: CreditCardIcon, hint: "Visa, Mastercard, RuPay" },
+  { id: "netbanking", label: "Net banking", icon: BankIcon, hint: "All major banks" },
+  { id: "wallet", label: "Wallets", icon: Wallet01Icon, hint: "Paytm, Mobikwik and more" },
+  { id: "cod", label: "Cash on delivery", icon: Money03Icon, hint: "Pay when it arrives" },
 ] as const;
 
-/** Neutral app tiles — brand logos are assets and are added with real, licensed artwork in M5. */
-const UPI_APPS = ["GPay", "PhonePe", "Paytm", "Other UPI"];
+export type PaymentChoice = (typeof METHODS)[number]["id"];
 
-export function PaymentPanel({ payLabel }: { payLabel: string }) {
+/** Neutral UPI app tiles — real brand logos need licensed artwork (docs/known-gaps.md). */
+const UPI_APPS = [
+  { id: "gpay", label: "GPay" },
+  { id: "phonepe", label: "PhonePe" },
+  { id: "paytm", label: "Paytm" },
+  { id: "other", label: "Other UPI" },
+] as const;
+
+/**
+ * CHK-04 payment step: method list (UPI first, with the prepaid offer) + a right panel with the pay button.
+ * Card / UPI / bank details are entered on the payment partner's secure page, never on ours (PCI).
+ * COD shows its fee or why it isn't available (CHK-07).
+ */
+export function PaymentMethods({
+  value,
+  onChange,
+  upiApp,
+  onUpiApp,
+  prepaidOffer,
+  cod,
+  payLabel,
+  onPay,
+  busy = false,
+  disabledReason,
+}: {
+  value: PaymentChoice;
+  onChange: (v: PaymentChoice) => void;
+  upiApp: string;
+  onUpiApp: (v: string) => void;
+  /** e.g. "Extra 5% off" shown next to UPI. */
+  prepaidOffer?: string;
+  cod: { allowed: boolean; reasons: string[]; feeLabel: string } | null;
+  payLabel: string;
+  onPay: () => void;
+  busy?: boolean;
+  disabledReason?: string | null;
+}) {
+  const codBlocked = cod !== null && !cod.allowed;
   return (
     <TabsPrimitive.Root
-      defaultValue="upi"
+      value={value}
+      onValueChange={(v) => onChange(v as PaymentChoice)}
       orientation="vertical"
-      className="grid border border-line md:grid-cols-[minmax(0,300px)_1fr]"
+      className="grid border border-line md:grid-cols-[minmax(0,280px)_1fr]"
     >
       <TabsPrimitive.List aria-label="Payment method" className="flex flex-col border-b border-line md:border-b-0 md:border-r">
         {METHODS.map((m) => (
@@ -89,51 +123,68 @@ export function PaymentPanel({ payLabel }: { payLabel: string }) {
           >
             <Icon icon={m.icon} size={18} />
             <span className="flex-1">{m.label}</span>
-            {"offer" in m ? (
-              <span className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-green">{m.offer}</span>
+            {m.id === "upi" && prepaidOffer ? (
+              <span className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-green">{prepaidOffer}</span>
             ) : null}
+            {m.id === "cod" && codBlocked ? <span className="text-[10.5px] text-muted">Unavailable</span> : null}
           </TabsPrimitive.Trigger>
         ))}
       </TabsPrimitive.List>
 
-      <TabsPrimitive.Content value="upi" className="p-4 outline-none lg:p-6">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {UPI_APPS.map((app, i) => (
-            <button
-              key={app}
-              type="button"
-              aria-pressed={i === 0}
-              className={cn(
-                "flex h-[70px] flex-col items-center justify-center gap-1.5 border text-[12.5px] font-medium",
-                i === 0 ? "border-2 border-black" : "border-line hover:border-ink-2",
-              )}
-            >
-              <span aria-hidden="true" className="size-6 rounded-md bg-soft-2" />
-              {app}
-            </button>
-          ))}
-        </div>
-        <p className="my-4 flex items-center gap-3 text-[12px] text-muted before:h-px before:flex-1 before:bg-line after:h-px after:flex-1 after:bg-line">
-          or pay with UPI ID
-        </p>
-        <div className="flex border border-input focus-within:border-black">
-          <Input aria-label="UPI ID" placeholder="yourname@upi" className="border-0" autoComplete="off" />
-          <button type="button" className="px-4 text-[11.5px] font-bold uppercase tracking-[0.12em]">
-            Verify
-          </button>
-        </div>
-        <p className="mt-4 flex items-center gap-2 bg-green-tint px-3 py-2.5 text-[12.5px] font-medium text-green">
-          <Icon icon={CheckmarkCircle02Icon} size={16} />
-          Demo: UPI savings note appears here
-        </p>
-        <Button size="lg" className="mt-4 w-full" type="button">
-          <Icon icon={SquareLock02Icon} size={18} />
-          {payLabel}
-        </Button>
-      </TabsPrimitive.Content>
-      {METHODS.slice(1).map((m) => (
-        <TabsPrimitive.Content key={m.id} value={m.id} className="p-6 text-[13px] text-ink-2 outline-none">
-          {m.label} — wired up with the payment gateway in milestone M5.
+      {METHODS.map((m) => (
+        <TabsPrimitive.Content key={m.id} value={m.id} className="p-4 outline-none lg:p-6">
+          {m.id === "upi" ? (
+            <div role="radiogroup" aria-label="UPI app" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {UPI_APPS.map((app) => (
+                <button
+                  key={app.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={upiApp === app.id}
+                  onClick={() => onUpiApp(app.id)}
+                  className={cn(
+                    "flex h-[70px] flex-col items-center justify-center gap-1.5 border text-[12.5px] font-medium",
+                    upiApp === app.id ? "border-2 border-black" : "border-line hover:border-ink-2",
+                  )}
+                >
+                  <span aria-hidden="true" className="size-6 rounded-md bg-soft-2" />
+                  {app.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[13px] text-ink-2">{m.hint}</p>
+          )}
+
+          {m.id === "cod" ? (
+            codBlocked ? (
+              <ul className="mt-3 space-y-1 text-[13px] text-accent" role="status">
+                {cod!.reasons.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-[12.5px] text-ink-2">A {cod?.feeLabel ?? "small"} cash handling fee applies. Your phone is already verified.</p>
+            )
+          ) : (
+            <p className="mt-4 flex items-center gap-2 text-[12px] text-ink-2">
+              <Icon icon={SquareLock02Icon} size={15} />
+              You&apos;ll complete the payment on our payment partner&apos;s secure page.
+            </p>
+          )}
+
+          {m.id === "upi" && prepaidOffer ? (
+            <p className="mt-4 flex items-center gap-2 bg-green-tint px-3 py-2.5 text-[12.5px] font-medium text-green">
+              <Icon icon={CheckmarkCircle02Icon} size={16} />
+              {prepaidOffer} applied to your total
+            </p>
+          ) : null}
+
+          <Button size="lg" className="mt-4 w-full" type="button" onClick={onPay} loading={busy} disabled={!!disabledReason || (m.id === "cod" && codBlocked)}>
+            <Icon icon={SquareLock02Icon} size={18} />
+            {payLabel}
+          </Button>
+          {disabledReason ? <p className="mt-2 text-[12px] text-ink-2">{disabledReason}</p> : null}
         </TabsPrimitive.Content>
       ))}
     </TabsPrimitive.Root>

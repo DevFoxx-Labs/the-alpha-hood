@@ -63,7 +63,17 @@ describe("public write guards (CSRF, size, content type)", () => {
     walk(join(process.cwd(), "app", "api"));
     const writes = routes.filter((r) => /export async function (POST|PUT|PATCH|DELETE)\b/.test(readFileSync(r, "utf8")));
     expect(writes.length).toBeGreaterThanOrEqual(4);
-    for (const r of writes) expect(readFileSync(r, "utf8"), r).toContain("guardPublicWrite(");
+    // Server-to-server webhooks can't pass a same-origin check; they must verify a signature instead.
+    const WEBHOOKS = [join("payments", "webhook", "route.ts")];
+    for (const r of writes) {
+      const src = readFileSync(r, "utf8");
+      if (WEBHOOKS.some((w) => r.endsWith(w))) {
+        expect(src, r).toContain("verifyWebhook(");
+        expect(src, r).toContain("rateLimiter.hit(");
+      } else {
+        expect(src, r).toContain("guardPublicWrite(");
+      }
+    }
   });
 });
 

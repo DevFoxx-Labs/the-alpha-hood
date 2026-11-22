@@ -1,4 +1,4 @@
-import { type Env, mockDataAllowed } from "@/lib/mock-guard";
+import { devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 import { createMockAdapter } from "./mock";
 import type { CommerceAdapter } from "./types";
 
@@ -19,7 +19,8 @@ export function resolveCommerce(env: Env): CommerceAdapter {
           "Mock commerce is disabled in production. Set COMMERCE_PROVIDER to a real platform.",
         );
       }
-      return createMockAdapter();
+      // One instance per process: carts and stock must be shared by every route bundle.
+      return devSingleton("commerce_mock", createMockAdapter);
     }
     default:
       throw new Error(`Unknown COMMERCE_PROVIDER "${provider}"`);
@@ -37,6 +38,7 @@ function refusingAdapter(message: string): CommerceAdapter {
   return {
     name: "disabled",
     getProduct: fail,
+    getProductById: fail,
     listProducts: fail,
     getCollection: fail,
     listCollections: fail,
@@ -45,6 +47,7 @@ function refusingAdapter(message: string): CommerceAdapter {
     getCategory: fail,
     searchCatalog: fail,
     suggest: fail,
-    cart: { get: fail, create: fail, addLine: fail, updateLine: fail, removeLine: fail },
+    cart: { get: fail, create: fail, addLine: fail, updateLine: fail, removeLine: fail, setCoupon: fail, refreshLine: fail, clear: fail },
+    inventory: { available: fail, reserve: fail, commit: fail, release: fail, isHeld: fail },
   };
 }

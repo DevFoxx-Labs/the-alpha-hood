@@ -38,6 +38,8 @@ export interface ProductImage {
   alt: string;
   art: GarmentKind;
   colour: string;
+  /** Placeholder shot type until photography exists (front / back / detail close-up / on model). */
+  view?: "front" | "back" | "detail" | "model";
 }
 
 export interface SizeOption {
@@ -73,7 +75,20 @@ export interface Product {
   popularity: number;
   /** Search keywords / synonyms beyond the title. */
   tags: string[];
+  /** Colour group: every colour of a style shares it (reviews, size chart). */
+  styleId: string;
+  sku: string;
+  description: string;
+  /** PDP-07 Specifications (label → value), e.g. Collar: Spread. */
+  specs: { label: string; value: string }[];
+  sizeChart: SizeChartKind;
+  /** e.g. { height: "6'0\"", size: "M" } — shown as the fit note (PDP-03). */
+  model?: { height: string; size: string };
+  /** Legal Metrology declarations (PDP-07). Never invented: placeholders until the supplier provides them. */
+  legal: { manufacturer: string; packer?: string; importer?: string; countryOfOrigin: string; netQuantity: string };
 }
+
+export type SizeChartKind = "tops" | "bottoms" | "shoes" | "none";
 
 export interface ProductAttributes {
   fit?: string;
@@ -108,6 +123,8 @@ export interface Collection {
 export interface CartLine {
   id: string;
   productId: string;
+  /** Product page handle (link back from the bag). */
+  handle?: string;
   title: string;
   colour: string;
   size: string;
@@ -125,6 +142,8 @@ export interface Cart {
   /** Sum of line MRP × quantity. */
   totalMrp: Paise;
   itemCount: number;
+  /** Coupon code the shopper applied (re-evaluated on every read). */
+  couponCode?: string | null;
 }
 
 export interface ListOptions {
@@ -138,6 +157,7 @@ export interface ListOptions {
 export interface CommerceAdapter {
   readonly name: string;
   getProduct(handle: string): Promise<Product | null>;
+  getProductById(id: string): Promise<Product | null>;
   listProducts(options?: ListOptions): Promise<{ products: Product[]; total: number }>;
   getCollection(handle: string): Promise<Collection | null>;
   /** Featured categories for the homepage rail (HOME-02). */
@@ -156,8 +176,25 @@ export interface CommerceAdapter {
     addLine(cartId: string, input: { productId: string; size: string; quantity: number }): Promise<Cart>;
     updateLine(cartId: string, lineId: string, input: { quantity?: number; size?: string }): Promise<Cart>;
     removeLine(cartId: string, lineId: string): Promise<Cart>;
+    setCoupon(cartId: string, code: string | null): Promise<Cart>;
+    /** CART-05: re-copy price/MRP from the catalogue and clamp quantity to what's available. */
+    refreshLine(cartId: string, lineId: string, input: { quantity: number }): Promise<Cart>;
+    /** Empties the cart after an order is placed. */
+    clear(cartId: string): Promise<void>;
   };
-  // checkout.* and customer.* are added with milestones M5 / M6.
+  /** Stock with reservations (ADM-02: held for 15 minutes during checkout). */
+  inventory: {
+    /** Units available to sell now (stock − active reservations − sold). */
+    available(productId: string, size: string, now?: Date): Promise<number>;
+    /** All-or-nothing reservation; throws CommerceError("out_of_stock") if any line can't be held. */
+    reserve(reference: string, items: { productId: string; size: string; quantity: number }[], ttlMs: number, now?: Date): Promise<void>;
+    /** Converts a reservation into a sale. Idempotent. */
+    commit(reference: string): Promise<void>;
+    /** Releases a reservation (payment failed / expired / cancelled). Idempotent. */
+    release(reference: string): Promise<void>;
+    /** True if the reservation exists and has not expired or been released. */
+    isHeld(reference: string, now?: Date): Promise<boolean>;
+  };
 }
 
 export class CommerceError extends Error {

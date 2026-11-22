@@ -40,3 +40,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 !.env.example
+# Non-secret local flags only (kill switches on for `next dev`). Never put secrets in it.
+!.env.development

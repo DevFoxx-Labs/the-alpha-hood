@@ -17,18 +17,20 @@ export interface DeliveryEstimate {
 
 /**
  * PDP-05 / DESIGN.md §3 DeliveryCheck: pincode input with a red CHECK/CHANGE text button; results with
- * check icons, date in green. `onCheck` is supplied by the caller (shipping adapter in M4); the mock
- * on /dev/components returns a fixed estimate. The pincode is not stored here.
+ * check icons, date in green. `onCheck` is supplied by the caller (PDP: /api/delivery). Storing the pincode
+ * (device only) is the caller's choice.
  */
 export function DeliveryCheck({
   onCheck,
+  initialPincode = "",
   className,
 }: {
   onCheck: (pincode: string) => Promise<DeliveryEstimate | null>;
+  initialPincode?: string;
   className?: string;
 }) {
   const inputId = useId();
-  const [pincode, setPincode] = useState("");
+  const [pincode, setPincode] = useState(initialPincode);
   const [checked, setChecked] = useState<string | null>(null);
   const [result, setResult] = useState<DeliveryEstimate | null>(null);
   const [error, setError] = useState<string | null>(null);

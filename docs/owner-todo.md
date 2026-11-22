@@ -23,3 +23,20 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] Choose email + WhatsApp/SMS providers (needed for request acknowledgements, OTP identity checks, newsletter opt-in).
 - [ ] Confirm the new demo values in `lib/config/store.ts`: refund start within 2 days, damage report within 24 h, 18+ only.
 - [ ] Provide social profile URLs (`SOCIAL_*_URL`) and confirm which payment methods/claims may be shown.
+
+## 2026-11-22 (after M4)
+- [ ] Provide Legal Metrology data per product (manufacturer / packer / importer name + address, country of origin) —
+      or confirm it comes from the commerce platform's product fields.
+- [ ] Choose the shipping partner (Shiprocket / Delhivery / …) and confirm COD fee (demo ₹49), COD max (demo ₹5,000),
+      express fee (demo ₹99) and dispatch cut-off (demo 2 pm IST).
+- [ ] Choose the reviews provider (Judge.me / Okendo / own) and supply measured size charts per style.
+- [ ] Confirm which coupons are live (demo: ALPHA10, HOOD200, HOOD500) and set `SITE_URL` on the host.
+
+## 2026-11-22 (after M5)
+- [ ] Choose the payment gateway (Razorpay / Cashfree / PayU) and SMS provider (DLT-registered OTP template). Put the
+      gateway webhook secret and API keys in the host's secret store (never in the repo).
+- [ ] Set `OTP_PEPPER` (≥ 32 random characters) as a secret on the host; set `CHECKOUT_ENABLED` / `COD_ENABLED` only when
+      the real gateway, SMS and database are live. Never set `ALLOW_MOCK_PAYMENTS` on the live store.
+- [ ] CA to confirm the GST rate table (HSN classes, ₹2,500 slab) and the warehouse state; confirm shipping fee ₹79,
+      COD fee ₹49 / max ₹5,000, UPI offer 5% (max ₹150), coupons and combos.
+- [ ] Turn on MFA on the gateway and SMS provider accounts.

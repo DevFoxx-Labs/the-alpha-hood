@@ -21,6 +21,8 @@ const TABS = [
 export function MobileTabBar({ active, className }: { active?: string; className?: string }) {
   const pathname = usePathname();
   const current = active ?? pathname;
+  // Product pages show their own fixed "Add to bag" bar instead (PDP-06).
+  if (!active && current.startsWith("/products/")) return null;
   return (
     <nav
       aria-label="Shortcuts"

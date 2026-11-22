@@ -1,0 +1,29 @@
+import { sendOtp } from "@/lib/auth/otp";
+import { checkoutEnabled } from "@/lib/checkout/flags";
+import { guardPublicWrite, jsonError } from "@/lib/http/guard";
+import { commerceErrorResponse, privateJson } from "@/lib/http/commerce-http";
+import { rateLimiter } from "@/lib/http/rate-limit";
+import { asObject, normaliseIndianMobile, rejectUnknownFields } from "@/lib/validation";
+
+/**
+ * POST /api/otp/send `{ phone }` → `{ challengeId }`. SMS costs money: per-IP limits here, per-phone
+ * cooldown/hourly/daily caps in lib/auth/otp.ts. Same response whether or not the phone has an account.
+ * The demo SMS provider returns `demoCode` (development / protected previews only — never the live store).
+ */
+export async function POST(request: Request) {
+  if (!checkoutEnabled()) return jsonError(503, "checkout_disabled", "Checkout is temporarily unavailable.");
+  const guard = await guardPublicWrite(request, { name: "otp-send", limit: 5, windowMs: 10 * 60_000, maxBytes: 128 });
+  if (!guard.ok) return guard.response;
+  const daily = rateLimiter.hit(`otp-send-day:ip:${guard.ip}`, 20, 86_400_000);
+  if (!daily.ok) return jsonError(429, "rate_limited", "Too many codes requested today.");
+  try {
+    const input = asObject(guard.body);
+    rejectUnknownFields(input, ["phone"]);
+    const phone = normaliseIndianMobile(input.phone);
+    if (!phone) return jsonError(422, "invalid_input", "Enter a valid 10-digit mobile number.");
+    const sent = await sendOtp(phone);
+    return privateJson(sent);
+  } catch (error) {
+    return commerceErrorResponse(error);
+  }
+}

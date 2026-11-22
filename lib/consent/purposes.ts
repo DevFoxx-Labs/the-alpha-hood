@@ -76,10 +76,31 @@ export const COOKIE_INVENTORY: CookieInfo[] = [
     provider: "The Alpha Hood (first party)",
   },
   {
+    name: "ah_cart",
+    purpose: "Keeps your bag between visits (a random bag ID, no personal data).",
+    category: "necessary",
+    lifetime: "30 days",
+    provider: "The Alpha Hood (first party, HTTP-only)",
+  },
+  {
+    name: "ah_session",
+    purpose: "Keeps you signed in after you verify your phone number at checkout.",
+    category: "necessary",
+    lifetime: "30 days",
+    provider: "The Alpha Hood (first party, HTTP-only)",
+  },
+  {
     name: "ah_recent_searches (local storage)",
     purpose: "Your last 8 searches, shown when you open search. Stays on your device, never sent to us; clear it from the search screen.",
     category: "necessary",
     lifetime: "Until you clear it",
+    provider: "The Alpha Hood (first party, this device only)",
+  },
+  {
+    name: "ah_pincode (local storage)",
+    purpose: "The delivery pincode you entered, so delivery dates show on every product. Stays on your device; sent to us only to look up delivery.",
+    category: "necessary",
+    lifetime: "Until you change or clear it",
     provider: "The Alpha Hood (first party, this device only)",
   },
   {

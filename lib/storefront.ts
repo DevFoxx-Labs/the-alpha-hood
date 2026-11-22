@@ -2,6 +2,8 @@ import { cacheLife } from "next/cache";
 import { commerce } from "@/lib/commerce";
 import type { Category, Product } from "@/lib/commerce/types";
 import { cms } from "@/lib/cms";
+import { bestCouponFor, DEMO_COUPONS } from "@/lib/promotions/coupons";
+import { reviews } from "@/lib/reviews";
 import { isLive, liveBlocks } from "@/lib/cms/schedule";
 import type { CatalogQuery, CatalogScope } from "@/lib/catalog/types";
 import type { HomeBlock } from "@/lib/cms/types";
@@ -21,20 +23,17 @@ export async function getShell() {
   "use cache";
   cacheLife("minutes");
   if (!storefrontAvailable()) return null;
-  const [announcements, headerLinks, menu, footer, trendingSearches, first, second] = await Promise.all([
+  const [announcements, headerLinks, menu, footer, trendingSearches, catalogue] = await Promise.all([
     cms.getAnnouncements(),
     cms.getHeaderLinks(),
     cms.getMenu(),
     cms.getFooter(),
     cms.getTrendingSearches(),
     commerce.listProducts({ limit: 60 }),
-    commerce.listProducts({ limit: 60, offset: 60 }),
   ]);
-  const catalogue = { products: [...first.products, ...second.products] };
-  // M1 display-only bag needs sizes for in-place size change; M5 replaces this with the server cart.
-  const sizesByProduct = Object.fromEntries(catalogue.products.map((p) => [p.id, p.sizes]));
+  // Mini-cart "complete your fit" row: in-stock add-ons at ₹999 or less.
   const upsell = catalogue.products.filter((p) => p.price <= 99_900 && p.sizes.some((s) => s.stock > 0)).slice(0, 3);
-  return { announcements, headerLinks, menu, footer, trendingSearches, sizesByProduct, upsell };
+  return { announcements, headerLinks, menu, footer, trendingSearches, upsell };
 }
 
 export type ResolvedHomeBlock =
@@ -138,4 +137,35 @@ export async function subcategoryParams(): Promise<{ category: string; sub: stri
 export async function collectionParams(): Promise<{ handle: string }[]> {
   const list = storefrontAvailable() ? await commerce.listCollections() : [];
   return list.length ? list.map((c) => ({ handle: c.handle })) : [{ handle: "all" }];
+}
+
+// ── Product page (M4) ─────────────────────────────────────────────────────────────────────────────
+
+export async function getProductPage(handle: string) {
+  "use cache";
+  cacheLife("minutes");
+  if (!storefrontAvailable()) return null;
+  const product = await commerce.getProduct(handle);
+  if (!product) return null;
+  const [category, reviewData] = await Promise.all([
+    commerce.getCategory(product.category),
+    reviews.summary(product.styleId, product.category),
+  ]);
+  const firstPage = reviewData
+    ? await reviews.list(
+        reviewData.scope === "style" ? { styleId: product.styleId } : { category: product.category },
+        { sort: "recent", page: 1 },
+      )
+    : null;
+  // Coupon liveness depends on the time — evaluated inside the cache scope (PDP-02).
+  const best = bestCouponFor(product.price, DEMO_COUPONS, new Date());
+  const coupon = best ? { code: best.coupon.code, description: best.coupon.description, finalPrice: best.finalPrice } : null;
+  return { product, category, reviewData, firstPage, coupon };
+}
+
+export async function productParams(): Promise<{ handle: string }[]> {
+  if (!storefrontAvailable()) return [{ handle: "placeholder" }];
+  const [a, b] = await Promise.all([commerce.listProducts({ limit: 60 }), commerce.listProducts({ limit: 60, offset: 60 })]);
+  const all = [...a.products, ...b.products].map((p) => ({ handle: p.handle }));
+  return all.length ? all : [{ handle: "placeholder" }];
 }

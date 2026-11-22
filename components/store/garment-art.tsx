@@ -13,6 +13,12 @@ const SHIRT_BODY =
 
 const HEX_RE = /^#[0-9a-f]{3,8}$/i;
 
+/** Which half of the placeholder figure wears the garment in the "on model" view. */
+const MODEL_LOOK: Partial<Record<GarmentKind, "top" | "bottom">> = {
+  tee: "top", oversized: "top", shirt: "top", check: "top", hoodie: "top", jacket: "top", puffer: "top", sweater: "top", polo: "top",
+  jeans: "bottom", baggy: "bottom", cargo: "bottom", trouser: "bottom",
+};
+
 function Shape({ kind, c, patternId }: { kind: GarmentKind; c: string; patternId: string }) {
   switch (kind) {
     case "tee":
@@ -171,23 +177,40 @@ export function GarmentArt({
   className,
   artClassName,
 }: {
-  image: Pick<ProductImage, "art" | "colour" | "alt">;
+  image: Pick<ProductImage, "art" | "colour" | "alt" | "view">;
   className?: string;
   /** Size of the drawing inside the well. Default 74% like the prototype. */
   artClassName?: string;
 }) {
   const patternId = useId().replace(/:/g, "");
   const colour = HEX_RE.test(image.colour) ? image.colour : "#333333";
+  const a11y = image.alt ? { role: "img" as const, "aria-label": image.alt } : { "aria-hidden": true as const };
+
+  // Placeholder "on model" shot: the garment colour on the matching half of a figure.
+  if (image.view === "model" && image.art in MODEL_LOOK) {
+    const bottomPiece = MODEL_LOOK[image.art] === "bottom";
+    return (
+      <div {...a11y} className={cn("relative overflow-hidden bg-soft-2", className)}>
+        <ModelFigure
+          top={bottomPiece ? "#2a2a2a" : colour}
+          bottom={bottomPiece ? colour : "#1f2937"}
+          label=""
+          className="absolute inset-x-0 bottom-0 mx-auto h-[92%] w-full"
+        />
+      </div>
+    );
+  }
+
   return (
-    <div
-      {...(image.alt ? { role: "img", "aria-label": image.alt } : { "aria-hidden": true })}
-      className={cn("relative overflow-hidden bg-soft", className)}>
+    <div {...a11y} className={cn("relative overflow-hidden bg-soft", className)}>
       <svg
         viewBox="0 0 100 100"
         preserveAspectRatio="xMidYMid meet"
         aria-hidden="true"
         className={cn(
           "absolute left-1/2 top-[52%] size-[74%] -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_18px_18px_rgba(0,0,0,0.12)]",
+          image.view === "back" && "-scale-x-100",
+          image.view === "detail" && "top-[62%] size-[190%]",
           artClassName,
         )}
       >
