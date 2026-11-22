@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowDown01Icon, Cancel01Icon, Delete02Icon, ShoppingBag02Icon } from "@hugeicons/core-free-icons";
+import { Mascot } from "@/components/brand/mascot";
+import { ArrowDown01Icon, Cancel01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -156,7 +157,8 @@ export function MiniCart({ upsell = [] }: { upsell?: Product[] }) {
 
         {lines.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-            <Icon icon={ShoppingBag02Icon} size={40} strokeWidth={1.2} className="text-muted" />
+            {/* MASCOT_PROMPTS #13 "Sleeping on hoodies" — empty bag. */}
+            <Mascot name="alpha-13-sleeping" sizes="260px" className="w-[220px]" />
             <p className="font-display text-[26px] uppercase leading-none">Your bag is empty</p>
             <p className="type-body">Fresh drops are waiting. Add something you&apos;ll actually wear.</p>
             <Button asChild className="mt-2 w-full">

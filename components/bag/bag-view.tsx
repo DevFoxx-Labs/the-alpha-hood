@@ -1,9 +1,10 @@
 "use client";
 
+import { Mascot } from "@/components/brand/mascot";
 import { useEffect, useRef } from "react";
 import { track } from "@/lib/analytics/client";
 import { itemFromLine } from "@/lib/analytics/events";
-import { FavouriteIcon, ShoppingBag02Icon } from "@hugeicons/core-free-icons";
+import { FavouriteIcon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { formatDeliveryDate, useDelivery } from "@/components/pdp/use-delivery";
 import { FreeShippingBar } from "@/components/store/free-shipping-bar";
@@ -49,7 +50,7 @@ export function BagView() {
   if (lines.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
-        <Icon icon={ShoppingBag02Icon} size={44} strokeWidth={1.2} className="text-muted" />
+        <Mascot name="alpha-13-sleeping" sizes="(min-width: 1024px) 360px, 280px" className="w-[280px] lg:w-[360px]" />
         <h2 className="font-display text-[32px] uppercase leading-none">Your bag is empty</h2>
         <p className="type-body">Fresh drops are waiting. Add something you&apos;ll actually wear.</p>
         <Button asChild className="mt-2">

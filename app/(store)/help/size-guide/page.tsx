@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Mascot } from "@/components/brand/mascot";
 import { SIZE_CHARTS, toInches } from "@/lib/catalog/size-charts";
 import { STORE_CONFIG } from "@/lib/config/store";
 import { breadcrumbJsonLd, toJsonLd } from "@/lib/seo/json-ld";
@@ -26,11 +27,17 @@ export default function SizeGuidePage() {
         </Link>{" "}
         / <span className="text-ink">Size guide</span>
       </nav>
-      <h1 className="type-section">Size guide</h1>
-      <p className="mt-4 text-[15px] leading-[1.6] text-ink-2">
-        Garment measurements, taken flat. Between sizes? Size up for a relaxed fit. Size exchanges are free within{" "}
-        {STORE_CONFIG.returnWindowDays} days of delivery.
-      </p>
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="type-section">Size guide</h1>
+          <p className="mt-4 text-[15px] leading-[1.6] text-ink-2">
+            Garment measurements, taken flat. Between sizes? Size up for a relaxed fit. Size exchanges are free within{" "}
+            {STORE_CONFIG.returnWindowDays} days of delivery.
+          </p>
+        </div>
+        {/* MASCOT_PROMPTS #8 "Measuring tape". */}
+        <Mascot name="alpha-08-measuring" sizes="(min-width: 1024px) 160px, 96px" blend className="w-24 shrink-0 lg:w-40" />
+      </div>
       {Object.entries(SIZE_CHARTS).map(([kind, chart]) => (
         <section key={kind} id={kind} className="scroll-mt-24 border-b border-line py-8 last:border-0">
           <h2 className="text-[15px] font-bold uppercase tracking-[0.06em]">{chart.title}</h2>

@@ -1,13 +1,12 @@
 "use client";
 
-import { FavouriteIcon } from "@hugeicons/core-free-icons";
+import { Mascot } from "@/components/brand/mascot";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ProductGrid } from "@/components/home/product-grid";
 import { ProductCard } from "@/components/store/product-card";
 import { useStoreUI } from "@/components/store/store-ui-provider";
 import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Product } from "@/lib/commerce/types";
 
@@ -32,7 +31,7 @@ export function WishlistView() {
   if (!ids) {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
-        <Icon icon={FavouriteIcon} size={40} strokeWidth={1.2} className="text-muted" />
+        <Mascot name="alpha-13-sleeping" sizes="(min-width: 1024px) 360px, 280px" className="w-[280px] lg:w-[360px]" />
         <p className="font-display text-[28px] uppercase leading-none">Nothing saved yet</p>
         <p className="type-body">Tap the heart on anything you like to save it here.</p>
         <Button asChild>

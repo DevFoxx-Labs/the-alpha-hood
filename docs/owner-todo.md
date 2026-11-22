@@ -80,3 +80,11 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
       brand art (e.g. the Alpha Club badge in M9)?
 - [ ] Before trademark filing: designer review of the master SVG and a trademark search (kit README).
 
+## 2026-11-24 (mascot images)
+- [ ] Review the mascot placements (`docs/brand/mascot/README.md`) in `pnpm dev`: homepage hero / tiles / promo band /
+      "The Pack" band, About page, empty bag & wishlist, order success, size guide, track order, sign-in, 404.
+- [ ] Copy edits: homepage hero now "Own the city / Hood up / Built to lead"; the third collection tile changed from
+      "Knit club" to "Denim days" (links to /men/jeans) to match the denim artwork.
+- [ ] Regenerate "Alpha Wolf Stride" (and a transparent "peek") if you want the runway banner and corner peek.
+- [ ] Before merch / trademark: designer recreation of the mascot (owned files).
+

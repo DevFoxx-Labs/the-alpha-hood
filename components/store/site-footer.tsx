@@ -1,4 +1,5 @@
 import { Facebook01Icon, InstagramIcon, NewTwitterIcon, YoutubeIcon } from "@hugeicons/core-free-icons";
+import { Mascot } from "@/components/brand/mascot";
 import { cacheLife } from "next/cache";
 import Link from "next/link";
 import { CookiePreferencesButton } from "@/components/consent/cookie-banner";
@@ -59,8 +60,14 @@ export async function SiteFooter({ content }: { content: FooterContent | null })
             </nav>
           ))}
           <div className="col-span-2 lg:col-span-1">
-            <h2 className="type-label text-white">{content.newsletter.heading}</h2>
-            <p className="mb-4 mt-3 text-[13px] leading-[1.6] text-white/70">{content.newsletter.text}</p>
+            <div className="flex items-end gap-3">
+              <div className="min-w-0 flex-1">
+                <h2 className="type-label text-white">{content.newsletter.heading}</h2>
+                <p className="mb-4 mt-3 text-[13px] leading-[1.6] text-white/70">{content.newsletter.text}</p>
+              </div>
+              {/* MASCOT_PROMPTS #4 "Pointing at you" — newsletter CTA (transparent cut-out on black). */}
+              <Mascot name="alpha-04-pointing" sizes="96px" className="-mb-2 w-[72px] shrink-0 lg:w-[88px]" />
+            </div>
             <NewsletterForm />
             {content.social.length > 0 ? (
               <ul className="mt-6 flex gap-2">

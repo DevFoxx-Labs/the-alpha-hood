@@ -1,3 +1,4 @@
+import { MASCOT, MASCOT_HERO } from "@/lib/brand/mascot";
 import type { FooterContent, HomeBlock, ListingTile } from "./types";
 
 /**
@@ -9,23 +10,27 @@ export const MOCK_HOMEPAGE: HomeBlock[] = [
     id: "hero",
     type: "hero",
     slides: [
+      // Mascot campaign art (MASCOT_PROMPTS §7: #21 rooftop hero, #15 hood-up drop, #10 run) until the
+      // product campaign shoot replaces slides 2–3 with real models.
+      {
+        id: "own-the-city",
+        kicker: "The Alpha Hood · Designed in India",
+        headline: ["Own", "the city"],
+        subline: "Streetwear and everyday menswear. Built for the ones who lead.",
+        cta: { label: "Shop new in", href: "/collections/new-in" },
+        textTone: "volt",
+        image: { desktop: MASCOT_HERO.rooftop.desktop, mobile: MASCOT_HERO.rooftop.mobile, alt: "Alpha, the brand's wolf mascot, in a black hoodie on a Mumbai rooftop at night" },
+        placeholder: { fill: "#1b2c49", look: { top: "#151515", bottom: "#151515", skin: "#C9946B" } },
+      },
       {
         id: "winter-drop",
         kicker: "Winter drop · 2026",
-        headline: ["Own", "the cold"],
-        subline: "Layers built for the streets. Puffers, knits & heavyweight hoodies.",
+        headline: ["Hood", "up"],
+        subline: "Heavyweight hoodies, puffers and knits. Layers built for the streets.",
         cta: { label: "Shop the drop", href: "/collections/winter-drop" },
-        textTone: "volt",
-        placeholder: { fill: "#161616", look: { top: "#151515", bottom: "#2d3f5a", skin: "#C9946B" } },
-      },
-      {
-        id: "weekend-uniform",
-        kicker: "New in",
-        headline: ["The weekend", "uniform"],
-        subline: "Relaxed cargos, boxy overshirts and heavyweight tees.",
-        cta: { label: "Shop new in", href: "/collections/new-in" },
         textTone: "white",
-        placeholder: { fill: "#2f3326", look: { top: "#7a5230", bottom: "#59603f", skin: "#B98563" } },
+        image: { desktop: MASCOT_HERO["hood-up"].desktop, mobile: MASCOT_HERO["hood-up"].mobile, alt: "Alpha pulling his black hood up in golden smoke" },
+        placeholder: { fill: "#0a0a0a", look: { top: "#151515", bottom: "#151515", skin: "#C9946B" } },
       },
       {
         id: "bestsellers",
@@ -34,7 +39,8 @@ export const MOCK_HOMEPAGE: HomeBlock[] = [
         subline: "The pieces everyone is wearing this season.",
         cta: { label: "Shop bestsellers", href: "/collections/bestsellers" },
         textTone: "volt",
-        placeholder: { fill: "#3a1219", look: { top: "#e8e1cf", bottom: "#1b1b1b", skin: "#8a5a3c" } },
+        image: { desktop: MASCOT_HERO.run.desktop, mobile: MASCOT_HERO.run.mobile, alt: "Alpha running with a black mailer box under his arm" },
+        placeholder: { fill: "#0a0a0a", look: { top: "#151515", bottom: "#151515", skin: "#C9946B" } },
       },
     ],
   },
@@ -46,14 +52,15 @@ export const MOCK_HOMEPAGE: HomeBlock[] = [
     right: "Up to 40%\noff",
     highlight: "40%",
     href: "/collections/sale",
+    image: MASCOT["alpha-06-shopping-haul"],
   },
   {
     id: "collections",
     type: "collection_tiles",
     tiles: [
-      { title: "Puffer\nseason", tagline: "Warmth with an attitude", href: "/collections/puffer-season", fill: "#8a8c90", look: { top: "#5a1f2a", bottom: "#151515", skin: "#B98563" } },
-      { title: "Smart\ncasuals", tagline: "Monday to Friday, sorted", href: "/collections/smart-casuals", fill: "#5a5a5a", look: { top: "#151515", bottom: "#d8c9a8", skin: "#C9946B" } },
-      { title: "Knit\nclub", tagline: "Texture that talks", href: "/collections/knit-club", fill: "#cfc6b4", look: { top: "#efe9da", bottom: "#2d3f5a", skin: "#8a5a3c" } },
+      { title: "Puffer\nseason", tagline: "Warmth with an attitude", href: "/collections/puffer-season", fill: MASCOT["season-16-winter"].bg, look: { top: "#151515", bottom: "#151515" }, image: MASCOT["season-16-winter"] },
+      { title: "Smart\ncasuals", tagline: "Monday to Friday, sorted", href: "/collections/smart-casuals", fill: MASCOT["season-17-linen"].bg, look: { top: "#efe9da", bottom: "#d8c9a8" }, image: MASCOT["season-17-linen"] },
+      { title: "Denim\ndays", tagline: "Baggy, washed, worn in", href: "/men/jeans", fill: MASCOT["season-19-denim"].bg, look: { top: "#8fb3d1", bottom: "#8fb3d1" }, image: MASCOT["season-19-denim"] },
     ],
   },
   {
@@ -85,6 +92,15 @@ export const MOCK_HOMEPAGE: HomeBlock[] = [
     ],
   },
   { id: "new-arrivals", type: "product_grid", lead: "Fresh", title: "New arrivals", viewAllHref: "/collections/new-in", sort: "newest", limit: 4 },
+  {
+    id: "the-pack",
+    type: "campaign_band",
+    kicker: "The Pack",
+    headline: ["One pack.", "Every fit."],
+    text: "Puffers, overshirts, varsity jackets and the hoodie that started it all. Find the look that leads.",
+    cta: { label: "Meet the pack", href: "/about" },
+    image: { ...MASCOT["scene-22-the-pack"], alt: "Alpha and three wolf friends in streetwear under a city underpass" },
+  },
   { id: "trust", type: "trust_strip" },
   {
     id: "seo",

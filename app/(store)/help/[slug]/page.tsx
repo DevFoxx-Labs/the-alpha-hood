@@ -24,5 +24,7 @@ export async function generateMetadata({ params }: PageProps<"/help/[slug]">): P
 export default async function HelpPage({ params }: PageProps<"/help/[slug]">) {
   const slug = helpSlug((await params).slug);
   if (!slug) notFound();
-  return <ContentView page={renderContentPage(slug)} crumb={{ label: "Help", href: "/help/faq" }} />;
+  // MASCOT_PROMPTS #10 "Delivery run" on Shipping; #11 "Thinking" on the FAQ.
+  const art = slug === "shipping" ? "alpha-10-delivery-run" : "alpha-11-thinking";
+  return <ContentView page={renderContentPage(slug)} crumb={{ label: "Help", href: "/help/faq" }} art={art} />;
 }

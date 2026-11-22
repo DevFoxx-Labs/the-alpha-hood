@@ -1,5 +1,6 @@
 "use client";
 
+import { Mascot } from "@/components/brand/mascot";
 import { CheckmarkCircle02Icon, Clock01Icon, Alert02Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -109,7 +110,12 @@ export function OrderConfirmation() {
   return (
     <div className="mx-auto max-w-[720px] px-4 py-8 lg:py-12">
       <section className="border border-line bg-white p-6 text-center lg:p-8" aria-live="polite">
-        <Icon icon={status.icon} size={40} className={`mx-auto ${status.tone}`} />
+        {order.status === "confirmed" ? (
+          // MASCOT_PROMPTS #12 "Celebration" — only for a confirmed order, never for a failed or pending payment.
+          <Mascot name="alpha-12-celebration" sizes="180px" blend className="mx-auto w-[150px] lg:w-[180px]" />
+        ) : (
+          <Icon icon={status.icon} size={40} className={`mx-auto ${status.tone}`} />
+        )}
         <h1 className="mt-3 font-display text-[32px] uppercase leading-none lg:text-[40px]">{status.title}</h1>
         <p className="mt-3 text-[14px] text-ink-2">{status.text}</p>
         <p className="tabular mt-4 text-[13px]">

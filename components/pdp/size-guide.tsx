@@ -1,5 +1,6 @@
 "use client";
 
+import { Mascot } from "@/components/brand/mascot";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Dialog } from "radix-ui";
 import { useState } from "react";
@@ -40,10 +41,14 @@ export function SizeGuide({
             </Dialog.Close>
           </div>
           <div className="overflow-y-auto px-5 py-5">
-            <p id="size-guide-desc" className="text-[13px] text-ink-2">
-              Garment measurements{chart.unitless ? "" : ` in ${unit === "cm" ? "centimetres" : "inches"}`}. Compare with a
-              piece you own that fits you well.
-            </p>
+            <div className="flex items-center gap-4">
+              {/* MASCOT_PROMPTS #8 "Measuring tape". Sits on its own background colour, so no box shows. */}
+              <Mascot name="alpha-08-measuring" sizes="96px" blend className="w-16 shrink-0 lg:w-20" />
+              <p id="size-guide-desc" className="text-[13px] text-ink-2">
+                Garment measurements{chart.unitless ? "" : ` in ${unit === "cm" ? "centimetres" : "inches"}`}. Compare with a
+                piece you own that fits you well.
+              </p>
+            </div>
             {model ? (
               <p className="mt-2 text-[13px]">
                 Model is <b>{model.height}</b> and wears size <b>{model.size}</b>.

@@ -197,7 +197,7 @@ function HeroImage({ image, first }: { image: NonNullable<HeroSlide["image"]>; f
   const common = { alt: image.alt, sizes: "100vw", fetchPriority: first ? ("high" as const) : undefined };
   const {
     props: { srcSet: desktop },
-  } = getImageProps({ ...common, src: image.desktop, width: 2880, height: 1260 });
+  } = getImageProps({ ...common, src: image.desktop, width: 1920, height: 840 });
   const {
     props: { srcSet: mobile, ...rest },
   } = getImageProps({ ...common, src: image.mobile, width: 1080, height: 1350 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { Mascot } from "@/components/brand/mascot";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
@@ -75,10 +76,14 @@ export function AccountFrame({ title, children }: { title: string; children: Rea
   return (
     <div className="mx-auto max-w-[1280px] px-4 py-6 lg:px-10 lg:py-10">
       {state.kind === "signed_out" ? (
-        <div className="mx-auto max-w-[420px] py-6">
-          <h1 className="type-section">Sign in</h1>
-          <p className="mb-6 mt-2 text-[14px] text-ink-2">Use your mobile number — new here? We&apos;ll create your account.</p>
-          <OtpSignIn onSignedIn={reload} />
+        <div className="mx-auto grid max-w-[880px] items-center gap-8 py-6 lg:grid-cols-[1fr_360px] lg:gap-14">
+          <div className="max-w-[420px]">
+            <h1 className="type-section">Sign in</h1>
+            <p className="mb-6 mt-2 text-[14px] text-ink-2">Use your mobile number — new here? We&apos;ll create your account.</p>
+            <OtpSignIn onSignedIn={reload} />
+          </div>
+          {/* MASCOT_PROMPTS #5 "Welcome salute" — desktop only, so the form stays first on phones. */}
+          <Mascot name="alpha-05-welcome" sizes="360px" blend className="hidden lg:block" />
         </div>
       ) : state.kind === "error" ? (
         <div className="flex flex-col items-start gap-3 py-10">

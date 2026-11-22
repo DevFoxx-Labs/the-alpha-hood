@@ -1,5 +1,6 @@
 "use client";
 
+import { Mascot } from "@/components/brand/mascot";
 import { Cancel01Icon, FilterHorizontalIcon, GridViewIcon, LayoutGridIcon, SortingDownIcon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -278,6 +279,8 @@ function EmptyState({
   return (
     <div className="py-10 lg:py-14">
       <div className="mx-auto max-w-[520px] text-center">
+        {/* MASCOT_PROMPTS #7 "Sneaker-box throne": an empty shelf, waiting for the next drop. Not for filter misses. */}
+        {filtered ? null : <Mascot name="alpha-07-sneaker-boxes" sizes="200px" blend className="mx-auto mb-4 w-[160px] lg:w-[200px]" />}
         <h2 className="font-display text-[30px] uppercase leading-none lg:text-[40px]">
           {filtered ? "No styles match" : "Nothing here yet"}
         </h2>

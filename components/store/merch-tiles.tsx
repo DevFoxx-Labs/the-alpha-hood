@@ -1,6 +1,8 @@
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import Image from "next/image";
 import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
+import type { TileImage } from "@/lib/cms/types";
 import type { Category, ProductImage } from "@/lib/commerce/types";
 import { cn } from "@/lib/utils";
 import { GarmentArt, ModelFigure } from "./garment-art";
@@ -32,6 +34,7 @@ export function CollectionTile({
   href,
   fill,
   look,
+  image,
   className,
 }: {
   title: string;
@@ -39,19 +42,32 @@ export function CollectionTile({
   href: string;
   fill: string;
   look: { top: string; bottom: string; skin?: string };
+  /** Campaign / mascot art; the tile is painted in its baked background colour so the edge disappears. */
+  image?: TileImage;
   className?: string;
 }) {
   return (
     <Link
       href={href}
       className={cn("on-dark group relative block h-[420px] overflow-hidden lg:h-[620px]", className)}
-      style={{ backgroundColor: fill }}
+      style={{ backgroundColor: image?.bg ?? fill }}
     >
-      <ModelFigure
-        {...look}
-        label=""
-        className="absolute inset-x-0 bottom-0 mx-auto h-[88%] w-full transition-transform duration-[400ms] ease-out group-hover:scale-[1.04]"
-      />
+      {image ? (
+        <Image
+          src={image.src}
+          width={image.width}
+          height={image.height}
+          alt=""
+          sizes="(min-width: 1024px) 34vw, 78vw"
+          className="absolute inset-x-0 bottom-0 mx-auto h-[94%] w-auto max-w-none object-contain transition-transform duration-[400ms] ease-out group-hover:scale-[1.04] motion-reduce:transition-none"
+        />
+      ) : (
+        <ModelFigure
+          {...look}
+          label=""
+          className="absolute inset-x-0 bottom-0 mx-auto h-[88%] w-full transition-transform duration-[400ms] ease-out group-hover:scale-[1.04]"
+        />
+      )}
       <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 to-transparent" />
       <div className="absolute inset-x-4 bottom-4 flex items-end justify-between gap-3 lg:inset-x-6 lg:bottom-6">
         <h3 className="whitespace-pre-line font-display text-[30px] uppercase leading-[0.9] text-white lg:text-[54px] lg:leading-[0.88]">
@@ -108,23 +124,37 @@ export function PromoBand({
   right,
   highlight,
   href,
+  image,
 }: {
   left: string;
   right: string;
   /** Part of `right` rendered in red (the %). */
   highlight: string;
   href: string;
+  image?: TileImage;
 }) {
   const [before, after] = right.split(highlight);
   return (
     <Link
       href={href}
       className="grid h-[220px] grid-cols-[1fr_auto_1fr] items-center gap-3 overflow-hidden bg-soft-2 px-4 lg:h-[300px] lg:gap-10 lg:px-10"
+      style={image?.bg ? { backgroundColor: image.bg } : undefined}
     >
       <p className="whitespace-pre-line text-right font-display text-[30px] uppercase leading-[0.9] lg:text-[78px] lg:leading-[0.88]">
         {left}
       </p>
-      <ModelFigure top="#1d2a44" bottom="#d8c9a8" label="" className="h-[190px] w-[90px] self-end lg:h-[270px] lg:w-[150px]" />
+      {image ? (
+        <Image
+          src={image.src}
+          width={image.width}
+          height={image.height}
+          alt=""
+          sizes="(min-width: 1024px) 240px, 160px"
+          className="h-[214px] w-auto self-end lg:h-[296px]"
+        />
+      ) : (
+        <ModelFigure top="#1d2a44" bottom="#d8c9a8" label="" className="h-[190px] w-[90px] self-end lg:h-[270px] lg:w-[150px]" />
+      )}
       <p className="whitespace-pre-line font-display text-[30px] uppercase leading-[0.9] lg:text-[78px] lg:leading-[0.88]">
         {before}
         <span className="text-accent">{highlight}</span>
@@ -144,5 +174,49 @@ export function ArrowLink({ href, children }: { href: string; children: React.Re
       {children}
       <Icon icon={ArrowRight01Icon} size={14} />
     </Link>
+  );
+}
+
+/**
+ * Editorial campaign band (MASCOT_PROMPTS §7 collection launch): 4:5 art beside an Anton headline on black.
+ * Mobile: art on top, text below. Lazy-loaded (below the fold).
+ */
+export function CampaignBand({
+  kicker,
+  headline,
+  text,
+  cta,
+  image,
+}: {
+  kicker: string;
+  headline: string[];
+  text: string;
+  cta: { label: string; href: string };
+  image: TileImage & { alt: string };
+}) {
+  return (
+    <section className="on-dark grid bg-black text-white lg:grid-cols-2" aria-label={kicker}>
+      <div className="relative aspect-[4/5] lg:aspect-auto lg:min-h-[640px]" style={image.bg ? { backgroundColor: image.bg } : undefined}>
+        <Image src={image.src} alt={image.alt} fill sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover object-center" />
+      </div>
+      <div className="flex flex-col justify-center gap-5 px-6 py-12 lg:px-[72px]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-volt lg:text-[12px]">{kicker}</p>
+        <h2 className="font-display text-[56px] uppercase leading-[0.88] lg:text-[112px]">
+          {headline.map((l) => (
+            <span key={l} className="block">
+              {l}
+            </span>
+          ))}
+        </h2>
+        <p className="max-w-[440px] text-[14px] leading-[1.6] text-white/80 lg:text-[16px]">{text}</p>
+        <Link
+          href={cta.href}
+          className="inline-flex h-12 items-center gap-2 self-start bg-white px-6 text-[12px] font-bold uppercase tracking-[0.1em] text-black transition-colors hover:bg-volt"
+        >
+          {cta.label}
+          <Icon icon={ArrowRight01Icon} size={16} />
+        </Link>
+      </div>
+    </section>
   );
 }

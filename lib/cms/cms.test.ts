@@ -47,9 +47,27 @@ describe("CMS adapter", () => {
       "offer_tiles",
       "product_tabs",
       "product_grid",
+      "campaign_band",
       "trust_strip",
       "seo",
     ]);
+  });
+
+  it("mascot art (MASCOT_PROMPTS §7) is registered with its size and points at a shipped file", async () => {
+    const { existsSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const { MASCOT, MASCOT_HERO } = await import("@/lib/brand/mascot");
+    for (const m of Object.values(MASCOT)) {
+      expect(existsSync(join(process.cwd(), "public", m.src))).toBe(true);
+      expect(m.width).toBeGreaterThan(0);
+      expect(m.height).toBeGreaterThan(0);
+    }
+    for (const h of Object.values(MASCOT_HERO)) {
+      expect(existsSync(join(process.cwd(), "public", h.desktop))).toBe(true);
+      expect(existsSync(join(process.cwd(), "public", h.mobile))).toBe(true);
+    }
+    const hero = MOCK_HOMEPAGE.find((b) => b.type === "hero");
+    expect(hero && hero.type === "hero" && hero.slides.every((s) => s.image && s.image.alt.length > 0)).toBe(true);
   });
 
   it("demo content is refused in production unless explicitly allowed", async () => {

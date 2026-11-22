@@ -115,3 +115,16 @@
   category list.
 - 🟡 Server-side GA4 purchase is not sent (browser `purchase` only, to avoid double counting); Google Ads enhanced
   conversions and Meta CAPI for other events (AddToCart etc.) are not built.
+
+## Mascot "ALPHA" (2026-11-24)
+- 🟠 AI-generated mascot images have unclear copyright — designer / 3D artist to recreate the final character before
+  trademark filing or merch (MASCOT_PROMPTS §8). Merch mockups are deliberately not on the site.
+- 🟠 Homepage hero slides 2–3 and the collection tiles use mascot art because there is no campaign shoot yet; replace
+  with real product/model photography when it exists (mascot keeps slide 1 and the in-between moments).
+- 🟡 "Alpha Wolf Stride" has a fake (painted) checkerboard background — regenerate with a real transparent / plain
+  background before using it for "new drop" banners.
+- 🟡 Corner-peek widget (#14) not built: needs a transparent cut-out of the peek pose (current file has a grey panel);
+  used on the 404 page instead.
+- 🟡 Homepage mascot changes not checked in a browser (1440/390/360) or with Lighthouse; the homepage renders only with
+  demo data (dev), production shows the coming-soon page (now with the hood-up mascot as its LCP image).
+

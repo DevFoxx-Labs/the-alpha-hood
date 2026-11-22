@@ -19,6 +19,14 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
+  // Image pipeline (web-performance rule): AVIF/WebP, and srcset widths no wider than our widest source (1920 px
+  // hero composites; mascot sources are ≤ 1536 px), so no 2048 / 3840 candidates repeat in every page.
+  images: {
+    formats: ["image/avif", "image/webp"],
+    deviceSizes: [360, 480, 640, 828, 1080, 1280, 1536, 1920],
+    imageSizes: [64, 96, 128, 192, 256, 320],
+    minimumCacheTTL: 2_678_400,
+  },
   turbopack: {
     rules: {
       "*.css": {

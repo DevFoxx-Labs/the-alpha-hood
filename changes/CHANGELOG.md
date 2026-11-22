@@ -1,5 +1,48 @@
 # Change log
 
+## 2026-11-24 — Pages redesigned with the "ALPHA" mascot images (MASCOT_PROMPTS §7)
+
+**Scope:** place the owner's 41 generated images (`E:\TheAlphaHoodImages`) by the placement map in
+`MASCOT_PROMPTS.md` §7. The full map (used, kept for M9, not used and why) is in `docs/brand/mascot/README.md`.
+
+**Added**
+- `scripts/build-mascot.py` builds web WebP files plus hero composites (16:7 desktop, 4:5 mobile) into
+  `public/mascot/`. The 24 images and 6 composites are about 2.3 MB, from 73 MB of PNG. Originals are not committed.
+- `lib/brand/mascot.ts` is a typed registry with intrinsic sizes and the sampled background colour.
+  `components/brand/mascot.tsx` renders `<Mascot>` with next/image (AVIF/WebP, lazy, `blend` so grey backgrounds
+  vanish).
+- `next.config` images: AVIF + WebP; srcset widths trimmed to 1920 px.
+- Homepage:
+  - The hero has 3 mascot slides: rooftop (#21), hood-up drop (#15) and delivery run (#10), with new copy.
+  - Collection tiles use the winter, linen and denim looks (#16, #17, #19). "Knit club" became "Denim days".
+  - The promo band uses the shopping haul (#6).
+  - A new `campaign_band` CMS block, "One pack. Every fit.", uses The Pack (#22).
+- Pages:
+  - **Coming-soon page** (production today): hood-up (#15) as its LCP image.
+  - **About** redesigned: hero stance (#1), The Pack (#22) and an "Every season" strip (#16–20).
+  - **404:** peek (#14).
+  - **Empty bag** (mini-cart and /bag) and **empty wishlist:** sleeping (#13).
+  - **Empty category:** sneaker boxes (#7).
+  - **Order confirmation:** celebration (#12), only when the order is confirmed.
+  - **Size guide** modal and page: measuring (#8).
+  - **Track order** and /help/shipping: delivery run (#10).
+  - **FAQ:** thinking (#11).
+  - **Sign-in:** welcome salute (#5), desktop only.
+  - **Footer newsletter:** pointing (#4).
+- The character reference sheet is in `docs/brand/mascot/`. CLAUDE.md has the mascot rule.
+
+**Not used (by design):** merch and packaging mockups and the billboard (they would look like products for sale),
+the old logo concepts (replaced by the logo kit), the Stride image (painted fake transparency) and near-duplicates.
+Alpha Club, #WearTheHood and Ask Alpha images are ready for M9.
+
+**Verification**
+- `pnpm verify` ✓ (typecheck, lint, test 247/247, build). A new test checks that every registered mascot file exists
+  and that hero slides have alt text.
+- Built HTML: mascot `<img>` tags have width and height. Below-fold images are lazy; the coming-soon and About hero
+  images are preloaded.
+- **Not done:** browser check at 1440/390/360 and Lighthouse. The homepage with mascots renders only with demo data
+  (dev).
+
 ## 2026-11-24 — Brand logo kit wired in (before M9)
 
 **Added**

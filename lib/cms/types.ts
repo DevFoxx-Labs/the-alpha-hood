@@ -35,13 +35,31 @@ export interface HeroSlide extends Targeting {
   placeholder: { fill: string; look: FigureLook };
 }
 
+/** Campaign / mascot art for a tile or band: a /public path plus the colour baked into its background. */
+export interface TileImage {
+  src: string;
+  width: number;
+  height: number;
+  /** Panel colour so the image edge disappears (null = transparent image). */
+  bg: string | null;
+}
+
 export type HomeBlock = Targeting & { id: string } & (
     | { type: "hero"; slides: HeroSlide[] }
     | { type: "category_rail"; lead: string; title: string; viewAllHref: string }
-    | { type: "promo_band"; left: string; right: string; highlight: string; href: string }
+    | { type: "promo_band"; left: string; right: string; highlight: string; href: string; image?: TileImage }
     | {
         type: "collection_tiles";
-        tiles: { title: string; tagline: string; href: string; fill: string; look: FigureLook }[];
+        tiles: { title: string; tagline: string; href: string; fill: string; look: FigureLook; image?: TileImage }[];
+      }
+    | {
+        /** Editorial band: art on one side, headline + CTA on the other (MASCOT_PROMPTS §7 collection launch). */
+        type: "campaign_band";
+        kicker: string;
+        headline: string[];
+        text: string;
+        cta: { label: string; href: string };
+        image: TileImage & { alt: string };
       }
     | {
         type: "offer_tiles";

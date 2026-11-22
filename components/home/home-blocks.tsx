@@ -1,5 +1,5 @@
 import { ProductCard } from "@/components/store/product-card";
-import { ArrowLink, CategoryRailItem, CollectionTile, OfferTile, PromoBand } from "@/components/store/merch-tiles";
+import { ArrowLink, CampaignBand, CategoryRailItem, CollectionTile, OfferTile, PromoBand } from "@/components/store/merch-tiles";
 import { SectionHeader } from "@/components/store/section-header";
 import { deviceClass } from "@/lib/cms/schedule";
 import type { ResolvedHomeBlock } from "@/lib/storefront";
@@ -49,7 +49,10 @@ function Block({ resolved }: { resolved: ResolvedHomeBlock }) {
     }
 
     case "promo_band":
-      return <PromoBand left={block.left} right={block.right} highlight={block.highlight} href={block.href} />;
+      return <PromoBand left={block.left} right={block.right} highlight={block.highlight} href={block.href} image={block.image} />;
+
+    case "campaign_band":
+      return <CampaignBand kicker={block.kicker} headline={block.headline} text={block.text} cta={block.cta} image={block.image} />;
 
     case "collection_tiles":
       return (
