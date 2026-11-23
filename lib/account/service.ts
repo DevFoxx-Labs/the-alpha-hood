@@ -215,6 +215,6 @@ export async function deleteAccount(customerId: string, ctx: RequestContext, now
   await resolveLoyalty().erase(customerId);
   await resolveAlerts().erase(customerId);
   await resolveUgc().erase(customerId);
-  revokeAllSessions(customerId);
+  await revokeAllSessions(customerId);
   return { erased: true, keptOrderRecords: orders.length };
 }

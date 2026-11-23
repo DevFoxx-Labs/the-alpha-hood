@@ -1,3 +1,4 @@
+import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 import type { ConsentMethod, ConsentPurpose, ConsentSource, ConsentStatus } from "./purposes";
 
@@ -66,5 +67,7 @@ function refusingLedger(): ConsentLedger {
 }
 
 export function resolveLedger(env: Env = process.env): ConsentLedger {
+  const db = dbStores(env);
+  if (db) return db.ledger;
   return mockDataAllowed(env) ? devSingleton("consent_ledger", createMemoryLedger) : refusingLedger();
 }

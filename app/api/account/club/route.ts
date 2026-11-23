@@ -7,7 +7,7 @@ import { asObject, rejectUnknownFields } from "@/lib/validation";
 
 /** GET /api/account/club — ACC-03 Alpha Club dashboard (tier, coins, history, referral code). */
 export async function GET(request: Request) {
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   try {
     return privateJson(await clubDashboard(auth.customerId, resolveOrders()));
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const guard = await guardPublicWrite(request, { name: "club", limit: 10, windowMs: 10 * 60_000, maxBytes: 128 });
   if (!guard.ok) return guard.response;
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   try {
     const input = asObject(guard.body);

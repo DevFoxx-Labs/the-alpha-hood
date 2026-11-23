@@ -39,9 +39,9 @@ export function privateJson(body: unknown, init: { status?: number } = {}) {
 }
 
 /** Signed-in customer id or a 401 response. */
-export function requireCustomer(request: Request): { ok: true; customerId: string } | { ok: false; response: Response } {
+export async function requireCustomer(request: Request): Promise<{ ok: true; customerId: string } | { ok: false; response: Response }> {
   try {
-    const id = customerIdFromRequest(request);
+    const id = await customerIdFromRequest(request);
     if (id) return { ok: true, customerId: id };
   } catch (error) {
     return { ok: false, response: errorResponse(error) };
@@ -71,9 +71,9 @@ export function commerceErrorResponse(error: unknown): Response {
 }
 
 /** Account area routes: accounts switched on (fail closed) + a signed-in customer. */
-export function requireAccount(request: Request): { ok: true; customerId: string } | { ok: false; response: Response } {
+export async function requireAccount(request: Request): Promise<{ ok: true; customerId: string } | { ok: false; response: Response }> {
   if (!accountsEnabled() && !checkoutEnabled()) {
     return { ok: false, response: jsonError(503, "accounts_disabled", "Your account is temporarily unavailable.") };
   }
-  return requireCustomer(request);
+  return await requireCustomer(request);
 }

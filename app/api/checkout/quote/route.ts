@@ -14,7 +14,7 @@ import { asObject, rejectUnknownFields } from "@/lib/validation";
 export async function POST(request: Request) {
   const guard = await guardPublicWrite(request, { name: "quote", limit: 60, windowMs: 60_000, maxBytes: 512 });
   if (!guard.ok) return guard.response;
-  const auth = requireCustomer(request);
+  const auth = await requireCustomer(request);
   if (!auth.ok) return auth.response;
   try {
     const input = asObject(guard.body);

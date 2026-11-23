@@ -3,7 +3,8 @@ import { commerce } from "@/lib/commerce";
 import { clientIp, guardPublicWrite, jsonError } from "@/lib/http/guard";
 import { cartIdFrom, commerceErrorResponse, privateJson } from "@/lib/http/commerce-http";
 import { rateLimiter } from "@/lib/http/rate-limit";
-import { lookupCoupon, isCouponLive, normaliseCouponCode } from "@/lib/promotions/coupons";
+import { isCouponLive, normaliseCouponCode } from "@/lib/promotions/coupons";
+import { lookupCoupon } from "@/lib/promotions/lookup";
 import { asObject, rejectUnknownFields } from "@/lib/validation";
 
 /**

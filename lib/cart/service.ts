@@ -2,7 +2,8 @@ import { commerce } from "@/lib/commerce";
 import type { CartLine, CommerceAdapter, Product, SizeOption } from "@/lib/commerce/types";
 import type { Paise } from "@/lib/format";
 import { priceCart, type PaymentMethod, type PriceBreakdown } from "@/lib/pricing/price-cart";
-import { DEMO_COUPONS, isCouponLive, lookupCoupon, type Coupon } from "@/lib/promotions/coupons";
+import { DEMO_COUPONS, isCouponLive, type Coupon } from "@/lib/promotions/coupons";
+import { lookupCoupon } from "@/lib/promotions/lookup";
 
 /**
  * Bag service (CART-01/02/05): the one place a cart is read, validated and priced. Used by the bag,

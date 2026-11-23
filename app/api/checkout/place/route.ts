@@ -18,7 +18,7 @@ import { asObject, rejectUnknownFields } from "@/lib/validation";
 export async function POST(request: Request) {
   const guard = await guardPublicWrite(request, { name: "place-order", limit: 10, windowMs: 10 * 60_000, maxBytes: 512 });
   if (!guard.ok) return guard.response;
-  const auth = requireCustomer(request);
+  const auth = await requireCustomer(request);
   if (!auth.ok) return auth.response;
   const perCustomer = rateLimiter.hit(`place-order:customer:${auth.customerId}`, 10, 60 * 60_000);
   if (!perCustomer.ok) return jsonError(429, "rate_limited", "Too many order attempts. Please try again later.");

@@ -8,7 +8,7 @@ import { removeOwnUgc, resolveUgc } from "@/lib/ugc/service";
 export async function DELETE(request: Request, ctx: RouteContext<"/api/account/ugc/[id]">) {
   const guard = await guardPublicWrite(request, { name: "ugc-delete", limit: 20, windowMs: 10 * 60_000, maxBytes: 64 });
   if (!guard.ok) return guard.response;
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   try {
     const { id } = await ctx.params;

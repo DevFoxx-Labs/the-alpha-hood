@@ -12,13 +12,13 @@ export async function POST(request: Request) {
     const input = asObject(guard.body);
     rejectUnknownFields(input, ["everywhere"]);
     const token = sessionTokenFrom(request);
-    const customerId = customerIdFromRequest(request);
+    const customerId = await customerIdFromRequest(request);
     let revoked = 0;
     if (customerId && input.everywhere === true) {
-      revoked = revokeAllSessions(customerId);
+      revoked = await revokeAllSessions(customerId);
       securityEvent("login", { customer: customerId, action: "sign_out_everywhere", revoked });
     } else if (token) {
-      revokeSession(token);
+      await revokeSession(token);
       revoked = 1;
     }
     const response = privateJson({ ok: true, revoked });

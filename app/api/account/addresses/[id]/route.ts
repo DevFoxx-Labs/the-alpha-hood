@@ -7,7 +7,7 @@ import { commerceErrorResponse, privateJson, requireAccount } from "@/lib/http/c
 export async function DELETE(request: Request, { params }: RouteContext<"/api/account/addresses/[id]">) {
   const guard = await guardPublicWrite(request, { name: "address-delete", limit: 20, windowMs: 10 * 60_000, maxBytes: 64 });
   if (!guard.ok) return guard.response;
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   const { id } = await params;
   if (!ADDRESS_ID_RE.test(id)) return jsonError(404, "not_found", "Address not found.");

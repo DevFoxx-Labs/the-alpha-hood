@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const productId = new URL(request.url).searchParams.get("productId") ?? "";
   if (!PRODUCT_ID_RE.test(productId)) return jsonError(422, "invalid_input", "Invalid product.");
   try {
-    const customerId = customerIdFromRequest(request);
+    const customerId = await customerIdFromRequest(request);
     if (!customerId) return privateJson({ advice: null });
     const target = await commerce.getProductById(productId);
     if (!target) return jsonError(404, "not_found", "Product not found.");

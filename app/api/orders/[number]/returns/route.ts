@@ -12,7 +12,7 @@ import { createReturn, parseReturnInput, publicReturn } from "@/lib/returns/serv
 export async function POST(request: Request, { params }: RouteContext<"/api/orders/[number]/returns">) {
   const guard = await guardPublicWrite(request, { name: "return-create", limit: 10, windowMs: 60 * 60_000, maxBytes: 4_096 });
   if (!guard.ok) return guard.response;
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   const { number } = await params;
   if (!ORDER_NUMBER_RE.test(number)) return jsonError(404, "order_not_found", "Order not found.");

@@ -12,7 +12,7 @@ import type { Paise } from "@/lib/format";
 import { resolveOrders, type Order, type OrderStore } from "@/lib/orders/store";
 import { resolveGateway, type PaymentEvent, type PaymentGateway } from "@/lib/payments/gateway";
 import type { PaymentMethod } from "@/lib/pricing/price-cart";
-import { lookupCoupon } from "@/lib/promotions/coupons";
+import { lookupCoupon } from "@/lib/promotions/lookup";
 import { orderPayable } from "@/lib/orders/store";
 import { checkReferral, clubSnapshot, type ReferralCoupon } from "@/lib/loyalty/service";
 import { type LoyaltyStore, resolveLoyalty } from "@/lib/loyalty/store";

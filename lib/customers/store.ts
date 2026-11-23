@@ -1,5 +1,6 @@
 import { randomToken } from "@/lib/auth/secrets";
 import type { Address, AddressInput } from "@/lib/checkout/address";
+import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 
 /**
@@ -136,6 +137,8 @@ export function createMemoryCustomerStore(): CustomerStore {
 }
 
 export function resolveCustomers(env: Env = process.env): CustomerStore {
+  const db = dbStores(env);
+  if (db) return db.customers;
   if (mockDataAllowed(env)) return devSingleton("customer_store", createMemoryCustomerStore);
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Customers");

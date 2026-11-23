@@ -8,7 +8,7 @@ import { cancelOrder } from "@/lib/orders/lifecycle";
 export async function POST(request: Request, { params }: RouteContext<"/api/orders/[number]/cancel">) {
   const guard = await guardPublicWrite(request, { name: "order-cancel", limit: 10, windowMs: 10 * 60_000, maxBytes: 64 });
   if (!guard.ok) return guard.response;
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   const { number } = await params;
   if (!ORDER_NUMBER_RE.test(number)) return jsonError(404, "order_not_found", "Order not found.");

@@ -22,6 +22,9 @@ shadcn/ui-style primitives on `radix-ui` in `components/ui` · store components 
   / `public/brand/` — never redraw or recolour the logo.
 - **Mascot "ALPHA":** placements in `docs/brand/mascot/README.md` (from `MASCOT_PROMPTS.md` §7); use `<Mascot>` +
   `lib/brand/mascot.ts`. Product photos lead; mascot only for in-between moments; never as product photos or merch for sale.
+- **Own backend (`docs/backend/README.md`):** data lives behind store interfaces; `lib/db` implements them for MySQL,
+  PostgreSQL and MongoDB (`DATABASE_DRIVER`). Every new store needs all three + memory, passing `lib/db/contract.test.ts`.
+  Never import `lib/db` from client code (guard test). Destructive DB ops only on local `_dev`/`_test` databases.
 - **Commerce only through `lib/commerce`** (adapter interface). The mock adapter and `/dev/*` pages fail closed in
   production (`resolveCommerce`, `devPagesEnabled`).
 - **Money:** integer paise everywhere (`lib/format.ts`); the server computes every price/total — client state is display only.

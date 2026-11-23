@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
   try {
     const enabled = checkoutEnabled();
-    const customerId = enabled ? customerIdFromRequest(request) : null;
+    const customerId = enabled ? await customerIdFromRequest(request) : null;
     const customer = customerId ? await resolveCustomers().get(customerId) : null;
     const view = await loadCartView(cartIdFrom(request));
     // LOY-04: remember (ids + time only) that this customer reached checkout, for the abandoned-checkout reminder.

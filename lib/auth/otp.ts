@@ -1,3 +1,4 @@
+import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 import { resolveSms, type SmsAdapter } from "@/lib/notify/sms";
 import { maskPhone, securityEvent } from "@/lib/security/log";
@@ -14,7 +15,7 @@ export const OTP_COOLDOWN_MS = 30_000;
 const HOURLY_CAP = 5;
 const DAILY_CAP = 10;
 
-interface Challenge {
+export interface Challenge {
   id: string;
   phone: string;
   codeHash: string;
@@ -23,13 +24,64 @@ interface Challenge {
   used: boolean;
 }
 
+/**
+ * OTP storage (memory, or the own-backend database). Every change that matters for security is atomic:
+ * `bumpAttempt` only increments while under the limit and unused, and `consume` marks a code used exactly once,
+ * so two concurrent verifications can't both succeed or skip the attempt limit.
+ */
 export interface OtpStore {
-  challenges: Map<string, Challenge>;
-  sends: Map<string, number[]>;
+  sendsSince(phone: string, sinceMs: number): Promise<number[]>;
+  recordSend(phone: string, atMs: number): Promise<void>;
+  /** Removes the phone's unused challenges and stores the new one (only one live code per phone). */
+  replaceChallenge(c: Challenge): Promise<void>;
+  getChallenge(id: string): Promise<Challenge | null>;
+  deleteChallenge(id: string): Promise<void>;
+  /** attempts += 1 if attempts < max and not used. Returns the new count, or null if refused. */
+  bumpAttempt(id: string, max: number): Promise<number | null>;
+  /** used = true if it wasn't. True exactly once. */
+  consume(id: string): Promise<boolean>;
 }
 
-export function createOtpStore(): OtpStore {
-  return { challenges: new Map(), sends: new Map() };
+export interface MemoryOtpStore extends OtpStore {
+  /** Test visibility only. */
+  challenges: Map<string, Challenge>;
+}
+
+export function createOtpStore(): MemoryOtpStore {
+  const challenges = new Map<string, Challenge>();
+  const sends = new Map<string, number[]>();
+  return {
+    challenges,
+    async sendsSince(phone, since) {
+      return (sends.get(phone) ?? []).filter((t) => t > since);
+    },
+    async recordSend(phone, at) {
+      sends.set(phone, [...(sends.get(phone) ?? []).filter((t) => t > at - 86_400_000), at]);
+    },
+    async replaceChallenge(c) {
+      for (const [id, x] of challenges) if (x.phone === c.phone && !x.used) challenges.delete(id);
+      challenges.set(c.id, { ...c });
+    },
+    async getChallenge(id) {
+      const c = challenges.get(id);
+      return c ? { ...c } : null;
+    },
+    async deleteChallenge(id) {
+      challenges.delete(id);
+    },
+    async bumpAttempt(id, max) {
+      const c = challenges.get(id);
+      if (!c || c.used || c.attempts >= max) return null;
+      c.attempts += 1;
+      return c.attempts;
+    },
+    async consume(id) {
+      const c = challenges.get(id);
+      if (!c || c.used) return false;
+      c.used = true;
+      return true;
+    },
+  };
 }
 
 export class OtpError extends Error {
@@ -44,8 +96,10 @@ export class OtpError extends Error {
 }
 
 export function resolveOtpStore(env: Env = process.env): OtpStore {
+  const db = dbStores(env);
+  if (db) return db.otp;
   if (!mockDataAllowed(env)) throw new BackendUnavailableError("OTP store");
-  return devSingleton("otp_store", createOtpStore);
+  return devSingleton("otp_store_v2", createOtpStore);
 }
 
 const codeHash = (challengeId: string, code: string) => hmac("OTP_PEPPER", `${challengeId}:${code}`);
@@ -54,7 +108,7 @@ export async function sendOtp(
   phone: string,
   { store = resolveOtpStore(), sms = resolveSms(), now = Date.now() }: { store?: OtpStore; sms?: SmsAdapter; now?: number } = {},
 ): Promise<{ challengeId: string; expiresInSeconds: number; demoCode?: string }> {
-  const history = (store.sends.get(phone) ?? []).filter((t) => t > now - 86_400_000);
+  const history = (await store.sendsSince(phone, now - 86_400_000)).sort((x, y) => x - y);
   const last = history.at(-1);
   if (last !== undefined && now - last < OTP_COOLDOWN_MS) {
     throw new OtpError("cooldown", "Please wait before requesting another code.", Math.ceil((OTP_COOLDOWN_MS - (now - last)) / 1000));
@@ -67,9 +121,8 @@ export async function sendOtp(
   const code = String(randomInt(1_000_000)).padStart(6, "0");
   const id = randomToken(18);
   // Only one live challenge per phone.
-  for (const [cid, c] of store.challenges) if (c.phone === phone && !c.used) store.challenges.delete(cid);
-  store.challenges.set(id, { id, phone, codeHash: codeHash(id, code), expiresAt: now + OTP_TTL_MS, attempts: 0, used: false });
-  store.sends.set(phone, [...history, now]);
+  await store.replaceChallenge({ id, phone, codeHash: codeHash(id, code), expiresAt: now + OTP_TTL_MS, attempts: 0, used: false });
+  await store.recordSend(phone, now);
 
   const sent = await sms.sendOtp(phone, code);
   securityEvent("otp_sent", { phone: maskPhone(phone) });
@@ -82,20 +135,22 @@ export async function verifyOtp(
   code: string,
   { store = resolveOtpStore(), now = Date.now() }: { store?: OtpStore; now?: number } = {},
 ): Promise<string> {
-  const c = store.challenges.get(challengeId);
+  const c = await store.getChallenge(challengeId);
   if (!c || c.used) throw new OtpError("invalid", "That code is incorrect or has expired.");
   if (c.expiresAt <= now) {
-    store.challenges.delete(challengeId);
+    await store.deleteChallenge(challengeId);
     throw new OtpError("expired", "That code is incorrect or has expired.");
   }
-  if (c.attempts >= OTP_MAX_ATTEMPTS) throw new OtpError("locked", "Too many wrong attempts. Request a new code.");
-  c.attempts += 1;
+  // Atomic: counts the attempt only while under the limit (concurrent guesses can't exceed it).
+  const attempts = await store.bumpAttempt(challengeId, OTP_MAX_ATTEMPTS);
+  if (attempts === null) throw new OtpError("locked", "Too many wrong attempts. Request a new code.");
   if (!/^\d{6}$/.test(code) || !safeEqualHex(codeHash(challengeId, code), c.codeHash)) {
-    securityEvent(c.attempts >= OTP_MAX_ATTEMPTS ? "otp_locked" : "otp_verify_failed", { phone: maskPhone(c.phone) });
-    if (c.attempts >= OTP_MAX_ATTEMPTS) throw new OtpError("locked", "Too many wrong attempts. Request a new code.");
+    securityEvent(attempts >= OTP_MAX_ATTEMPTS ? "otp_locked" : "otp_verify_failed", { phone: maskPhone(c.phone) });
+    if (attempts >= OTP_MAX_ATTEMPTS) throw new OtpError("locked", "Too many wrong attempts. Request a new code.");
     throw new OtpError("invalid", "That code is incorrect or has expired.");
   }
-  c.used = true;
-  store.challenges.delete(challengeId);
+  // Single use: only one concurrent verification can consume the code.
+  if (!(await store.consume(challengeId))) throw new OtpError("invalid", "That code is incorrect or has expired.");
+  await store.deleteChallenge(challengeId);
   return c.phone;
 }

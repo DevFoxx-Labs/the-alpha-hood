@@ -9,7 +9,7 @@ const RETURN_RE = /^RT[0-9A-F]{10}$/;
 export async function POST(request: Request, { params }: RouteContext<"/api/returns/[number]/cancel">) {
   const guard = await guardPublicWrite(request, { name: "return-cancel", limit: 10, windowMs: 10 * 60_000, maxBytes: 64 });
   if (!guard.ok) return guard.response;
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   const { number } = await params;
   if (!RETURN_RE.test(number)) return jsonError(404, "return_not_found", "Return not found.");

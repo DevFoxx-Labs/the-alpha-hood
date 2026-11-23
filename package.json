@@ -9,14 +9,24 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "db:status": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/db.ts status",
+    "db:migrate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/db.ts migrate",
+    "db:reset": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/db.ts reset",
+    "db:test:migrate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/db.ts migrate --env-file=.env.test.local",
+    "db:mongo:dev": "\"C:/Program Files/MongoDB/Server/8.3/bin/mongod.exe\" --replSet rs0 --port 27018 --bind_ip 127.0.0.1 --dbpath .data/mongo-rs --logpath .data/mongo-rs.log --logappend",
+    "db:mongo:init": "node scripts/mongo-rs-init.mjs"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.4.0",
     "@hugeicons/react": "^1.1.10",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "kysely": "^0.29.9",
+    "mongodb": "^7.9.1",
+    "mysql2": "^3.24.6",
     "next": "16.4.6",
+    "pg": "^8.23.1",
     "qrcode.react": "^4.2.0",
     "radix-ui": "^1.8.1",
     "react": "19.3.0",
@@ -27,6 +37,7 @@
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

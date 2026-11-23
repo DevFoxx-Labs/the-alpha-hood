@@ -12,7 +12,7 @@ import { asObject, rejectUnknownFields } from "@/lib/validation";
 export async function GET(request: Request) {
   const rl = rateLimiter.hit(`prefs-read:ip:${clientIp(request)}`, 60, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   try {
     return privateJson(await getPreferences(auth.customerId));
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const guard = await guardPublicWrite(request, { name: "prefs", limit: 30, windowMs: 10 * 60_000, maxBytes: 256 });
   if (!guard.ok) return guard.response;
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   try {
     const input = asObject(guard.body);

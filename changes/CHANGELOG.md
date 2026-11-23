@@ -1,5 +1,77 @@
 # Change log
 
+## 2026-11-26 — Own backend, phase 1: MySQL / PostgreSQL / MongoDB foundation + identity stores (High-risk tier: auth, personal data)
+
+**Scope:** the store runs on its own backend, on any one of MySQL 8, PostgreSQL or MongoDB, selected by
+`DATABASE_DRIVER` + `DATABASE_URL`. Phase 1 builds the foundation and the identity / DPDP stores. The guide is
+`docs/backend/README.md`.
+
+**Added**
+- Packages (owner-approved 2026-11-26):
+  - `kysely` (one typed SQL layer for MySQL + PostgreSQL);
+  - `mysql2`, `pg`, `mongodb` (official drivers);
+  - `@types/pg` (dev).
+- `lib/db/config.ts`:
+  - fail-closed config parsing (driver/URL mismatch and a missing database name are errors);
+  - `describeTarget` (never shows credentials);
+  - `assertDestructiveAllowed` (local + `_dev`/`_test` + not production).
+- Connections:
+  - `lib/db/sql.ts`: Kysely pools (lazy driver import, UTC, utf8mb4) and `sqlTx` (one transaction, retries
+    deadlocks);
+  - `lib/db/mongo.ts`: client and `mongoTx` (majority read/write concern).
+- Migrations, one runner for all three engines (`lib/db/migrate.ts`):
+  - `lib/db/migrations/sql.ts`: tables `consent_records`, `customers`, `customer_addresses` (FK cascade),
+    `sessions`, `otp_challenges`, `otp_sends`, with UNIQUE(phone) and indexes;
+  - `lib/db/migrations/mongo.ts`: collections plus UNIQUE / TTL indexes, versioned in `_migrations`.
+- CLI `scripts/db.ts`: `pnpm db:status | db:migrate | db:reset | db:test:migrate`. It prints the target and
+  environment first.
+- Local MongoDB replica set: `pnpm db:mongo:dev` / `db:mongo:init`, port 27018, data in `.data/` (gitignored). The
+  installed Windows service is untouched.
+- Database stores (`lib/db/stores/*`), each for SQL and MongoDB:
+  - consent ledger (append-only);
+  - customers (race-safe find-or-create, address cap in a locked transaction or an atomic push, atomic counters,
+    erasure);
+  - sessions (token hash);
+  - OTP (atomic attempt counting and single use).
+- `lib/db/index.ts` `dbStores(env)`. Each `resolveX()` uses the database when one is configured; otherwise it keeps
+  memory-in-dev / refuse-in-production.
+- **Auth is now async end to end:**
+  - `SessionStore` / `OtpStore` became async interfaces;
+  - `requireCustomer`, `requireAccount`, `customerIdFromRequest`, `createSession`, `revokeSession` and
+    `revokeAllSessions` return Promises;
+  - all 29 call sites now `await` (checked with a scan, not just the type checker: a Promise is truthy, so a
+    missing `await` would have looked "signed in").
+- `lookupCoupon` moved to the server-only `lib/promotions/lookup.ts`. Through `coupons.ts` it had pulled the
+  database drivers into the browser bundle.
+- Tests (`lib/db/contract.test.ts`):
+  - config / guard tests;
+  - the same store contract on memory and every `TEST_*_URL` (races included);
+  - the real API routes end to end on each database;
+  - a guard that fails if any `"use client"` file can reach `lib/db` or a DB driver (proven by re-adding the leak).
+- `.env.local` / `.env.test.local` created (gitignored, no secrets), plus `tsconfig` `allowImportingTsExtensions`
+  for the plain-Node CLI.
+
+**Threat model (abuse case → layer)**
+- Missing `await` on an auth check reads as "signed in" → every call site awaited and scanned; the API test checks
+  no-cookie → 401 on the DB path (prevent, tested).
+- Session table leak → only SHA-256 hashes stored (prevent).
+- OTP brute force with parallel requests → conditional increment `attempts < max` (prevent, race-tested).
+- OTP replay / double use → conditional `used = false → true` (prevent, race-tested).
+- Duplicate accounts for one phone → UNIQUE index plus read-back on duplicate (prevent, race-tested).
+- SQL injection → Kysely bound parameters only; search input escaped for LIKE and regex (prevent, tested).
+- Dropping a real database → destructive operations only on local `_dev`/`_test` (prevent, tested).
+- Credentials leaking into logs → `describeTarget` strips them (prevent, tested).
+- DB code in the browser → guard test (enforce, tested).
+
+**Verification**
+- `pnpm verify` ✓ (typecheck, lint, test 298/298, build) · `pnpm audit --prod`: no known vulnerabilities.
+- On local MongoDB (`alpha_hood_dev`, `alpha_hood_test`, 127.0.0.1:27018): migrations applied and idempotent; all 8
+  store-contract tests and the API end-to-end test pass.
+- **Not done:**
+  - MySQL and PostgreSQL contract runs (need the owner's credentials in `.env.test.local`).
+  - Phases 2–6 (money, after-sales, catalogue, admin, seed).
+  - Browser check.
+
 ## 2026-11-25 — Security review M5–M9, fix R1, roadmap
 
 **Added**

@@ -8,7 +8,7 @@ import { asObject, rejectUnknownFields } from "@/lib/validation";
 
 /** GET — the customer's own #WearTheHood posts with their moderation status. */
 export async function GET(request: Request) {
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   try {
     const posts = await resolveUgc().listByCustomer(auth.customerId);
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const guard = await guardPublicWrite(request, { name: "ugc", limit: 10, windowMs: 60 * 60_000, maxBytes: 1024 });
   if (!guard.ok) return guard.response;
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   try {
     const input = asObject(guard.body);

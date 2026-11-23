@@ -6,7 +6,7 @@ import { commerceErrorResponse, privateJson, requireAccount } from "@/lib/http/c
 export async function DELETE(request: Request, ctx: RouteContext<"/api/account/alerts/[id]">) {
   const guard = await guardPublicWrite(request, { name: "alerts-delete", limit: 30, windowMs: 10 * 60_000, maxBytes: 64 });
   if (!guard.ok) return guard.response;
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   try {
     const { id } = await ctx.params;

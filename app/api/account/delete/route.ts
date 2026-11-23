@@ -12,7 +12,7 @@ import { asObject, rejectUnknownFields } from "@/lib/validation";
 export async function POST(request: Request) {
   const guard = await guardPublicWrite(request, { name: "account-delete", limit: 5, windowMs: 60 * 60_000, maxBytes: 128 });
   if (!guard.ok) return guard.response;
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   try {
     const input = asObject(guard.body);

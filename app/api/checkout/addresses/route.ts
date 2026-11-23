@@ -7,7 +7,7 @@ import { commerceErrorResponse, privateJson, requireCustomer } from "@/lib/http/
 export async function POST(request: Request) {
   const guard = await guardPublicWrite(request, { name: "address", limit: 20, windowMs: 10 * 60_000, maxBytes: 2_048 });
   if (!guard.ok) return guard.response;
-  const auth = requireCustomer(request);
+  const auth = await requireCustomer(request);
   if (!auth.ok) return auth.response;
   try {
     const customers = resolveCustomers();

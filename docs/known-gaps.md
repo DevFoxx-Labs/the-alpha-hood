@@ -172,3 +172,14 @@
 - 🟡 Shop the Look uses placeholder art and demo looks; the CMS / platform should own looks and hotspots.
 - 🟡 Size advice uses order history only; the height/weight quiz (PDP-04) is not built.
 - 🟡 Not browser-checked at 1440/390/360; homepage M9 blocks render only with demo data (`pnpm dev`).
+
+## Own backend (2026-11-26 — `docs/backend/README.md`)
+- 🔴 Only phase 1 stores (consent, customers, sessions, OTP) are on the database. Carts, orders, payments, wallet,
+  returns, catalogue, staff, etc. are still memory-only — with `DATABASE_DRIVER` set in production those still refuse
+  (fail closed). Phases 2–6 pending.
+- 🟠 MySQL and PostgreSQL stores are written but not yet run against a real server (contract tests skip without
+  `TEST_MYSQL_URL` / `TEST_POSTGRES_URL`). Run them before relying on either engine.
+- 🟠 The local MongoDB replica set (port 27018) is a manual process (`pnpm db:mongo:dev`); it isn't a Windows service.
+- 🟡 Expired sessions / OTP rows: MongoDB TTL indexes clean them; SQL needs a scheduled cleanup (add to the cron sweep).
+- 🟡 No CI database matrix yet (MySQL + Postgres + Mongo service containers running the contract suite).
+

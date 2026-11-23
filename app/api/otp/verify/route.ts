@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
     securityEvent("login", { customer: customer.id, phone: maskPhone(phone), created });
     const response = privateJson({ ok: true });
-    setSessionCookie(response, createSession(customer.id));
+    setSessionCookie(response, await createSession(customer.id));
     return response;
   } catch (error) {
     return commerceErrorResponse(error);

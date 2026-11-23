@@ -7,7 +7,7 @@ import { resolvePhotos } from "@/lib/returns/photos";
 export async function GET(request: Request, { params }: RouteContext<"/api/returns/photos/[id]">) {
   const rl = rateLimiter.hit(`photo-read:ip:${clientIp(request)}`, 120, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   const { id } = await params;
   try {

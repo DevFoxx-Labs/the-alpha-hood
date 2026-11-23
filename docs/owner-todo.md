@@ -120,3 +120,10 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] Decide whether to sell gift cards online (needs a payment flow + GST decision) — staff can issue them today.
 - [ ] Give finance staff the gift card process: issue with a reason, send the code privately, block if reported lost.
 
+## 2026-11-26 (own backend, phase 1)
+- [ ] Create the local databases and a dedicated app user (not root):
+      MySQL `CREATE DATABASE alpha_hood_dev …; CREATE DATABASE alpha_hood_test …;` and the same two in PostgreSQL.
+- [ ] Put the credentials in `.env.test.local` (`TEST_MYSQL_URL`, `TEST_POSTGRES_URL`) and, to run the app on them,
+      in `.env.local` — then run `pnpm test` (contract suite on all three) and tell me the result.
+- [ ] Production database choice (MySQL / PostgreSQL / MongoDB Atlas) and hosting — the app supports all three.
+

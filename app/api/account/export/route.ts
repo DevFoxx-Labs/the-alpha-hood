@@ -5,7 +5,7 @@ import { rateLimiter } from "@/lib/http/rate-limit";
 
 /** GET /api/account/export — DPDP access right: a JSON copy of the caller's own data. 5 per hour. */
 export async function GET(request: Request) {
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   const rl = rateLimiter.hit(`export:customer:${auth.customerId}`, 5, 60 * 60_000);
   const ipRl = rateLimiter.hit(`export:ip:${clientIp(request)}`, 10, 60 * 60_000);

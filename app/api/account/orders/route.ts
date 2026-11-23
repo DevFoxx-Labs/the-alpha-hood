@@ -7,7 +7,7 @@ import { resolveOrders } from "@/lib/orders/store";
 export async function GET(request: Request) {
   const rl = rateLimiter.hit(`orders-list:ip:${clientIp(request)}`, 60, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   try {
     const orders = (await resolveOrders().listByCustomer(auth.customerId)).filter((o) => o.status !== "expired" || o.attempts.length > 0);

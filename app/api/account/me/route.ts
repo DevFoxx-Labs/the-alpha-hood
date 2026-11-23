@@ -9,7 +9,7 @@ import { resolveCredit } from "@/lib/wallet/store-credit";
 export async function GET(request: Request) {
   const rl = rateLimiter.hit(`account-read:ip:${clientIp(request)}`, 60, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   try {
     const customer = await resolveCustomers().get(auth.customerId);
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   const guard = await guardPublicWrite(request, { name: "profile", limit: 20, windowMs: 10 * 60_000, maxBytes: 512 });
   if (!guard.ok) return guard.response;
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   try {
     const input = asObject(guard.body);

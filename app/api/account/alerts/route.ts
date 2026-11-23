@@ -10,7 +10,7 @@ const SIZE_RE = /^[A-Za-z0-9 ]{1,8}$/;
 
 /** GET /api/account/alerts — the customer's own alerts (PDP-10). */
 export async function GET(request: Request) {
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   try {
     const alerts = await resolveAlerts().listByCustomer(auth.customerId);
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const guard = await guardPublicWrite(request, { name: "alerts", limit: 20, windowMs: 10 * 60_000, maxBytes: 256 });
   if (!guard.ok) return guard.response;
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   if (!rateLimiter.hit(`alerts:customer:${auth.customerId}`, 40, 86_400_000).ok) return jsonError(429, "rate_limited", "Too many alerts today.");
   try {

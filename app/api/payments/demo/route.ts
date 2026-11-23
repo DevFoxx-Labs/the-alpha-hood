@@ -17,7 +17,7 @@ const PAYMENT_RE = /^pay_[a-f0-9]{24}$/;
 async function ownedPayment(request: Request, paymentId: string) {
   const deps = defaultDeps();
   if (!isDemoGateway(deps.gateway)) return { deps, error: jsonError(404, "not_found", "Not found.") };
-  const customerId = customerIdFromRequest(request);
+  const customerId = await customerIdFromRequest(request);
   const order = PAYMENT_RE.test(paymentId) ? await deps.orders.byPaymentId(paymentId) : null;
   if (!customerId || !order || order.customerId !== customerId) return { deps, error: jsonError(404, "not_found", "Not found.") };
   return { deps, gateway: deps.gateway, order };

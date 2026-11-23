@@ -9,7 +9,7 @@ import { resolveOrders } from "@/lib/orders/store";
 export async function GET(request: Request, { params }: RouteContext<"/api/orders/[number]">) {
   const rl = rateLimiter.hit(`order-read:ip:${clientIp(request)}`, 60, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
-  const auth = requireCustomer(request);
+  const auth = await requireCustomer(request);
   if (!auth.ok) return auth.response;
   const { number } = await params;
   if (!ORDER_NUMBER_RE.test(number)) return jsonError(404, "order_not_found", "Order not found.");

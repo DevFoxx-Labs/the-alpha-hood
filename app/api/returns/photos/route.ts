@@ -7,7 +7,7 @@ import { MAX_PHOTO_BYTES, resolvePhotos } from "@/lib/returns/photos";
  * day each plus a per-IP limit. Type is verified by magic bytes; metadata (EXIF/GPS) is stripped.
  */
 export async function POST(request: Request) {
-  const auth = requireAccount(request);
+  const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   const guard = await guardPublicUpload(request, { name: "return-photo", limit: 20, windowMs: 60 * 60_000, maxBytes: MAX_PHOTO_BYTES });
   if (!guard.ok) return guard.response;
