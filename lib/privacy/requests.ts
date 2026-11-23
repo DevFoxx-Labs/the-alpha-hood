@@ -1,3 +1,4 @@
+import { dbStores } from "@/lib/db";
 import { ValidationError } from "@/lib/http/guard";
 import { LEGAL_CONFIG } from "@/lib/legal/config";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
@@ -49,18 +50,23 @@ function reference(): string {
   return `PR-${Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join("")}`;
 }
 
+/** A new request with its reference and DPDP deadlines (one rule for every store). */
+export function newPrivacyRequest(input: PrivacyRequestInput, now: Date): PrivacyRequest {
+  return {
+    ...input,
+    reference: reference(),
+    status: "received",
+    createdAt: now.toISOString(),
+    acknowledgeBy: new Date(now.getTime() + LEGAL_CONFIG.acknowledgeWithinHours * 3_600_000).toISOString(),
+    resolveBy: new Date(now.getTime() + LEGAL_CONFIG.resolveWithinDays * 86_400_000).toISOString(),
+  };
+}
+
 export function createMemoryInbox(): GrievanceInbox {
   const items: PrivacyRequest[] = [];
   return {
     async create(input, now) {
-      const request: PrivacyRequest = {
-        ...input,
-        reference: reference(),
-        status: "received",
-        createdAt: now.toISOString(),
-        acknowledgeBy: new Date(now.getTime() + LEGAL_CONFIG.acknowledgeWithinHours * 3_600_000).toISOString(),
-        resolveBy: new Date(now.getTime() + LEGAL_CONFIG.resolveWithinDays * 86_400_000).toISOString(),
-      };
+      const request = newPrivacyRequest(input, now);
       items.push(request);
       return request;
     },
@@ -86,6 +92,8 @@ export function createMemoryInbox(): GrievanceInbox {
 }
 
 export function resolveInbox(env: Env = process.env): GrievanceInbox {
+  const db = dbStores(env);
+  if (db) return db.inbox;
   if (mockDataAllowed(env)) return devSingleton("grievance_inbox", createMemoryInbox);
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Grievance inbox");

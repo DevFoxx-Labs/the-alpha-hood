@@ -5,8 +5,9 @@
 ## DPDP / legal
 - 🔴 **Notices are drafts.** Company, address, GSTIN, support and Grievance Officer details are placeholders
   (`lib/legal/config.ts`, env) and every text needs lawyer review (Privacy, Terms, Refund, Cookie; Hindi translation too).
-- 🔴 **No production persistence** for the consent ledger, newsletter list and grievance inbox — they fail closed (503)
-  in production. Needs the database from the platform decision (PRD §4) with an append-only `consent_records` table.
+- 🟠 The consent ledger, newsletter list and grievance inbox now persist on the own backend (phases 1 and 3,
+  `docs/backend/README.md`). Without `DATABASE_DRIVER` + `DATABASE_URL` they still fail closed (503) in production.
+  Remaining step: choose and host the production database (owner TODO).
 - 🟠 Privacy requests are worked in `/admin/privacy` (M7); the acknowledgement message and identity-check OTP still need
   an email/SMS provider.
 - 🟠 Newsletter double opt-in (confirmation message before any offer) when the email/WhatsApp provider is added;
@@ -91,7 +92,10 @@
 - 🟠 No list of active sessions/devices and no new-device alerts yet.
 - 🟠 COD refunds to UPI are queued (`payout_pending`) — needs the gateway payout API + ops approval (M7). UPI IDs must be
   encrypted at rest once a database exists.
-- 🟠 Return photos live in memory — production needs a private bucket, short-lived signed URLs and a purge job.
+- 🟠 Return photos are stored in the database (`return_photos`, owner-scoped, EXIF stripped), never in a public
+  folder. Still needed before scale:
+  - move them to a private bucket with short-lived signed URLs (DB rows add backup weight);
+  - a purge job for photos never attached to a return, and for return photos past their retention period.
 - 🟠 Notifications are only queued (outbox) — SMS (DLT templates) / email providers and the delivery worker are pending.
 - 🟠 Courier webhooks (shipped / delivered / NDR / RTO) not connected — staff advance orders in `/admin`; NDR handling pending.
 - 🟠 Account deletion keeps addresses inside past orders (tax records) — confirm with the lawyer.
@@ -174,10 +178,18 @@
 - 🟡 Not browser-checked at 1440/390/360; homepage M9 blocks render only with demo data (`pnpm dev`).
 
 ## Own backend (2026-11-26 — `docs/backend/README.md`)
-- 🔴 Phases 1–2 are on the database: consent, customers, sessions, OTP, locks, carts, inventory, orders, payments,
-  invoice series, store credit, Hood Coins, Alpha Club and gift cards. Still memory-only: returns, privacy inbox,
-  newsletter (phase 3); catalogue (phase 4); staff, MFA, audit log, alerts, UGC, outbox, rate limiter, flows
-  (phase 5). In production, everything that needs the catalogue still refuses (fail closed). Phases 3–6 pending.
+- 🔴 Phases 1–3 are on the database:
+  - identity: consent, customers, sessions, OTP;
+  - money: locks, carts, inventory, orders, payments, invoice series, store credit, Hood Coins, Alpha Club, gift cards;
+  - after-sales: returns, return photos, privacy inbox, newsletter.
+
+  Still memory-only:
+  - catalogue (phase 4);
+  - staff, MFA, audit log, alerts, UGC, outbox, rate limiter, flows (phase 5).
+
+  In production, everything that needs the catalogue still refuses (fail closed). Phases 4–6 pending.
+- 🟡 The per-contact privacy-request cap (3 a day) is a count followed by an insert. Two requests sent at the same
+  instant could both get through. The per-IP route limit still applies; add a lock if this is ever abused.
 - 🟠 The catalogue still comes from the mock adapter. Inventory `on_hand` is seeded from its stock numbers once per
   SKU (`lib/db/stores/commerce.ts` `ensureSku`). After phase 4, the seed must come from the real product data.
 - 🟡 SQL `app_locks` / `markers` / expired `inventory_reservations` rows aren't cleaned yet (harmless, they grow).

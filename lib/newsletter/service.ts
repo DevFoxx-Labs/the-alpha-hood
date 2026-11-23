@@ -1,5 +1,6 @@
 import { recordCommunicationConsent, type RequestContext } from "@/lib/consent/service";
 import type { ConsentLedger } from "@/lib/consent/ledger";
+import { dbStores } from "@/lib/db";
 import { ValidationError } from "@/lib/http/guard";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 import { asObject, normaliseEmail, normaliseIndianMobile, rejectUnknownFields } from "@/lib/validation";
@@ -57,6 +58,8 @@ export function createMemoryNewsletterStore(): NewsletterStore {
 }
 
 export function resolveNewsletterStore(env: Env = process.env): NewsletterStore {
+  const db = dbStores(env);
+  if (db) return db.newsletter;
   if (mockDataAllowed(env)) return devSingleton("newsletter", createMemoryNewsletterStore);
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Newsletter");

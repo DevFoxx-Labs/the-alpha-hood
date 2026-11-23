@@ -7,7 +7,21 @@ import type { CustomerStore } from "@/lib/customers/store";
 import type { GiftCardStore } from "@/lib/giftcards/store";
 import type { LoyaltyStore } from "@/lib/loyalty/store";
 import type { OrderStore } from "@/lib/orders/store";
+import type { NewsletterStore } from "@/lib/newsletter/service";
+import type { GrievanceInbox } from "@/lib/privacy/requests";
+import type { PhotoStore } from "@/lib/returns/photos";
+import type { ReturnStore } from "@/lib/returns/service";
 import type { StoreCreditLedger } from "@/lib/wallet/store-credit";
+import {
+  createMongoInbox,
+  createMongoNewsletterStore,
+  createMongoPhotoStore,
+  createMongoReturnStore,
+  createSqlInbox,
+  createSqlNewsletterStore,
+  createSqlPhotoStore,
+  createSqlReturnStore,
+} from "./stores/aftersales";
 import { type DbConfig, readDbConfig } from "./config";
 import { getMongo } from "./mongo";
 import { createMongoPrimitives, createSqlPrimitives, type Primitives } from "./primitives";
@@ -27,6 +41,7 @@ import { createDbCreditLedger, createMongoGiftCardStore, createMongoLoyaltyStore
  * Phase 1: consent ledger, customers, sessions, OTP.
  * Phase 2: locks, orders + payments + invoice series, carts + inventory (catalogue still from the adapter),
  *          store credit, Hood Coins + Alpha Club, gift cards.
+ * Phase 3: returns + return photos, DPDP grievance inbox, newsletter subscribers.
  */
 export interface DbStores {
   config: DbConfig;
@@ -42,6 +57,10 @@ export interface DbStores {
   giftCards: GiftCardStore;
   /** Wraps a catalogue adapter with database carts + inventory. */
   commerce(catalog: CommerceAdapter): CommerceAdapter;
+  returns: ReturnStore;
+  photos: PhotoStore;
+  inbox: GrievanceInbox;
+  newsletter: NewsletterStore;
 }
 
 type Env = Record<string, string | undefined>;
@@ -65,6 +84,10 @@ export function createDbStores(cfg: DbConfig): DbStores {
       loyalty: createMongoLoyaltyStore(conn, p),
       giftCards: createMongoGiftCardStore(conn, p),
       commerce: (catalog) => createDbCommerce(catalog, createMongoCartRepo(conn), createMongoInventory(conn, p, catalog)),
+      returns: createMongoReturnStore(conn),
+      photos: createMongoPhotoStore(conn),
+      inbox: createMongoInbox(conn),
+      newsletter: createMongoNewsletterStore(conn),
     };
   }
   const db = getSqlDb(cfg);
@@ -82,6 +105,10 @@ export function createDbStores(cfg: DbConfig): DbStores {
     loyalty: createSqlLoyaltyStore(db, p),
     giftCards: createSqlGiftCardStore(db, p),
     commerce: (catalog) => createDbCommerce(catalog, createSqlCartRepo(db), createSqlInventory(db, p, catalog)),
+    returns: createSqlReturnStore(db),
+    photos: createSqlPhotoStore(db),
+    inbox: createSqlInbox(db),
+    newsletter: createSqlNewsletterStore(db),
   };
 }
 

@@ -26,6 +26,8 @@ const MONEY_COLLECTIONS = [
   "gift_cards",
 ];
 
+const AFTERSALES_COLLECTIONS = ["returns", "return_photos", "privacy_requests", "newsletter_subscribers"];
+
 async function ensureCollection(db: Db, name: string) {
   const exists = await db.listCollections({ name }, { nameOnly: true }).hasNext();
   if (!exists) await db.createCollection(name);
@@ -94,6 +96,31 @@ export const MONGO_MIGRATIONS: MongoMigration[] = [
     },
     async down(db) {
       for (const c of MONEY_COLLECTIONS) {
+        if (await db.listCollections({ name: c }, { nameOnly: true }).hasNext()) await db.collection(c).drop();
+      }
+    },
+  },
+  {
+    name: "2026_11_26_003_aftersales",
+    async up(db) {
+      for (const c of AFTERSALES_COLLECTIONS) await ensureCollection(db, c);
+      await db.collection("returns").createIndexes([
+        { key: { orderNumber: 1 }, name: "returns_order_idx" },
+        { key: { customerId: 1, createdAt: -1 }, name: "returns_customer_idx" },
+        { key: { createdAt: -1 }, name: "returns_created_idx" },
+      ]);
+      await db.collection("return_photos").createIndexes([{ key: { owner_id: 1, created_at: -1 }, name: "return_photos_owner_idx" }]);
+      await db.collection("privacy_requests").createIndexes([
+        { key: { contact: 1, createdAt: -1 }, name: "privacy_requests_contact_idx" },
+        { key: { createdAt: -1 }, name: "privacy_requests_created_idx" },
+      ]);
+      await db.collection("newsletter_subscribers").createIndexes([
+        { key: { channel: 1, contact: 1 }, name: "newsletter_contact_uq", unique: true },
+        { key: { id: 1 }, name: "newsletter_id_uq", unique: true },
+      ]);
+    },
+    async down(db) {
+      for (const c of AFTERSALES_COLLECTIONS) {
         if (await db.listCollections({ name: c }, { nameOnly: true }).hasNext()) await db.collection(c).drop();
       }
     },

@@ -7,6 +7,7 @@ import { refundTenders, splitRefund } from "@/lib/wallet/tenders";
 import { CommerceError } from "@/lib/commerce/types";
 import type { Paise } from "@/lib/format";
 import { ValidationError } from "@/lib/http/guard";
+import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 import { notify } from "@/lib/notify/outbox";
 import { capturedAmount, refundedAmount } from "@/lib/orders/lifecycle";
@@ -91,6 +92,8 @@ export function createMemoryReturnStore(): ReturnStore {
 }
 
 export function resolveReturns(env: Env = process.env): ReturnStore {
+  const db = dbStores(env);
+  if (db) return db.returns;
   if (mockDataAllowed(env)) return devSingleton("return_store", createMemoryReturnStore);
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Returns");

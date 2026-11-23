@@ -297,5 +297,69 @@ export function sqlMigrations(d: Driver): Record<string, Migration> {
         }
       },
     },
+
+    "2026_11_26_003_aftersales": {
+      async up(db: AnyDb) {
+        const table = (name: string) => db.schema.createTable(name).ifNotExists();
+        const end = mysqlTable(d);
+        const blob = d === "postgres" ? sql`bytea` : sql`mediumblob`; // ≤ 16 MB; photos are capped at 5 MB
+
+        // Returns: indexed lookup columns + the full request document; updates under FOR UPDATE.
+        await table("returns")
+          .addColumn("number", "varchar(32)", (col) => col.primaryKey())
+          .addColumn("order_number", "varchar(32)", (col) => col.notNull())
+          .addColumn("customer_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("status", "varchar(24)", (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addColumn("doc", c.json, (col) => col.notNull())
+          .addColumn("version", "integer", (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "returns_order_idx", "returns", ["order_number"]);
+        await createIndex(db, d, "returns_customer_idx", "returns", ["customer_id", "created_at"]);
+        await createIndex(db, d, "returns_created_idx", "returns", ["created_at"]);
+
+        // Return photos (private): EXIF already stripped before insert; only reachable through an owner check.
+        await table("return_photos")
+          .addColumn("id", "varchar(40)", (col) => col.primaryKey())
+          .addColumn("owner_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("type", "varchar(16)", (col) => col.notNull())
+          .addColumn("bytes", blob, (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addColumn("attached_to", "varchar(32)")
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "return_photos_owner_idx", "return_photos", ["owner_id", "created_at"]);
+
+        // DPDP grievance inbox: requests are compliance records (kept; not erased with the account).
+        await table("privacy_requests")
+          .addColumn("reference", "varchar(16)", (col) => col.primaryKey())
+          .addColumn("type", "varchar(32)", (col) => col.notNull())
+          .addColumn("contact", "varchar(254)", (col) => col.notNull())
+          .addColumn("status", "varchar(16)", (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addColumn("doc", c.json, (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "privacy_requests_contact_idx", "privacy_requests", ["contact", "created_at"]);
+        await createIndex(db, d, "privacy_requests_created_idx", "privacy_requests", ["created_at"]);
+
+        // Newsletter: one current subscriber per (channel, contact) — UNIQUE, so racing sign-ups can't duplicate.
+        await table("newsletter_subscribers")
+          .addColumn("id", "varchar(64)", (col) => col.primaryKey())
+          .addColumn("channel", "varchar(10)", (col) => col.notNull())
+          .addColumn("contact", "varchar(254)", (col) => col.notNull())
+          .addColumn("status", "varchar(24)", (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "newsletter_contact_uq", "newsletter_subscribers", ["channel", "contact"], true);
+      },
+      async down(db: AnyDb) {
+        for (const t of ["newsletter_subscribers", "privacy_requests", "return_photos", "returns"]) {
+          await db.schema.dropTable(t).ifExists().execute();
+        }
+      },
+    },
   };
 }

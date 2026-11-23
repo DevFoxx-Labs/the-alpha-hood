@@ -211,6 +211,8 @@ for (const target of testTargets().filter((t) => t.cfg)) {
 
 // ── Phase 2: money stores + checkout API (same file so database suites run sequentially) ─────────
 import "./money-contract";
+// ── Phase 3: returns, photos, grievance inbox, newsletter ─────────────────────────────────────────
+import "./aftersales-contract";
 
 // ── Guard: database code must never reach the browser bundle ─────────────────────────────────────
 import { existsSync as fileExists, readFileSync as readSource, readdirSync, statSync } from "node:fs";

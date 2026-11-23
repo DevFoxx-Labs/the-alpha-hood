@@ -159,7 +159,44 @@ export interface GiftCardsTable {
   disabled: boolean | number;
 }
 
+export interface ReturnsTable {
+  number: string;
+  order_number: string;
+  customer_id: string;
+  status: string;
+  created_at: Date;
+  doc: unknown;
+  version: number;
+}
+export interface ReturnPhotosTable {
+  id: string;
+  owner_id: string;
+  type: string;
+  bytes: Uint8Array;
+  created_at: Date;
+  attached_to: string | null;
+}
+export interface PrivacyRequestsTable {
+  reference: string;
+  type: string;
+  contact: string;
+  status: string;
+  created_at: Date;
+  doc: unknown;
+}
+export interface NewsletterSubscribersTable {
+  id: string;
+  channel: string;
+  contact: string;
+  status: string;
+  created_at: Date;
+}
+
 export interface Database {
+  returns: ReturnsTable;
+  return_photos: ReturnPhotosTable;
+  privacy_requests: PrivacyRequestsTable;
+  newsletter_subscribers: NewsletterSubscribersTable;
   app_locks: AppLocksTable;
   markers: MarkersTable;
   counters: CountersTable;

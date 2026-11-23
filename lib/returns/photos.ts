@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 
 /**
@@ -72,7 +73,18 @@ export function stripPng(bytes: Uint8Array): Uint8Array {
   return out;
 }
 
-interface StoredPhoto {
+/** One rule for every store: size cap, sniffed type, metadata stripped, server-chosen random id. */
+export function preparePhoto(raw: Uint8Array): { id: string; type: PhotoType; bytes: Uint8Array } {
+  if (raw.length === 0 || raw.length > MAX_PHOTO_BYTES) throw new Error("bad_size");
+  const type = sniffType(raw);
+  if (!type) throw new Error("bad_type");
+  const bytes = type === "image/jpeg" ? stripJpeg(raw) : stripPng(raw);
+  return { id: `img_${randomBytes(16).toString("hex")}`, type, bytes };
+}
+
+export const isPhotoId = (id: string) => PHOTO_ID_RE.test(id);
+
+export interface StoredPhoto {
   id: string;
   ownerId: string;
   type: PhotoType;
@@ -93,11 +105,7 @@ export function createMemoryPhotoStore(): PhotoStore {
   const photos = new Map<string, StoredPhoto>();
   return {
     async save(ownerId, raw, now = Date.now()) {
-      if (raw.length === 0 || raw.length > MAX_PHOTO_BYTES) throw new Error("bad_size");
-      const type = sniffType(raw);
-      if (!type) throw new Error("bad_type");
-      const bytes = type === "image/jpeg" ? stripJpeg(raw) : stripPng(raw);
-      const id = `img_${randomBytes(16).toString("hex")}`;
+      const { id, type, bytes } = preparePhoto(raw);
       photos.set(id, { id, ownerId, type, bytes, createdAt: now, attachedTo: null });
       return { id, type };
     },
@@ -121,6 +129,8 @@ export function createMemoryPhotoStore(): PhotoStore {
 }
 
 export function resolvePhotos(env: Env = process.env): PhotoStore {
+  const db = dbStores(env);
+  if (db) return db.photos;
   if (mockDataAllowed(env)) return devSingleton("return_photos", createMemoryPhotoStore);
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Photo storage");

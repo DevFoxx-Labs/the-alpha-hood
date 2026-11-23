@@ -8,7 +8,11 @@ import { createMemoryLedger } from "@/lib/consent/ledger";
 import { createMemoryCustomerStore } from "@/lib/customers/store";
 import { createMemoryGiftCardStore } from "@/lib/giftcards/store";
 import { createMemoryLoyaltyStore } from "@/lib/loyalty/store";
+import { createMemoryNewsletterStore } from "@/lib/newsletter/service";
 import { createMemoryOrderStore } from "@/lib/orders/store";
+import { createMemoryInbox } from "@/lib/privacy/requests";
+import { createMemoryPhotoStore } from "@/lib/returns/photos";
+import { createMemoryReturnStore } from "@/lib/returns/service";
 import { createMemoryCreditLedger } from "@/lib/wallet/store-credit";
 import { assertDestructiveAllowed, type DbConfig } from "./config";
 import { createDbStores, type DbStores, forgetDbStores } from "./index";
@@ -60,6 +64,10 @@ export function testTargets(): Target[] {
           loyalty: createMemoryLoyaltyStore(),
           giftCards: createMemoryGiftCardStore(),
           commerce: createMockAdapter(),
+          returns: createMemoryReturnStore(),
+          photos: createMemoryPhotoStore(),
+          inbox: createMemoryInbox(),
+          newsletter: createMemoryNewsletterStore(),
         };
       },
       async teardown() {},
@@ -87,6 +95,10 @@ export function testTargets(): Target[] {
           loyalty: s.loyalty,
           giftCards: s.giftCards,
           commerce: s.commerce(createMockAdapter()),
+          returns: s.returns,
+          photos: s.photos,
+          inbox: s.inbox,
+          newsletter: s.newsletter,
         };
       },
       async teardown() {

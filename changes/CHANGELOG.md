@@ -1,5 +1,48 @@
 # Change log
 
+## 2026-11-26 — Own backend, phase 3: returns, return photos, grievance inbox, newsletter on the database (High-risk tier: uploads, personal data)
+
+**Threat model:**
+- *Assets:* return photos (private, may show a home); privacy requests (contact + details); subscriber contacts;
+  return / refund state.
+- *Actors:* a customer trying to read someone else's photo or reuse one photo on two returns; parallel sign-ups;
+  staff working the same privacy request at the same time.
+- *Abuse cases and the layer that stops each:*
+  - reading another customer's photo → owner-scoped query (an id that isn't yours behaves like one that doesn't
+    exist);
+  - path-like photo ids → id regex before any query;
+  - EXIF/GPS leak → stripped before insert, the same `preparePhoto` for every store;
+  - script disguised as an image → magic-byte sniffing;
+  - one photo on two returns, or attaching someone else's photo → all-or-nothing conditional attach in a transaction;
+  - lost return or privacy-request updates → row lock / version check / atomic `$push`;
+  - duplicate subscribers → UNIQUE (channel, contact).
+
+**Added**
+- Migrations `2026_11_26_003_aftersales` (SQL + Mongo, additive; reversible only on local `_dev` / `_test`
+  databases): `returns`, `return_photos`, `privacy_requests`, `newsletter_subscribers`.
+- `lib/db/stores/aftersales.ts`: SQL and MongoDB versions of all four stores.
+- Shared rules, so the memory and database stores can't drift:
+  - `preparePhoto` / `isPhotoId` in `lib/returns/photos.ts`;
+  - `newPrivacyRequest` in `lib/privacy/requests.ts`.
+- Tests: `lib/db/aftersales-contract.ts`, the contract with races (photo attach, concurrent status updates, racing
+  sign-ups), plus API end-to-end tests on each database:
+  - return with a photo;
+  - privacy request;
+  - newsletter sign-up + withdrawal.
+
+**Changed**
+- `resolveReturns`, `resolvePhotos`, `resolveInbox` and `resolveNewsletterStore` use the database when one is
+  configured.
+
+**Verified**
+- `pnpm verify`: typecheck, lint, 325/325 tests (memory + local MongoDB), build.
+- `pnpm audit --prod`: clean.
+- `pnpm db:migrate` on local `alpha_hood_dev`: 3 migrations applied.
+
+**Not verified**
+- MySQL / PostgreSQL. They need `TEST_MYSQL_URL` / `TEST_POSTGRES_URL` (owner TODO).
+- No UI change.
+
 ## 2026-11-26 — Own backend, phase 2: money stores on MySQL / PostgreSQL / MongoDB (High-risk tier: payments, wallet, stock)
 
 **Threat model:**
