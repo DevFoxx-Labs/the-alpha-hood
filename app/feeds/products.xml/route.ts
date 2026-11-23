@@ -10,7 +10,7 @@ import { getAllProducts, storefrontAvailable } from "@/lib/storefront";
  * feed on the platforms' next scheduled fetch. Not indexed; rate-limited per IP.
  */
 export async function GET(request: Request) {
-  const rl = rateLimiter.hit(`feed:ip:${clientIp(request)}`, 30, 60 * 60_000);
+  const rl = await rateLimiter.hit(`feed:ip:${clientIp(request)}`, 30, 60 * 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
   if (!storefrontAvailable()) return jsonError(503, "unavailable", "Catalogue not available.");
   const products = await getAllProducts();

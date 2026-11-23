@@ -418,5 +418,141 @@ export function sqlMigrations(d: Driver): Record<string, Migration> {
         for (const t of ["review_votes", "reviews", "catalog_documents", "products"]) await db.schema.dropTable(t).ifExists().execute();
       },
     },
+
+    "2026_11_26_005_admin_growth": {
+      async up(db: AnyDb) {
+        const table = (name: string) => db.schema.createTable(name).ifNotExists();
+        const end = mysqlTable(d);
+
+        // Staff: UNIQUE email; TOTP secret stored sealed (AES-256-GCM, lib/db/secret-box.ts).
+        await table("staff")
+          .addColumn("id", "varchar(40)", (col) => col.primaryKey())
+          .addColumn("email", "varchar(254)", (col) => col.notNull().unique())
+          .addColumn("name", "varchar(80)", (col) => col.notNull())
+          .addColumn("role", "varchar(24)", (col) => col.notNull())
+          .addColumn("password_hash", "varchar(300)")
+          .addColumn("totp_secret_sealed", "varchar(300)")
+          .addColumn("totp_enabled", c.bool, (col) => col.notNull().defaultTo(c.falseDefault))
+          .addColumn("last_totp_step", "bigint", (col) => col.notNull().defaultTo(-1))
+          .addColumn("disabled", c.bool, (col) => col.notNull().defaultTo(c.falseDefault))
+          .addColumn("failed_logins", "integer", (col) => col.notNull().defaultTo(0))
+          .addColumn("locked_until", "bigint", (col) => col.notNull().defaultTo(0))
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addColumn("last_login_at", c.ts)
+          .modifyEnd(end)
+          .execute();
+
+        await table("staff_invites")
+          .addColumn("token_hash", "char(64)", (col) => col.primaryKey())
+          .addColumn("email", "varchar(254)", (col) => col.notNull())
+          .addColumn("name", "varchar(80)", (col) => col.notNull())
+          .addColumn("role", "varchar(24)", (col) => col.notNull())
+          .addColumn("invited_by", "varchar(40)", (col) => col.notNull())
+          .addColumn("expires_at", "bigint", (col) => col.notNull())
+          .addColumn("used", c.bool, (col) => col.notNull().defaultTo(c.falseDefault))
+          .modifyEnd(end)
+          .execute();
+
+        await table("staff_tickets")
+          .addColumn("token_hash", "char(64)", (col) => col.primaryKey())
+          .addColumn("staff_id", "varchar(40)", (col) => col.notNull())
+          .addColumn("expires_at", "bigint", (col) => col.notNull())
+          .addColumn("attempts", "integer", (col) => col.notNull().defaultTo(0))
+          .addColumn("pending_secret_sealed", "varchar(300)")
+          .modifyEnd(end)
+          .execute();
+
+        await table("staff_sessions")
+          .addColumn("token_hash", "char(64)", (col) => col.primaryKey())
+          .addColumn("staff_id", "varchar(40)", (col) => col.notNull())
+          .addColumn("created_at", "bigint", (col) => col.notNull())
+          .addColumn("last_seen", "bigint", (col) => col.notNull())
+          .addColumn("expires_at", "bigint", (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "staff_sessions_staff_idx", "staff_sessions", ["staff_id"]);
+
+        // Append-only audit log (no update / delete in the app).
+        await table("audit_log")
+          .addColumn("id", "varchar(40)", (col) => col.primaryKey())
+          .addColumn("at", c.ts, (col) => col.notNull())
+          .addColumn("actor_id", "varchar(40)", (col) => col.notNull())
+          .addColumn("actor_email", "varchar(254)", (col) => col.notNull())
+          .addColumn("action", "varchar(60)", (col) => col.notNull())
+          .addColumn("target", "varchar(190)", (col) => col.notNull())
+          .addColumn("details", c.json, (col) => col.notNull())
+          .addColumn("ip", "varchar(45)", (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "audit_log_at_idx", "audit_log", ["at"]);
+        await createIndex(db, d, "audit_log_actor_idx", "audit_log", ["actor_id", "at"]);
+        await createIndex(db, d, "audit_log_target_idx", "audit_log", ["target", "at"]);
+
+        // Shared rate-limit windows; keys are SHA-256 hashes (no IPs / phone numbers stored).
+        await table("rate_limits")
+          .addColumn("key_hash", "char(64)", (col) => col.primaryKey())
+          .addColumn("count", "integer", (col) => col.notNull())
+          .addColumn("reset_at", "bigint", (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "rate_limits_reset_idx", "rate_limits", ["reset_at"]);
+
+        await table("product_alerts")
+          .addColumn("id", "varchar(40)", (col) => col.primaryKey())
+          .addColumn("customer_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("product_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("size", "varchar(16)")
+          .addColumn("kind", "varchar(16)", (col) => col.notNull())
+          .addColumn("price_at_set", "integer", (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addColumn("fired_at", c.ts)
+          // One open alert per (customer, product, kind, size): the app writes '' for "no size" in this key.
+          .addColumn("open_key", "varchar(200)")
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "product_alerts_open_uq", "product_alerts", ["open_key"], true);
+        await createIndex(db, d, "product_alerts_customer_idx", "product_alerts", ["customer_id"]);
+        await createIndex(db, d, "product_alerts_product_idx", "product_alerts", ["product_id", "fired_at"]);
+
+        await table("ugc_posts")
+          .addColumn("id", "varchar(40)", (col) => col.primaryKey())
+          .addColumn("customer_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("status", "varchar(12)", (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addColumn("doc", c.json, (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "ugc_posts_status_idx", "ugc_posts", ["status", "created_at"]);
+        await createIndex(db, d, "ugc_posts_customer_idx", "ugc_posts", ["customer_id"]);
+
+        // Notification outbox: template + references only (no message bodies, no personal data).
+        await table("notify_outbox")
+          .addColumn("id", "varchar(40)", (col) => col.primaryKey())
+          .addColumn("customer_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("template", "varchar(40)", (col) => col.notNull())
+          .addColumn("marketing", c.bool, (col) => col.notNull().defaultTo(c.falseDefault))
+          .addColumn("status", "varchar(12)", (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addColumn("doc", c.json, (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "notify_outbox_customer_idx", "notify_outbox", ["customer_id", "created_at"]);
+        await createIndex(db, d, "notify_outbox_status_idx", "notify_outbox", ["status", "created_at"]);
+
+        await table("flow_checkouts")
+          .addColumn("customer_id", "varchar(64)", (col) => col.primaryKey())
+          .addColumn("cart_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("started_at", "varchar(30)", (col) => col.notNull())
+          .addColumn("sent_h1", c.bool, (col) => col.notNull().defaultTo(c.falseDefault))
+          .addColumn("sent_h24", c.bool, (col) => col.notNull().defaultTo(c.falseDefault))
+          .modifyEnd(end)
+          .execute();
+      },
+      async down(db: AnyDb) {
+        for (const t of ["flow_checkouts", "notify_outbox", "ugc_posts", "product_alerts", "rate_limits", "audit_log", "staff_sessions", "staff_tickets", "staff_invites", "staff"]) {
+          await db.schema.dropTable(t).ifExists().execute();
+        }
+      },
+    },
   };
 }

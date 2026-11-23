@@ -4,7 +4,7 @@ import { reports } from "@/lib/admin/ops";
 
 /** ADM-07 GET ?days=7|14|30 */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "reports.read");
+  const auth = await requireStaff(request, "reports.read");
   if (!auth.ok) return auth.response;
   const d = Number(new URL(request.url).searchParams.get("days"));
   try {

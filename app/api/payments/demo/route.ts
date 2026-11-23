@@ -24,7 +24,7 @@ async function ownedPayment(request: Request, paymentId: string) {
 }
 
 export async function GET(request: Request) {
-  const rl = rateLimiter.hit(`demo-pay-read:ip:${clientIp(request)}`, 60, 60_000);
+  const rl = await rateLimiter.hit(`demo-pay-read:ip:${clientIp(request)}`, 60, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
   try {
     const paymentId = new URL(request.url).searchParams.get("paymentId") ?? "";

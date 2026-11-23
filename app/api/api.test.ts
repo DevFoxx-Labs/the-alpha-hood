@@ -69,7 +69,7 @@ describe("public write guards (CSRF, size, content type)", () => {
       const src = readFileSync(r, "utf8");
       if (WEBHOOKS.some((w) => r.endsWith(w))) {
         expect(src, r).toContain("verifyWebhook(");
-        expect(src, r).toContain("rateLimiter.hit(");
+        expect(src, r).toContain("await rateLimiter.hit(");
       } else if (src.includes("adminWrite(")) {
         // Admin writes: adminWrite = guardPublicWrite + requireStaff + permission (lib/admin/http.ts).
         expect(src, r).not.toContain("guardPublicWrite(request, { name: \"admin-\"");

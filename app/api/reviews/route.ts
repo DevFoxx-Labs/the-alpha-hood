@@ -8,7 +8,7 @@ const HANDLE_RE = /^[a-z0-9-]{1,120}$/;
 
 /** PDP-08 GET /api/reviews?style=style_06 (or ?category=shirts) &rating=&photos=1&size=&sort=&page= */
 export async function GET(request: Request) {
-  const rl = rateLimiter.hit(`reviews:ip:${clientIp(request)}`, 60, 60_000);
+  const rl = await rateLimiter.hit(`reviews:ip:${clientIp(request)}`, 60, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.", { "Retry-After": String(rl.retryAfterSeconds) });
 
   const params = new URL(request.url).searchParams;

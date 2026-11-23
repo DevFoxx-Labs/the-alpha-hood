@@ -7,7 +7,7 @@ import { resolveOrders } from "@/lib/orders/store";
 
 /** GET /api/orders/{number} — the caller's own order with timeline, cancel/return options (404 otherwise). */
 export async function GET(request: Request, { params }: RouteContext<"/api/orders/[number]">) {
-  const rl = rateLimiter.hit(`order-read:ip:${clientIp(request)}`, 60, 60_000);
+  const rl = await rateLimiter.hit(`order-read:ip:${clientIp(request)}`, 60, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
   const auth = await requireCustomer(request);
   if (!auth.ok) return auth.response;

@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 
 /**
@@ -40,6 +41,8 @@ export function createMemoryAudit(): AuditLog {
 }
 
 export function resolveAudit(env: Env = process.env): AuditLog {
+  const db = dbStores(env);
+  if (db) return db.audit;
   if (mockDataAllowed(env)) return devSingleton("admin_audit", createMemoryAudit);
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Audit log");

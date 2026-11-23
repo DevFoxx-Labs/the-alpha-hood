@@ -15,7 +15,7 @@ export async function adminWrite(
 ): Promise<{ ok: true; staff: Staff; ip: string; body: unknown } | { ok: false; response: Response }> {
   const guard = await guardPublicWrite(request, { name: `admin-${name}`, limit: 120, windowMs: 60_000, maxBytes });
   if (!guard.ok) return guard;
-  const auth = requireStaff(request, permission);
+  const auth = await requireStaff(request, permission);
   if (!auth.ok) return auth;
   return { ok: true, staff: auth.staff, ip: auth.ip, body: guard.body };
 }

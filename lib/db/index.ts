@@ -12,6 +12,25 @@ import type { GrievanceInbox } from "@/lib/privacy/requests";
 import type { PhotoStore } from "@/lib/returns/photos";
 import type { ReturnStore } from "@/lib/returns/service";
 import type { CartRepo } from "@/lib/commerce/cart-engine";
+import type { AuditLog } from "@/lib/admin/audit";
+import type { StaffStore } from "@/lib/admin/staff";
+import type { AlertStore } from "@/lib/alerts/service";
+import type { FlowStore } from "@/lib/flows/service";
+import type { RateCounterStore } from "@/lib/http/rate-limit";
+import type { OutboxStore } from "@/lib/notify/outbox";
+import type { UgcStore } from "@/lib/ugc/service";
+import { createSecretBox } from "./secret-box";
+import { createMongoAudit, createMongoRateCounters, createMongoStaffStore, createSqlAudit, createSqlRateCounters, createSqlStaffStore } from "./stores/admin";
+import {
+  createMongoAlertStore,
+  createMongoFlowStore,
+  createMongoOutbox,
+  createMongoUgcStore,
+  createSqlAlertStore,
+  createSqlFlowStore,
+  createSqlOutbox,
+  createSqlUgcStore,
+} from "./stores/growth";
 import { createOwnCatalog } from "@/lib/catalog/own";
 import type { CatalogStore } from "@/lib/catalog/store";
 import { type ReviewStore, reviewsFromStore } from "@/lib/reviews/store";
@@ -49,6 +68,8 @@ import { createDbCreditLedger, createMongoGiftCardStore, createMongoLoyaltyStore
  *          store credit, Hood Coins + Alpha Club, gift cards.
  * Phase 3: returns + return photos, DPDP grievance inbox, newsletter subscribers.
  * Phase 4: products, category tree + collections, reviews (COMMERCE_PROVIDER=own).
+ * Phase 5: staff + MFA (TOTP secrets sealed), audit log, shared rate limits, product alerts, #WearTheHood posts,
+ *          notification outbox, scheduled-flow state.
  */
 export interface DbStores {
   config: DbConfig;
@@ -71,6 +92,13 @@ export interface DbStores {
   catalog: CatalogStore;
   reviewStore: ReviewStore;
   reviews: ReviewsAdapter;
+  staff: StaffStore;
+  audit: AuditLog;
+  rateCounters: RateCounterStore;
+  alerts: AlertStore;
+  ugc: UgcStore;
+  outbox: OutboxStore;
+  flows: FlowStore;
   /** COMMERCE_PROVIDER=own: catalogue, bag and stock all on this database (built once, cached). */
   own(): OwnCommerce;
 }
@@ -82,8 +110,11 @@ export interface OwnCommerce {
 }
 
 type Env = Record<string, string | undefined>;
-const g = globalThis as unknown as { __alpha_hood_db_stores?: Map<string, DbStores> };
-const cache = () => (g.__alpha_hood_db_stores ??= new Map());
+// Per module instance (not globalThis): a hot reload or a new deploy builds fresh store objects from the current
+// code instead of reusing ones built by older code. The expensive parts — connection pools — are cached
+// separately (lib/db/sql.ts, lib/db/mongo.ts) and stay shared.
+const storeCache = new Map<string, DbStores>();
+const cache = () => storeCache;
 
 function catalogParts(
   catalog: CatalogStore,
@@ -128,6 +159,13 @@ export function createDbStores(cfg: DbConfig): DbStores {
       photos: createMongoPhotoStore(conn),
       inbox: createMongoInbox(conn),
       newsletter: createMongoNewsletterStore(conn),
+      staff: createMongoStaffStore(conn, createSecretBox()),
+      audit: createMongoAudit(conn),
+      rateCounters: createMongoRateCounters(conn),
+      alerts: createMongoAlertStore(conn),
+      ugc: createMongoUgcStore(conn),
+      outbox: createMongoOutbox(conn),
+      flows: createMongoFlowStore(conn, p),
       ...catalogParts(createMongoCatalogStore(conn), createMongoReviewStore(conn), (catalog) => ({ repo: createMongoCartRepo(conn), inventory: createMongoInventory(conn, p, catalog) })),
     };
   }
@@ -150,6 +188,13 @@ export function createDbStores(cfg: DbConfig): DbStores {
     photos: createSqlPhotoStore(db),
     inbox: createSqlInbox(db),
     newsletter: createSqlNewsletterStore(db),
+    staff: createSqlStaffStore(db, createSecretBox()),
+    audit: createSqlAudit(db),
+    rateCounters: createSqlRateCounters(db),
+    alerts: createSqlAlertStore(db),
+    ugc: createSqlUgcStore(db),
+    outbox: createSqlOutbox(db),
+    flows: createSqlFlowStore(db, p),
     ...catalogParts(createSqlCatalogStore(db), createSqlReviewStore(db), (catalog) => ({ repo: createSqlCartRepo(db), inventory: createSqlInventory(db, p, catalog) })),
   };
 }

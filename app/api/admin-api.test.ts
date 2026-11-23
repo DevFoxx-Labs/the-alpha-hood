@@ -66,7 +66,7 @@ const secrets = new Map<string, string>();
 let owner = "";
 async function ensureOwner() {
   const store = resolveStaffStore();
-  if (store.staff.size === 0) {
+  if ((await store.count()) === 0) {
     expect((await setupPOST(req("/api/admin/setup", "POST", { email: "owner@example.test", name: "Owner", password: "correct horse battery staple" }))).status).toBe(201);
   }
   owner = await adminSignIn("owner@example.test", "correct horse battery staple");
@@ -125,7 +125,9 @@ describe("guard: every admin route checks staff + permission", () => {
     for (const f of files) {
       if (PUBLIC.some((x) => f.endsWith(x))) continue;
       const src = readFileSync(f, "utf8");
-      expect(/requireStaff\(|adminWrite\(/.test(src), f).toBe(true);
+      expect(/await requireStaff\(|await adminWrite\(/.test(src), f).toBe(true);
+      // The guard is async: a call without `await` would be a Promise, never a refusal.
+      expect(/(?<!await )\brequireStaff\(request/.test(src), f).toBe(false);
     }
   });
 

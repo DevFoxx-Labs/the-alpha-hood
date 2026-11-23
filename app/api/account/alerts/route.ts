@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   if (!guard.ok) return guard.response;
   const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
-  if (!rateLimiter.hit(`alerts:customer:${auth.customerId}`, 40, 86_400_000).ok) return jsonError(429, "rate_limited", "Too many alerts today.");
+  if (!(await rateLimiter.hit(`alerts:customer:${auth.customerId}`, 40, 86_400_000)).ok) return jsonError(429, "rate_limited", "Too many alerts today.");
   try {
     const input = asObject(guard.body);
     rejectUnknownFields(input, ["productId", "kind", "size"]);

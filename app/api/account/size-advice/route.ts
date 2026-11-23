@@ -11,7 +11,7 @@ const PRODUCT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** GET ?productId= — PDP-04 size advice for the signed-in customer; `{ advice: null }` for guests. */
 export async function GET(request: Request) {
-  if (!rateLimiter.hit(`size-advice:ip:${clientIp(request)}`, 60, 60_000).ok) return jsonError(429, "rate_limited", "Too many requests.");
+  if (!(await rateLimiter.hit(`size-advice:ip:${clientIp(request)}`, 60, 60_000)).ok) return jsonError(429, "rate_limited", "Too many requests.");
   const productId = new URL(request.url).searchParams.get("productId") ?? "";
   if (!PRODUCT_ID_RE.test(productId)) return jsonError(422, "invalid_input", "Invalid product.");
   try {

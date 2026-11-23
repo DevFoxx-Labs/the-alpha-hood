@@ -7,7 +7,7 @@ import { PINCODE_RE, shipping } from "@/lib/shipping";
  * used only for this lookup — not stored or logged on the server.
  */
 export async function GET(request: Request) {
-  const rl = rateLimiter.hit(`delivery:ip:${clientIp(request)}`, 30, 60_000);
+  const rl = await rateLimiter.hit(`delivery:ip:${clientIp(request)}`, 30, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.", { "Retry-After": String(rl.retryAfterSeconds) });
 
   const pincode = new URL(request.url).searchParams.get("pincode") ?? "";

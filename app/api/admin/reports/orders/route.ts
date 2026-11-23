@@ -6,9 +6,9 @@ import { rateLimiter } from "@/lib/http/rate-limit";
 
 /** ADM-07 CSV export of orders (GST columns) — no customer contact details; formula cells neutralised. */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "reports.read");
+  const auth = await requireStaff(request, "reports.read");
   if (!auth.ok) return auth.response;
-  if (!rateLimiter.hit(`admin-export:${auth.staff.id}`, 10, 60 * 60_000).ok) return jsonError(429, "rate_limited", "Too many exports.");
+  if (!(await rateLimiter.hit(`admin-export:${auth.staff.id}`, 10, 60 * 60_000)).ok) return jsonError(429, "rate_limited", "Too many exports.");
   const d = Number(new URL(request.url).searchParams.get("days"));
   try {
     const days = [7, 14, 30, 90].includes(d) ? d : 30;

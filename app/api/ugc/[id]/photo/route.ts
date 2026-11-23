@@ -9,7 +9,7 @@ import { resolveUgc } from "@/lib/ugc/service";
  * Metadata was stripped at upload; served with nosniff + sandbox CSP so it can never execute.
  */
 export async function GET(request: Request, ctx: RouteContext<"/api/ugc/[id]/photo">) {
-  if (!rateLimiter.hit(`ugc-photo:ip:${clientIp(request)}`, 240, 60_000).ok) return jsonError(429, "rate_limited", "Too many requests.");
+  if (!(await rateLimiter.hit(`ugc-photo:ip:${clientIp(request)}`, 240, 60_000)).ok) return jsonError(429, "rate_limited", "Too many requests.");
   try {
     const { id } = await ctx.params;
     const post = await resolveUgc().get(id);

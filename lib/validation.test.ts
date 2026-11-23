@@ -34,12 +34,22 @@ describe("validators", () => {
 });
 
 describe("rate limiter", () => {
-  it("allows `limit` hits per window then blocks until reset", () => {
+  it("allows `limit` hits per window then blocks until reset", async () => {
     const rl = createRateLimiter();
-    for (let i = 0; i < 3; i++) expect(rl.hit("k", 3, 1_000, 0).ok).toBe(true);
-    const blocked = rl.hit("k", 3, 1_000, 500);
+    for (let i = 0; i < 3; i++) expect((await rl.hit("k", 3, 1_000, 0)).ok).toBe(true);
+    const blocked = await rl.hit("k", 3, 1_000, 500);
     expect(blocked.ok).toBe(false);
     expect(blocked.retryAfterSeconds).toBe(1);
-    expect(rl.hit("k", 3, 1_000, 1_000).ok).toBe(true);
+    expect((await rl.hit("k", 3, 1_000, 1_000)).ok).toBe(true);
+  });
+
+  it("falls back to in-process counters when the shared store fails (limits never switch off)", async () => {
+    const rl = createRateLimiter(() => ({
+      hit: async () => Promise.reject(new Error("db down")),
+      peek: async () => Promise.reject(new Error("db down")),
+    }));
+    for (let i = 0; i < 2; i++) expect((await rl.hit("k", 2, 1_000, 0)).ok).toBe(true);
+    expect((await rl.hit("k", 2, 1_000, 0)).ok).toBe(false);
+    expect(await rl.peek("k", 2, 1_000, 0)).toBe(false);
   });
 });

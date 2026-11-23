@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (!signInEnabled()) return jsonError(503, "sign_in_disabled", "Sign-in is temporarily unavailable.");
   const guard = await guardPublicWrite(request, { name: "otp-send", limit: 5, windowMs: 10 * 60_000, maxBytes: 128 });
   if (!guard.ok) return guard.response;
-  const daily = rateLimiter.hit(`otp-send-day:ip:${guard.ip}`, 20, 86_400_000);
+  const daily = await rateLimiter.hit(`otp-send-day:ip:${guard.ip}`, 20, 86_400_000);
   if (!daily.ok) return jsonError(429, "rate_limited", "Too many codes requested today.");
   try {
     const input = asObject(guard.body);

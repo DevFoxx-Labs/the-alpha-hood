@@ -5,7 +5,7 @@ import { resolveInbox } from "@/lib/privacy/requests";
 
 /** DPDP rights / grievance inbox (privacy.read). Contacts masked in the list. */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "privacy.read");
+  const auth = await requireStaff(request, "privacy.read");
   if (!auth.ok) return auth.response;
   try {
     const rows = (await resolveInbox().list()).map((r) => ({

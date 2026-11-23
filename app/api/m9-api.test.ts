@@ -246,14 +246,14 @@ describe("ORD-02 / LOY-04 notifications follow consent", () => {
     const ledger = resolveLedger();
     const id = "cus_notify_1";
     await notify(id, "order_shipped", { orderNumber: "AH1" });
-    expect(outboxFor(id)[0].channels).toEqual(["sms", "email"]);
+    expect((await outboxFor(id))[0].channels).toEqual(["sms", "email"]);
     expect(await notify(id, "abandoned_checkout_1h", {})).toBe(false); // no marketing consent → not queued
     const row = (purpose: "whatsapp_updates" | "marketing_whatsapp") => ({ user_id: id, visitor_id: null, subscriber_id: null, purpose, status: "granted" as const, method: "preferences" as const, source: "web" as const, notice_version: "privacy@x", ip_address: "1.1.1.1", user_agent: "t" });
     await ledger.append([row("whatsapp_updates"), row("marketing_whatsapp")]);
     await notify(id, "order_delivered", { orderNumber: "AH1" });
-    expect(outboxFor(id).at(-1)!.channels).toContain("whatsapp");
+    expect((await outboxFor(id)).at(-1)!.channels).toContain("whatsapp");
     expect(await notify(id, "abandoned_checkout_1h", {})).toBe(true);
-    expect(outboxFor(id).at(-1)!.channels).toEqual(["whatsapp"]);
+    expect((await outboxFor(id)).at(-1)!.channels).toEqual(["whatsapp"]);
     expect(await notify(id, "abandoned_checkout_24h", {})).toBe(false); // FREQUENCY_CAP.perDay
     expect(FREQUENCY_CAP.perDay).toBe(1);
   });

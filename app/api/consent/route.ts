@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const rl = rateLimiter.hit(`consent-read:ip:${clientIp(request)}`, 60, 60_000);
+  const rl = await rateLimiter.hit(`consent-read:ip:${clientIp(request)}`, 60, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.", { "Retry-After": String(rl.retryAfterSeconds) });
 
   const visitorId = existingVisitor(request);

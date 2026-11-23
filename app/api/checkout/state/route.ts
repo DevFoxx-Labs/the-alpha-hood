@@ -9,7 +9,7 @@ import { rateLimiter } from "@/lib/http/rate-limit";
 
 /** GET /api/checkout/state — flags, the signed-in customer (masked) and the validated bag. */
 export async function GET(request: Request) {
-  const rl = rateLimiter.hit(`checkout-state:ip:${clientIp(request)}`, 60, 60_000);
+  const rl = await rateLimiter.hit(`checkout-state:ip:${clientIp(request)}`, 60, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
   try {
     const enabled = checkoutEnabled();
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const customer = customerId ? await resolveCustomers().get(customerId) : null;
     const view = await loadCartView(cartIdFrom(request));
     // LOY-04: remember (ids + time only) that this customer reached checkout, for the abandoned-checkout reminder.
-    if (customer && view.id && view.purchasable.length > 0) recordCheckoutStart(customer.id, view.id);
+    if (customer && view.id && view.purchasable.length > 0) await recordCheckoutStart(customer.id, view.id);
     return privateJson({
       enabled,
       codEnabled: codEnabled(),

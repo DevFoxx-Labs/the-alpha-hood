@@ -10,7 +10,7 @@ import { asObject, rejectUnknownFields } from "@/lib/validation";
  * consents — every change is written to the consent ledger (DPDP rule §4) and off by default.
  */
 export async function GET(request: Request) {
-  const rl = rateLimiter.hit(`prefs-read:ip:${clientIp(request)}`, 60, 60_000);
+  const rl = await rateLimiter.hit(`prefs-read:ip:${clientIp(request)}`, 60, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
   const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;

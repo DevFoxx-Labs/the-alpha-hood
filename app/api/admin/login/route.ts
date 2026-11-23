@@ -10,7 +10,7 @@ import { asObject, rejectUnknownFields } from "@/lib/validation";
 export async function POST(request: Request) {
   const guard = await guardPublicWrite(request, { name: "admin-login", limit: 10, windowMs: 10 * 60_000, maxBytes: 512 });
   if (!guard.ok) return guard.response;
-  if (!rateLimiter.hit("admin-login:global", 300, 60_000).ok) return jsonError(429, "rate_limited", "Too many sign-in attempts. Try again shortly.");
+  if (!(await rateLimiter.hit("admin-login:global", 300, 60_000)).ok) return jsonError(429, "rate_limited", "Too many sign-in attempts. Try again shortly.");
   try {
     const input = asObject(guard.body);
     rejectUnknownFields(input, ["email", "password"]);

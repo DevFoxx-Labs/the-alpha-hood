@@ -134,3 +134,11 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
       Legal Metrology details (manufacturer / packer / importer, country of origin, net quantity) per product.
       Demo products and reviews are only for local testing and must not be imported to the live store.
 - [ ] Product photos (shot list per DESIGN.md §5) — the upload feature is the next catalogue step.
+
+## 2026-11-26 (own backend, phase 5 — admin + growth)
+- [ ] Generate `SECRET_BOX_KEY` (32 random bytes, base64) and put it in the production secret store — staff
+      sign-in refuses to run in production without it. Keep a copy in the password manager: without it, staff TOTP
+      secrets can't be read and everyone must re-enrol MFA.
+- [ ] When the production database is created, give the app a database user that can't UPDATE or DELETE
+      `audit_log` (insert + select only).
+

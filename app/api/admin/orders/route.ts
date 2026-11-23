@@ -7,7 +7,7 @@ const STATUS = ["pending_payment", "payment_failed", "expired", "confirmed", "ne
 
 /** ADM-03 GET ?q=&fulfilment=&payment=cod|prepaid&status=&page= */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "orders.read");
+  const auth = await requireStaff(request, "orders.read");
   if (!auth.ok) return auth.response;
   const p = new URL(request.url).searchParams;
   const pick = (k: string, allowed: string[]) => {

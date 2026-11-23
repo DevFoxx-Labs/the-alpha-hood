@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const input = asObject(guard.body);
     rejectUnknownFields(input, ["addressId", "speed", "payment", "tenders"]);
     const tenders = parseTenderChoice(input.tenders);
-    if (tenders.giftCardCode && !giftCardTriesLeft(auth.customerId, guard.ip)) return jsonError(429, "rate_limited", "Too many gift card attempts. Try again later.");
+    if (tenders.giftCardCode && !(await giftCardTriesLeft(auth.customerId, guard.ip))) return jsonError(429, "rate_limited", "Too many gift card attempts. Try again later.");
     const q = await quote(defaultDeps(), {
       customerId: auth.customerId,
       cartId: cartIdFrom(request),
@@ -28,8 +28,8 @@ export async function POST(request: Request) {
       speed: parseSpeed(input.speed),
       payment: parsePayment(input.payment, { optional: true }),
       tenders,
-    }).catch((e) => {
-      if (e instanceof TenderError && e.code === "invalid_gift_card") recordGiftCardFailure(auth.customerId, guard.ip);
+    }).catch(async (e) => {
+      if (e instanceof TenderError && e.code === "invalid_gift_card") await recordGiftCardFailure(auth.customerId, guard.ip);
       throw e;
     });
     return privateJson({

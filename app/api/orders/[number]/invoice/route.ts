@@ -11,7 +11,7 @@ import { resolveOrders } from "@/lib/orders/store";
  * Available once the order has shipped (the invoice is issued at dispatch). Seller facts come from config.
  */
 export async function GET(request: Request, { params }: RouteContext<"/api/orders/[number]/invoice">) {
-  const rl = rateLimiter.hit(`invoice:ip:${clientIp(request)}`, 30, 60_000);
+  const rl = await rateLimiter.hit(`invoice:ip:${clientIp(request)}`, 30, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
   const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;

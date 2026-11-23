@@ -7,8 +7,8 @@ import { rateLimiter } from "@/lib/http/rate-limit";
 export async function GET(request: Request) {
   const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
-  const rl = rateLimiter.hit(`export:customer:${auth.customerId}`, 5, 60 * 60_000);
-  const ipRl = rateLimiter.hit(`export:ip:${clientIp(request)}`, 10, 60 * 60_000);
+  const rl = await rateLimiter.hit(`export:customer:${auth.customerId}`, 5, 60 * 60_000);
+  const ipRl = await rateLimiter.hit(`export:ip:${clientIp(request)}`, 10, 60 * 60_000);
   if (!rl.ok || !ipRl.ok) return jsonError(429, "rate_limited", "Too many downloads. Try again later.");
   try {
     const data = await exportData(auth.customerId);

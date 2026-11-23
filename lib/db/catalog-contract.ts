@@ -189,7 +189,7 @@ for (const target of testTargets().filter((t) => t.cfg)) {
     async function ownerCookie() {
       const email = "owner-db@example.test";
       const password = "correct horse battery staple";
-      if (resolveStaffStore().staff.size === 0) expect((await setupPOST(req("/api/admin/setup", "POST", { email, name: "Owner", password }))).status).toBe(201);
+      if ((await resolveStaffStore().count()) === 0) expect((await setupPOST(req("/api/admin/setup", "POST", { email, name: "Owner", password }))).status).toBe(201);
       const { ticket } = await (await loginPOST(req("/api/admin/login", "POST", { email, password }))).json();
       const { secret } = await (await totpEnrol(req("/api/admin/totp/enrol", "POST", { ticket }))).json();
       const res = await totpVerify(req("/api/admin/totp/verify", "POST", { ticket, code: totpAt(secret, Math.floor(Date.now() / 30_000)) }));

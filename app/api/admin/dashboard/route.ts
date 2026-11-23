@@ -6,7 +6,7 @@ import { resolveInbox } from "@/lib/privacy/requests";
 
 /** GET — KPIs + the work queue for the signed-in role (only what the role may see). */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "dashboard");
+  const auth = await requireStaff(request, "dashboard");
   if (!auth.ok) return auth.response;
   try {
     const role = auth.staff.role;

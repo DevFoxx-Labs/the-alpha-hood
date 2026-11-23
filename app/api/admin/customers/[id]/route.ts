@@ -10,7 +10,7 @@ const ID_RE = /^cus_[A-Za-z0-9_-]{8,24}$/;
 
 /** ADM-06 customer profile. POST `{ action: block_cod | unblock_cod | credit, amount?, reason }` (audited). */
 export async function GET(request: Request, { params }: RouteContext<"/api/admin/customers/[id]">) {
-  const auth = requireStaff(request, "customers.read");
+  const auth = await requireStaff(request, "customers.read");
   if (!auth.ok) return auth.response;
   const { id } = await params;
   if (!ID_RE.test(id)) return jsonError(404, "not_found", "Customer not found.");

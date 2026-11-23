@@ -1,6 +1,6 @@
 /**
  * ADM-08 staff roles (PRD §3) → permissions. The ONE source for both server authorization
- * (`requireStaff(request, permission)`) and which nav items a role sees. Hiding a link is never the control;
+ * (`await requireStaff(request, permission)`) and which nav items a role sees. Hiding a link is never the control;
  * every /api/admin route checks its permission on the server.
  */
 export const ROLES = ["owner", "store_manager", "catalog_editor", "support", "warehouse", "marketing", "finance"] as const;

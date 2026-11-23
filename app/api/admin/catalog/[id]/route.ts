@@ -11,7 +11,7 @@ import { jsonError } from "@/lib/http/guard";
  * — products are never hard-deleted (orders and returns point at them). Audited.
  */
 export async function GET(request: Request, ctx: RouteContext<"/api/admin/catalog/[id]">) {
-  const auth = requireStaff(request, "catalog.read");
+  const auth = await requireStaff(request, "catalog.read");
   if (!auth.ok) return auth.response;
   try {
     const { id } = await ctx.params;

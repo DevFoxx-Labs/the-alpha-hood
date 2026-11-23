@@ -6,13 +6,13 @@ import { asObject, normaliseEmail, rejectUnknownFields } from "@/lib/validation"
 
 /** ADM-08 staff (owner only). GET → staff + open invites. POST `{ email, name, role }` → one-time invite link. */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "staff.manage");
+  const auth = await requireStaff(request, "staff.manage");
   if (!auth.ok) return auth.response;
   try {
     const store = resolveStaffStore();
     return privateJson({
-      staff: [...store.staff.values()].map(publicStaff),
-      invites: [...store.invites.values()].filter((i) => !i.used && i.expiresAt > Date.now()).map((i) => ({ email: i.email, role: i.role, expiresAt: new Date(i.expiresAt).toISOString() })),
+      staff: (await store.list()).map(publicStaff),
+      invites: (await store.listInvites(Date.now())).map((i) => ({ email: i.email, role: i.role, expiresAt: new Date(i.expiresAt).toISOString() })),
     });
   } catch (error) {
     return adminError(error);
@@ -31,8 +31,8 @@ export async function POST(request: Request) {
     if (name.length < 2) return jsonError(422, "invalid_input", "Enter a name.");
     const role = parseRole(input.role);
     const store = resolveStaffStore();
-    if (findByEmail(store, email)) return jsonError(409, "exists", "Someone with this email is already on the team.");
-    const token = createInvite(store, { email, name, role, invitedBy: w.staff.id });
+    if (await findByEmail(store, email)) return jsonError(409, "exists", "Someone with this email is already on the team.");
+    const token = await createInvite(store, { email, name, role, invitedBy: w.staff.id });
     await audit(w, "staff.invite", email, { role });
     // Shown once to the owner to send privately; only its hash is stored.
     return privateJson({ invitePath: `/admin/invite/${token}` }, { status: 201 });

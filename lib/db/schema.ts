@@ -224,7 +224,105 @@ export interface ReviewVotesTable {
   created_at: Date;
 }
 
+export interface StaffTable {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  password_hash: string | null;
+  totp_secret_sealed: string | null;
+  totp_enabled: boolean | number;
+  last_totp_step: number | string;
+  disabled: boolean | number;
+  failed_logins: number;
+  locked_until: number | string;
+  created_at: Date;
+  last_login_at: Date | null;
+}
+export interface StaffInvitesTable {
+  token_hash: string;
+  email: string;
+  name: string;
+  role: string;
+  invited_by: string;
+  expires_at: number | string;
+  used: boolean | number;
+}
+export interface StaffTicketsTable {
+  token_hash: string;
+  staff_id: string;
+  expires_at: number | string;
+  attempts: number;
+  pending_secret_sealed: string | null;
+}
+export interface StaffSessionsTable {
+  token_hash: string;
+  staff_id: string;
+  created_at: number | string;
+  last_seen: number | string;
+  expires_at: number | string;
+}
+export interface AuditLogTable {
+  id: string;
+  at: Date;
+  actor_id: string;
+  actor_email: string;
+  action: string;
+  target: string;
+  details: unknown;
+  ip: string;
+}
+export interface RateLimitsTable {
+  key_hash: string;
+  count: number;
+  reset_at: number | string;
+}
+export interface ProductAlertsTable {
+  id: string;
+  customer_id: string;
+  product_id: string;
+  size: string | null;
+  kind: string;
+  price_at_set: number;
+  created_at: Date;
+  fired_at: Date | null;
+  open_key: string | null;
+}
+export interface UgcPostsTable {
+  id: string;
+  customer_id: string;
+  status: string;
+  created_at: Date;
+  doc: unknown;
+}
+export interface NotifyOutboxTable {
+  id: string;
+  customer_id: string;
+  template: string;
+  marketing: boolean | number;
+  status: string;
+  created_at: Date;
+  doc: unknown;
+}
+export interface FlowCheckoutsTable {
+  customer_id: string;
+  cart_id: string;
+  started_at: string;
+  sent_h1: boolean | number;
+  sent_h24: boolean | number;
+}
+
 export interface Database {
+  staff: StaffTable;
+  staff_invites: StaffInvitesTable;
+  staff_tickets: StaffTicketsTable;
+  staff_sessions: StaffSessionsTable;
+  audit_log: AuditLogTable;
+  rate_limits: RateLimitsTable;
+  product_alerts: ProductAlertsTable;
+  ugc_posts: UgcPostsTable;
+  notify_outbox: NotifyOutboxTable;
+  flow_checkouts: FlowCheckoutsTable;
   products: ProductsTable;
   catalog_documents: CatalogDocumentsTable;
   reviews: ReviewsTable;

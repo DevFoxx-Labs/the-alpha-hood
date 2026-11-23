@@ -6,11 +6,11 @@ import { rateLimiter } from "@/lib/http/rate-limit";
  */
 const HOUR = 3_600_000;
 
-export function giftCardTriesLeft(customerId: string, ip: string): boolean {
-  return rateLimiter.peek(`giftcard-fail:c:${customerId}`, 10, HOUR) && rateLimiter.peek(`giftcard-fail:ip:${ip}`, 30, HOUR);
+export async function giftCardTriesLeft(customerId: string, ip: string): Promise<boolean> {
+  return await rateLimiter.peek(`giftcard-fail:c:${customerId}`, 10, HOUR) && await rateLimiter.peek(`giftcard-fail:ip:${ip}`, 30, HOUR);
 }
 
-export function recordGiftCardFailure(customerId: string, ip: string) {
-  rateLimiter.hit(`giftcard-fail:c:${customerId}`, 10, HOUR);
-  rateLimiter.hit(`giftcard-fail:ip:${ip}`, 30, HOUR);
+export async function recordGiftCardFailure(customerId: string, ip: string) {
+  await rateLimiter.hit(`giftcard-fail:c:${customerId}`, 10, HOUR);
+  await rateLimiter.hit(`giftcard-fail:ip:${ip}`, 30, HOUR);
 }

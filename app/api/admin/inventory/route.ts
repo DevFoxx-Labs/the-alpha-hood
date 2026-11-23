@@ -7,7 +7,7 @@ import { asObject, cleanText, rejectUnknownFields } from "@/lib/validation";
 
 /** ADM-02 inventory. GET ?q=&low=1 ; POST `{ productId, size, delta, reason }` (audited, never below zero). */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "inventory.read");
+  const auth = await requireStaff(request, "inventory.read");
   if (!auth.ok) return auth.response;
   const p = new URL(request.url).searchParams;
   const q = (p.get("q") ?? "").toLowerCase().slice(0, 60);

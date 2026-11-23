@@ -4,7 +4,7 @@ import { resolveAudit } from "@/lib/admin/audit";
 
 /** ADM-08 audit log (owner). GET ?target= */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "audit.read");
+  const auth = await requireStaff(request, "audit.read");
   if (!auth.ok) return auth.response;
   const target = (new URL(request.url).searchParams.get("target") ?? "").slice(0, 80) || undefined;
   try {

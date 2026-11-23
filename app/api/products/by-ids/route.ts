@@ -5,7 +5,7 @@ import { rateLimiter } from "@/lib/http/rate-limit";
 
 /** GET /api/products/by-ids?ids=a,b,c — public catalogue data for the wishlist page (max 50 ids). */
 export async function GET(request: Request) {
-  const rl = rateLimiter.hit(`by-ids:ip:${clientIp(request)}`, 60, 60_000);
+  const rl = await rateLimiter.hit(`by-ids:ip:${clientIp(request)}`, 60, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
   const raw = new URL(request.url).searchParams.get("ids") ?? "";
   const ids = [...new Set(raw.split(","))].filter((id) => /^[a-z0-9_]{1,64}$/.test(id)).slice(0, 50);

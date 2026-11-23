@@ -8,7 +8,7 @@ import { resolveOrders } from "@/lib/orders/store";
 
 /** ADM-03 shipping label data (after dispatch). Reveals the delivery phone, so each view is audited. */
 export async function GET(request: Request, { params }: RouteContext<"/api/admin/orders/[number]/label">) {
-  const auth = requireStaff(request, "orders.ship");
+  const auth = await requireStaff(request, "orders.ship");
   if (!auth.ok) return auth.response;
   const { number } = await params;
   if (!ORDER_NUMBER_RE.test(number)) return jsonError(404, "not_found", "Order not found.");

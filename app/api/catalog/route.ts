@@ -10,7 +10,7 @@ import { rateLimiter } from "@/lib/http/rate-limit";
  * Powers "Apply (n results)" in the mobile filter sheet. Same allow-list parsing as the pages.
  */
 export async function GET(request: Request) {
-  const rl = rateLimiter.hit(`catalog:ip:${clientIp(request)}`, 90, 60_000);
+  const rl = await rateLimiter.hit(`catalog:ip:${clientIp(request)}`, 90, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.", { "Retry-After": String(rl.retryAfterSeconds) });
 
   const params = new URL(request.url).searchParams;

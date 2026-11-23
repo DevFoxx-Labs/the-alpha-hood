@@ -6,7 +6,7 @@ import { jsonError } from "@/lib/http/guard";
 
 /** ADM-03 order detail (customer phone masked; the delivery address is needed to ship). */
 export async function GET(request: Request, { params }: RouteContext<"/api/admin/orders/[number]">) {
-  const auth = requireStaff(request, "orders.read");
+  const auth = await requireStaff(request, "orders.read");
   if (!auth.ok) return auth.response;
   const { number } = await params;
   if (!ORDER_NUMBER_RE.test(number)) return jsonError(404, "not_found", "Order not found.");

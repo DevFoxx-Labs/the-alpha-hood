@@ -20,7 +20,7 @@
 - 🟡 Hindi only for the Privacy Notice; Terms/Refund/Cookie and the banner are English.
 
 ## Security
-- 🟠 Rate limiter is in-memory per instance — move to a shared store (Redis/Upstash) before multi-instance hosting.
+- 🟡 With the own backend configured, rate limits are shared through the database (`rate_limits`, hashed keys); without it they are per process. At high traffic consider Redis for the counters (one DB write per limited request).
 - 🟠 `clientIp` trusts the first `X-Forwarded-For` hop — correct only behind our CDN/host; confirm with hosting choice.
 - 🟠 No Content-Security-Policy yet (baseline headers only, `next.config.ts`). Add a nonce-based CSP; tracker hosts to
   allow-list (M8): `www.googletagmanager.com`, `www.google-analytics.com`, `*.google.com` / `googleadservices.com`
@@ -103,14 +103,14 @@
 - 🟡 Store credit can't be spent at checkout yet (CHK-05, P1).
 
 ## Admin & ops (M7)
-- 🔴 Staff, sessions, audit log and TOTP secrets live in memory (dev only, refused in production like every mock store).
-  With the database: TOTP secrets encrypted at rest (envelope key in the secret store), audit log in an append-only table.
+- 🟠 Staff, sessions, audit log and TOTP secrets are on the own backend (phase 5): TOTP secrets sealed with
+  AES-256-GCM (`SECRET_BOX_KEY`), the audit log insert-only. Still needed: the key in the production secret store
+  (owner TODO), and a database-level guard (a DB user without UPDATE/DELETE on `audit_log`).
 - 🟠 Products can be created, edited, published and archived in `/admin/catalog` on the own backend
   (`COMMERCE_PROVIDER=own`). Still read-only: coupons and combos. On Shopify / Medusa, products stay read-only too
   (edited in that platform).
 - 🟠 COD UPI payouts are recorded by hand (UTR) — needs the gateway payout API and a two-person approval above a limit.
 - 🟠 No new-device / new-IP alert for staff sign-ins, and no WebAuthn (phishing-resistant MFA) yet.
-- 🟠 Admin rate limits are per process (in memory) — move to the shared store with the database.
 - 🟡 Reports chart uses plain CSS bars (`recharts` not installed — needs the owner's OK to add the package).
 - 🟡 No notification bell feed in the admin topbar yet (counts only).
 - 🟡 Missing negative tests: admin ticket reuse, COD payout marked paid twice, production setup without/with a wrong token.
@@ -120,7 +120,9 @@
   IDs and a browser session — not done. Nothing loads until IDs are set, so the store is safe meanwhile.
 - 🟠 Product feed has no `image_link` until real product photos exist (Merchant Center / Meta reject items without one);
   placeholder art and the generated OG cards must not be used as feed images.
-- 🟠 Server-side event outbox and RUM samples are in memory (lost on restart) — durable outbox / table with the database.
+- 🟠 The server-side analytics event queue (Meta CAPI / GA4 MP) and RUM samples are still in memory (lost on restart).
+  Not moved to the database on purpose: queued events carry the provider access token. To persist them, store the
+  event without the token and add it at send time. The customer notification outbox IS on the database (phase 5).
 - 🟠 Help, About and FAQ copy is draft (owner + lawyer review); returns & cancellation pages redirect into the Refund &
   Cancellation Policy. Gift Cards and Alpha Club merch tiles still link to pages that don't exist yet (M9, P1).
 - 🟡 Brand icons from the logo kit (bag, wishlist, delivery, returns, Alpha Club) are in `public/brand/icons/` but not
@@ -179,14 +181,16 @@
 - 🟡 Not browser-checked at 1440/390/360; homepage M9 blocks render only with demo data (`pnpm dev`).
 
 ## Own backend (2026-11-26 — `docs/backend/README.md`)
-- 🔴 Phases 1–4 are on the database:
+- 🔴 Phases 1–5 are on the database:
   - identity: consent, customers, sessions, OTP;
   - money: locks, carts, inventory, orders, payments, invoice series, store credit, Hood Coins, Alpha Club, gift cards;
   - after-sales: returns, return photos, privacy inbox, newsletter;
   - catalogue (`COMMERCE_PROVIDER=own`): products, categories, collections, reviews.
 
-  Still memory-only: staff, MFA, audit log, alerts, UGC, outbox, rate limiter, flows (phase 5). In production the
-  admin (staff store) therefore still refuses, so products can't be managed on a live server until phase 5.
+  - admin + growth: staff + MFA, audit log, rate limits, alerts, #WearTheHood, notification outbox, flow state.
+
+  Still memory-only: the analytics event queue and RUM samples (see SEO & analytics). The phase 6 switch-over
+  checklist (production database, secrets, backups, real catalogue) is the remaining step before going live.
 - 🟠 Product photos: there is no image upload yet. Products show the placeholder drawing, and there is no
   user-supplied image URL field on purpose (no fetching of URLs). Needed: a private upload to a bucket/CDN with
   type sniffing and EXIF stripping (same rules as return photos), and responsive variants.
@@ -212,4 +216,6 @@
 - 🟠 The local MongoDB replica set (port 27018) is a manual process (`pnpm db:mongo:dev`); it isn't a Windows service.
 - 🟡 Expired sessions / OTP rows: MongoDB TTL indexes clean them; SQL needs a scheduled cleanup (add to the cron sweep).
 - 🟡 No CI database matrix yet (MySQL + Postgres + Mongo service containers running the contract suite).
-
+- 🟡 Nothing deletes expired SQL rows yet: `staff_sessions`, `staff_tickets`, `rate_limits`, used `staff_invites`, sent
+  `notify_outbox` rows. MongoDB TTL indexes clean sessions, tickets and rate limits. Add a cleanup to the cron sweep.
+- 🟡 There is no delivery worker reading `notify_outbox` yet (no SMS / email / WhatsApp provider).

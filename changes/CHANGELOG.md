@@ -1,5 +1,74 @@
 # Change log
 
+## 2026-11-26 — Own backend, phase 5: staff + MFA, audit log, rate limits, alerts, UGC, outbox, flows on the database (High-risk tier: auth, admin powers)
+
+**Threat model:**
+- *Assets:* staff accounts and their second factor, admin sessions, the audit trail, rate-limit protection,
+  customers' alert / UGC / message data.
+- *Actors:* password guessers; someone with a stolen or shoulder-surfed TOTP code; anyone holding an invite link;
+  two servers or retried crons acting at once; a database dump in the wrong hands.
+- *Abuse cases and the layer that stops each:*
+  - password guessing across servers → database-counted lockout;
+  - replaying a TOTP code (also in parallel) → step accepted once, only if newer (conditional update);
+  - brute-forcing a sign-in ticket → 5 guesses, counted atomically;
+  - reusing an invite → single-use consume + UNIQUE email;
+  - two first owners → setup under a lock;
+  - two owners demoting each other at once → staff changes under a lock (the last owner stays);
+  - TOTP secrets readable from a DB dump → AES-256-GCM sealed (`SECRET_BOX_KEY`; production refuses without it);
+  - rate limits bypassed by hitting other servers → shared DB counters;
+  - IPs / phone numbers sitting in the limiter table → hashed keys;
+  - limiter store down → in-process fallback (never switches off);
+  - an alert or reminder sent twice → conditional fire / claim;
+  - the marketing cap exceeded by parallel sweeps → per-customer lock;
+  - an admin route missing the guard → guard test now requires `await requireStaff(` / `await adminWrite(`.
+
+**Added**
+- Migrations `2026_11_26_005_admin_growth` (SQL + Mongo, additive): `staff`, `staff_invites`, `staff_tickets`,
+  `staff_sessions`, `audit_log`, `rate_limits`, `product_alerts`, `ugc_posts`, `notify_outbox`, `flow_checkouts`.
+  Mongo TTL indexes cover sessions, tickets and rate limits.
+- `lib/db/secret-box.ts`: AES-256-GCM sealing with key rotation.
+- `lib/db/stores/admin.ts` (staff, audit, rate counters) and `lib/db/stores/growth.ts` (alerts, UGC, outbox, flows),
+  each for SQL and MongoDB.
+- `SECRET_BOX_KEY` / `SECRET_BOX_PREVIOUS_KEYS` in `.env.example`.
+- `lib/db/admin-contract.ts`. Every security counter is raced:
+  - parallel setups → 1 owner;
+  - one TOTP code on two tickets → 1 sign-in, then refused;
+  - parallel wrong passwords → lock;
+  - 8 parallel guesses on a ticket → spent;
+  - double invite accept → 1 account;
+  - raw DB row shows only the sealed secret;
+  - 12 parallel limiter hits → counts 1…12;
+  - alert create/fire races;
+  - UGC approve-vs-reject race;
+  - outbox windows;
+  - flow step claims.
+
+**Changed**
+- `StaffStore` is now an async interface; `requireStaff`, `staffFromRequest` and the sign-in steps are async, and
+  every admin route awaits them.
+- Invite acceptance moved into `acceptInvite`.
+- `RateLimiter.hit` / `peek` are async; 34 call sites updated. The gift card attempt limit (`giftCardTriesLeft`)
+  is awaited — without that it would have silently stopped limiting.
+- Notification outbox and flow state moved behind `OutboxStore` / `FlowStore`; account deletion also erases the
+  customer's queued messages.
+- `lib/db/index.ts` caches store sets per module instance: a long-running dev server no longer keeps store objects
+  built by older code (found during the smoke check: `/api/admin/setup` returned 500 on a server started before this
+  change).
+
+**Verified**
+- `pnpm verify`: typecheck, lint, 358/358 tests (memory + local MongoDB), build.
+- `pnpm audit --prod`: clean.
+- `pnpm db:migrate` on local `alpha_hood_dev`: 5 migrations.
+- Fresh `next dev` on the Mongo dev DB:
+  - `GET /api/admin/setup` → `{"needed":true}`;
+  - a wrong login → 401 with the generic message;
+  - no admin cookie → 401;
+  - `rate_limits` rows have 64-character hashed keys only.
+
+**Not verified**
+- MySQL / PostgreSQL (credentials pending).
+- No UI change.
+
 ## 2026-11-26 — Own backend, phase 4: catalogue + reviews on the database, admin product editing, `COMMERCE_PROVIDER=own` (High-risk tier: admin powers, prices)
 
 **Threat model:**

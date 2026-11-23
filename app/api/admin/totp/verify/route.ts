@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   try {
     const input = asObject(guard.body);
     rejectUnknownFields(input, ["ticket", "code"]);
-    const { token, staff } = totpStep(resolveStaffStore(), String(input.ticket ?? ""), input.code);
+    const { token, staff } = await totpStep(resolveStaffStore(), String(input.ticket ?? ""), input.code);
     await resolveAudit().append({ actorId: staff.id, actorEmail: staff.email, action: "auth.sign_in", target: staff.id, details: {}, ip: guard.ip });
     const response = NextResponse.json({ ok: true }, { headers: PRIVATE_NO_STORE });
     setAdminCookie(response, token);

@@ -26,7 +26,8 @@ const MONEY_COLLECTIONS = [
   "gift_cards",
 ];
 
-const CATALOG_COLLECTIONS = ["products", "catalog_documents", "reviews", "review_votes"];
+const ADMIN_COLLECTIONS = ["staff", "staff_invites", "staff_tickets", "staff_sessions", "audit_log", "rate_limits", "product_alerts", "ugc_posts", "notify_outbox", "flow_checkouts"];
+const CATALOG_COLLECTIONS =["products", "catalog_documents", "reviews", "review_votes"];
 const AFTERSALES_COLLECTIONS =["returns", "return_photos", "privacy_requests", "newsletter_subscribers"];
 
 async function ensureCollection(db: Db, name: string) {
@@ -143,6 +144,43 @@ export const MONGO_MIGRATIONS: MongoMigration[] = [
     },
     async down(db) {
       for (const c of CATALOG_COLLECTIONS) {
+        if (await db.listCollections({ name: c }, { nameOnly: true }).hasNext()) await db.collection(c).drop();
+      }
+    },
+  },
+  {
+    name: "2026_11_26_005_admin_growth",
+    async up(db) {
+      for (const c of ADMIN_COLLECTIONS) await ensureCollection(db, c);
+      await db.collection("staff").createIndexes([{ key: { email: 1 }, name: "staff_email_uq", unique: true }]);
+      await db.collection("staff_sessions").createIndexes([
+        { key: { staffId: 1 }, name: "staff_sessions_staff_idx" },
+        { key: { expiresAtDate: 1 }, name: "staff_sessions_ttl", expireAfterSeconds: 0 },
+      ]);
+      await db.collection("staff_tickets").createIndexes([{ key: { expiresAtDate: 1 }, name: "staff_tickets_ttl", expireAfterSeconds: 0 }]);
+      await db.collection("audit_log").createIndexes([
+        { key: { at: -1 }, name: "audit_log_at_idx" },
+        { key: { actorId: 1, at: -1 }, name: "audit_log_actor_idx" },
+        { key: { target: 1, at: -1 }, name: "audit_log_target_idx" },
+      ]);
+      // Expired windows are removed by MongoDB itself.
+      await db.collection("rate_limits").createIndexes([{ key: { resetAtDate: 1 }, name: "rate_limits_ttl", expireAfterSeconds: 0 }]);
+      await db.collection("product_alerts").createIndexes([
+        { key: { openKey: 1 }, name: "product_alerts_open_uq", unique: true, partialFilterExpression: { openKey: { $type: "string" } } },
+        { key: { customerId: 1 }, name: "product_alerts_customer_idx" },
+        { key: { productId: 1, firedAt: 1 }, name: "product_alerts_product_idx" },
+      ]);
+      await db.collection("ugc_posts").createIndexes([
+        { key: { status: 1, createdAt: -1 }, name: "ugc_posts_status_idx" },
+        { key: { customerId: 1 }, name: "ugc_posts_customer_idx" },
+      ]);
+      await db.collection("notify_outbox").createIndexes([
+        { key: { customerId: 1, createdAt: -1 }, name: "notify_outbox_customer_idx" },
+        { key: { status: 1, createdAt: 1 }, name: "notify_outbox_status_idx" },
+      ]);
+    },
+    async down(db) {
+      for (const c of ADMIN_COLLECTIONS) {
         if (await db.listCollections({ name: c }, { nameOnly: true }).hasNext()) await db.collection(c).drop();
       }
     },

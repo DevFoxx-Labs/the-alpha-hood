@@ -5,7 +5,7 @@ import { resolveOrders } from "@/lib/orders/store";
 
 /** ADM-03 courier manifest: orders shipped on a day (IST) — GET ?date=YYYY-MM-DD */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "orders.ship");
+  const auth = await requireStaff(request, "orders.ship");
   if (!auth.ok) return auth.response;
   const raw = new URL(request.url).searchParams.get("date") ?? "";
   const date = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);

@@ -1,6 +1,8 @@
 import type { ConsentLedger, ConsentRecord } from "@/lib/consent/ledger";
 import { resolveLedger } from "@/lib/consent/ledger";
-import { devSingleton, mockDataAllowed } from "@/lib/mock-guard";
+import { locks } from "@/lib/concurrency/lock";
+import { dbStores } from "@/lib/db";
+import { devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 
 /**
  * ORD-02 / LOY-04 notifications. Providers (SMS with DLT templates, email, WhatsApp BSP) are pending (PRD §9),
@@ -12,6 +14,7 @@ import { devSingleton, mockDataAllowed } from "@/lib/mock-guard";
  *   customer switched on "Order updates on WhatsApp" (`whatsapp_updates`);
  * - marketing (abandoned checkout): only the channels with marketing consent (`marketing_email`,
  *   `marketing_whatsapp`), and at most 1 per 24 h and 3 per 7 days per customer. No consent → not queued.
+ *   The cap check and the insert run under a per-customer lock (two sweeps can't both slip past it).
  */
 export type Template =
   | "order_confirmed"
@@ -47,8 +50,42 @@ export interface OutboxMessage {
   status: "queued";
 }
 
-function outbox(): OutboxMessage[] | null {
-  return mockDataAllowed() ? devSingleton("notify_outbox", () => [] as OutboxMessage[]) : null;
+export interface OutboxStore {
+  push(m: OutboxMessage): Promise<void>;
+  /** Marketing messages queued for this customer since `since` (ISO). */
+  marketingSince(customerId: string, since: string): Promise<number>;
+  listFor(customerId: string): Promise<OutboxMessage[]>;
+  /** Account erasure: drops queued messages for the customer. */
+  erase(customerId: string): Promise<void>;
+}
+
+export function createMemoryOutbox(): OutboxStore & { clear(): void } {
+  const box: OutboxMessage[] = [];
+  return {
+    async push(m) {
+      box.push(structuredClone(m));
+      if (box.length > 5_000) box.splice(0, box.length - 5_000);
+    },
+    async marketingSince(customerId, since) {
+      return box.filter((m) => m.customerId === customerId && isMarketing(m.template) && m.createdAt >= since).length;
+    },
+    async listFor(customerId) {
+      return box.filter((m) => m.customerId === customerId).map((m) => structuredClone(m));
+    },
+    async erase(customerId) {
+      for (let i = box.length - 1; i >= 0; i--) if (box[i].customerId === customerId) box.splice(i, 1);
+    },
+    clear() {
+      box.splice(0);
+    },
+  };
+}
+
+/** The outbox, or null when there is nowhere to queue to (live store without a database). */
+export function resolveOutbox(env: Env = process.env): OutboxStore | null {
+  const db = dbStores(env);
+  if (db) return db.outbox;
+  return mockDataAllowed(env) ? devSingleton("notify_outbox_v2", createMemoryOutbox) : null;
 }
 
 function latest(rows: ConsentRecord[], purpose: string) {
@@ -66,28 +103,32 @@ export async function channelsFor(customerId: string, template: Template, ledger
 
 /** Queues a message; returns false when nothing may be sent (no consent, over the cap, or no outbox). */
 export async function notify(customerId: string, template: Template, refs: Record<string, string>, now = new Date(), ledger?: ConsentLedger): Promise<boolean> {
-  const box = outbox();
+  const box = resolveOutbox();
   // No provider/DB on the live store yet: nothing to queue to (tracked in docs/known-gaps.md).
   if (!box) return false;
   const channels = await channelsFor(customerId, template, ledger);
   if (channels.length === 0) return false;
-  if (isMarketing(template)) {
-    const t = now.getTime();
-    const mine = box.filter((m) => m.customerId === customerId && isMarketing(m.template));
-    const inDay = mine.filter((m) => t - Date.parse(m.createdAt) < 86_400_000).length;
-    const inWeek = mine.filter((m) => t - Date.parse(m.createdAt) < 7 * 86_400_000).length;
-    if (inDay >= FREQUENCY_CAP.perDay || inWeek >= FREQUENCY_CAP.perWeek) return false;
+  const message: OutboxMessage = { customerId, template, channels, refs, createdAt: now.toISOString(), status: "queued" };
+  if (!isMarketing(template)) {
+    await box.push(message);
+    return true;
   }
-  box.push({ customerId, template, channels, refs, createdAt: now.toISOString(), status: "queued" });
-  if (box.length > 5_000) box.splice(0, box.length - 5_000);
-  return true;
+  return locks.run(`notify:marketing:${customerId}`, async () => {
+    const t = now.getTime();
+    const inDay = await box.marketingSince(customerId, new Date(t - 86_400_000).toISOString());
+    const inWeek = await box.marketingSince(customerId, new Date(t - 7 * 86_400_000).toISOString());
+    if (inDay >= FREQUENCY_CAP.perDay || inWeek >= FREQUENCY_CAP.perWeek) return false;
+    await box.push(message);
+    return true;
+  });
 }
 
-export function outboxFor(customerId: string): OutboxMessage[] {
-  return (outbox() ?? []).filter((m) => m.customerId === customerId);
+export async function outboxFor(customerId: string): Promise<OutboxMessage[]> {
+  return (await resolveOutbox()?.listFor(customerId)) ?? [];
 }
 
-/** Test hook. */
+/** Test hook (memory outbox only). */
 export function clearOutboxForTests() {
-  outbox()?.splice(0);
+  const box = resolveOutbox();
+  if (box && "clear" in box) (box as { clear(): void }).clear();
 }

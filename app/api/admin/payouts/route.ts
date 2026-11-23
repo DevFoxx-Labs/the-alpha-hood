@@ -7,7 +7,7 @@ import { asObject, rejectUnknownFields } from "@/lib/validation";
 
 /** COD refunds queued to UPI. GET → list; POST `{ orderNumber, refundId, utr }` → mark paid (role money limit). */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "refunds.issue");
+  const auth = await requireStaff(request, "refunds.issue");
   if (!auth.ok) return auth.response;
   try {
     return privateJson({ rows: await listPayouts() });

@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { CommerceAdapter } from "@/lib/commerce/types";
 import type { Paise } from "@/lib/format";
+import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 import { notify } from "@/lib/notify/outbox";
 
@@ -72,6 +73,8 @@ export function createMemoryAlertStore(): AlertStore {
 }
 
 export function resolveAlerts(env: Env = process.env): AlertStore {
+  const db = dbStores(env);
+  if (db) return db.alerts;
   if (mockDataAllowed(env)) return devSingleton("product_alerts", createMemoryAlertStore);
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Product alerts");

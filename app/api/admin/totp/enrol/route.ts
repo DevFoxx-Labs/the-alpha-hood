@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   try {
     const input = asObject(guard.body);
     rejectUnknownFields(input, ["ticket"]);
-    return NextResponse.json(enrolStep(resolveStaffStore(), String(input.ticket ?? "")), { headers: PRIVATE_NO_STORE });
+    return NextResponse.json(await enrolStep(resolveStaffStore(), String(input.ticket ?? "")), { headers: PRIVATE_NO_STORE });
   } catch (error) {
     return adminError(error);
   }

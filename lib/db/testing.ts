@@ -15,6 +15,13 @@ import { createMemoryPhotoStore } from "@/lib/returns/photos";
 import { createMemoryReturnStore } from "@/lib/returns/service";
 import { createMemoryCatalogStore } from "@/lib/catalog/store";
 import { createMemoryReviewStore } from "@/lib/reviews/store";
+import { createMemoryAudit } from "@/lib/admin/audit";
+import { createStaffStore } from "@/lib/admin/staff";
+import { createMemoryAlertStore } from "@/lib/alerts/service";
+import { createMemoryFlowStore } from "@/lib/flows/service";
+import { createMemoryCounters } from "@/lib/http/rate-limit";
+import { createMemoryOutbox } from "@/lib/notify/outbox";
+import { createMemoryUgcStore } from "@/lib/ugc/service";
 import { createMemoryCreditLedger } from "@/lib/wallet/store-credit";
 import { assertDestructiveAllowed, type DbConfig } from "./config";
 import { createDbStores, type DbStores, forgetDbStores } from "./index";
@@ -72,6 +79,13 @@ export function testTargets(): Target[] {
           newsletter: createMemoryNewsletterStore(),
           catalog: createMemoryCatalogStore(),
           reviewStore: createMemoryReviewStore(),
+          staff: createStaffStore(),
+          audit: createMemoryAudit(),
+          rateCounters: createMemoryCounters(),
+          alerts: createMemoryAlertStore(),
+          ugc: createMemoryUgcStore(),
+          outbox: createMemoryOutbox(),
+          flows: createMemoryFlowStore(),
         };
       },
       async teardown() {},
@@ -105,6 +119,13 @@ export function testTargets(): Target[] {
           newsletter: s.newsletter,
           catalog: s.catalog,
           reviewStore: s.reviewStore,
+          staff: s.staff,
+          audit: s.audit,
+          rateCounters: s.rateCounters,
+          alerts: s.alerts,
+          ugc: s.ugc,
+          outbox: s.outbox,
+          flows: s.flows,
         };
       },
       async teardown() {

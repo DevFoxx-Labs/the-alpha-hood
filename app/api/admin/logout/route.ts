@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   if (!guard.ok) return guard.response;
   const token = adminTokenFrom(request);
   try {
-    if (token) resolveStaffStore().sessions.delete(sha256(token));
+    if (token) await resolveStaffStore().deleteSession(sha256(token));
   } catch {
     // store unavailable — clearing the cookie is still right
   }

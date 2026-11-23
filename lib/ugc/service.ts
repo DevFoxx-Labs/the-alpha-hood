@@ -3,6 +3,7 @@ import type { ConsentLedger } from "@/lib/consent/ledger";
 import type { RequestContext } from "@/lib/consent/service";
 import { recordServiceConsent, rewardUgc } from "@/lib/loyalty/service";
 import type { LoyaltyStore } from "@/lib/loyalty/store";
+import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 import type { OrderStore } from "@/lib/orders/store";
 import type { PhotoStore } from "@/lib/returns/photos";
@@ -73,6 +74,8 @@ export function createMemoryUgcStore(): UgcStore {
 }
 
 export function resolveUgc(env: Env = process.env): UgcStore {
+  const db = dbStores(env);
+  if (db) return db.ugc;
   if (mockDataAllowed(env)) return devSingleton("ugc", createMemoryUgcStore);
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("#WearTheHood");

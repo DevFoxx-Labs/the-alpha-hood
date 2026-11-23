@@ -6,7 +6,7 @@ const STATUSES: UgcStatus[] = ["pending", "approved", "rejected"];
 
 /** GET ?status=pending|approved|rejected — #WearTheHood moderation queue (ugc.moderate). */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "ugc.moderate");
+  const auth = await requireStaff(request, "ugc.moderate");
   if (!auth.ok) return auth.response;
   const s = new URL(request.url).searchParams.get("status");
   const status = STATUSES.find((x) => x === s) ?? "pending";

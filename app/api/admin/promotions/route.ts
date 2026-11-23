@@ -5,7 +5,7 @@ import { DEMO_COUPONS, isCouponLive } from "@/lib/promotions/coupons";
 
 /** ADM-05 promotions (read-only until the platform holds them). */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "promotions.read");
+  const auth = await requireStaff(request, "promotions.read");
   if (!auth.ok) return auth.response;
   const now = new Date();
   return privateJson({

@@ -6,7 +6,7 @@ const STATUSES = ["pickup_scheduled", "picked_up", "qc_failed", "completed", "ca
 
 /** ADM-04 returns queue — GET ?status= */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "returns.read");
+  const auth = await requireStaff(request, "returns.read");
   if (!auth.ok) return auth.response;
   const s = new URL(request.url).searchParams.get("status") ?? "";
   try {

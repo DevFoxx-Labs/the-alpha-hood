@@ -8,7 +8,7 @@ import { asObject, rejectUnknownFields } from "@/lib/validation";
 
 /** GET — the post's photo for moderators (any status except withdrawn). */
 export async function GET(request: Request, ctx: RouteContext<"/api/admin/ugc/[id]">) {
-  const auth = requireStaff(request, "ugc.moderate");
+  const auth = await requireStaff(request, "ugc.moderate");
   if (!auth.ok) return auth.response;
   try {
     const { id } = await ctx.params;

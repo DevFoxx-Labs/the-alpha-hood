@@ -5,7 +5,7 @@ import { resolveOrders } from "@/lib/orders/store";
 
 /** GET /api/account/orders — the caller's orders, newest first (ACC-02). */
 export async function GET(request: Request) {
-  const rl = rateLimiter.hit(`orders-list:ip:${clientIp(request)}`, 60, 60_000);
+  const rl = await rateLimiter.hit(`orders-list:ip:${clientIp(request)}`, 60, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
   const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;

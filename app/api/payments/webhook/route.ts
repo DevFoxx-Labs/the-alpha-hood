@@ -11,7 +11,7 @@ import { securityEvent } from "@/lib/security/log";
  * fails closed (no gateway configured → every request is rejected). Events are idempotent.
  */
 export async function POST(request: Request) {
-  const rl = rateLimiter.hit(`webhook:ip:${clientIp(request)}`, 300, 60_000);
+  const rl = await rateLimiter.hit(`webhook:ip:${clientIp(request)}`, 300, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
   const raw = await request.text();
   if (raw.length > 16_384) return jsonError(413, "payload_too_large", "Too large.");

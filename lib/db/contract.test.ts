@@ -215,6 +215,8 @@ import "./money-contract";
 import "./aftersales-contract";
 // ── Phase 4: catalogue, reviews, admin product editing, COMMERCE_PROVIDER=own end to end ─────────
 import "./catalog-contract";
+// ── Phase 5: staff + MFA, audit, rate limits, alerts, UGC, outbox, flows ─────────────────────────
+import "./admin-contract";
 
 // ── Guard: database code must never reach the browser bundle ─────────────────────────────────────
 import { existsSync as fileExists, readFileSync as readSource, readdirSync, statSync } from "node:fs";

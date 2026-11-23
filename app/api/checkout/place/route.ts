@@ -20,13 +20,13 @@ export async function POST(request: Request) {
   if (!guard.ok) return guard.response;
   const auth = await requireCustomer(request);
   if (!auth.ok) return auth.response;
-  const perCustomer = rateLimiter.hit(`place-order:customer:${auth.customerId}`, 10, 60 * 60_000);
+  const perCustomer = await rateLimiter.hit(`place-order:customer:${auth.customerId}`, 10, 60 * 60_000);
   if (!perCustomer.ok) return jsonError(429, "rate_limited", "Too many order attempts. Please try again later.");
   try {
     const input = asObject(guard.body);
     rejectUnknownFields(input, ["addressId", "speed", "payment", "expectedTotal", "upiApp", "tenders"]);
     const tenders = parseTenderChoice(input.tenders);
-    if (tenders.giftCardCode && !giftCardTriesLeft(auth.customerId, guard.ip)) return jsonError(429, "rate_limited", "Too many gift card attempts. Try again later.");
+    if (tenders.giftCardCode && !(await giftCardTriesLeft(auth.customerId, guard.ip))) return jsonError(429, "rate_limited", "Too many gift card attempts. Try again later.");
     const result = await placeOrder(defaultDeps(), {
       customerId: auth.customerId,
       cartId: cartIdFrom(request),

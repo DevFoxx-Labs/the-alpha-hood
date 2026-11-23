@@ -65,7 +65,7 @@ export async function guardPublicWrite(request: Request, options: WriteGuardOpti
   }
 
   const ip = clientIp(request);
-  const rl = limiter.hit(`${name}:ip:${ip}`, limit, windowMs);
+  const rl = await limiter.hit(`${name}:ip:${ip}`, limit, windowMs);
   if (!rl.ok) {
     return {
       ok: false,
@@ -124,7 +124,7 @@ export async function guardPublicUpload(
   const { name, limit, windowMs, maxBytes, limiter = rateLimiter } = options;
   if (!isSameOrigin(request)) return { ok: false, response: jsonError(403, "forbidden_origin", "Cross-origin requests are not allowed.") };
   const ip = clientIp(request);
-  const rl = limiter.hit(`${name}:ip:${ip}`, limit, windowMs);
+  const rl = await limiter.hit(`${name}:ip:${ip}`, limit, windowMs);
   if (!rl.ok) {
     return { ok: false, response: jsonError(429, "rate_limited", "Too many uploads. Please try again later.", { "Retry-After": String(rl.retryAfterSeconds) }) };
   }

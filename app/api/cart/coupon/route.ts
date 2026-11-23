@@ -13,7 +13,7 @@ import { asObject, rejectUnknownFields } from "@/lib/validation";
  * POST `{ code }` — apply; DELETE `{}` — remove. Tight per-IP limit + a daily cap stop code guessing.
  */
 export async function GET(request: Request) {
-  const rl = rateLimiter.hit(`offers:ip:${clientIp(request)}`, 60, 60_000);
+  const rl = await rateLimiter.hit(`offers:ip:${clientIp(request)}`, 60, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
   try {
     return privateJson({ offers: listOffers(await loadCartView(cartIdFrom(request))) });
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const guard = await guardPublicWrite(request, { name: "coupon", limit: 10, windowMs: 10 * 60_000, maxBytes: 128 });
   if (!guard.ok) return guard.response;
-  const daily = rateLimiter.hit(`coupon-day:ip:${guard.ip}`, 40, 86_400_000);
+  const daily = await rateLimiter.hit(`coupon-day:ip:${guard.ip}`, 40, 86_400_000);
   if (!daily.ok) return jsonError(429, "rate_limited", "Too many coupon attempts today.");
   const cartId = cartIdFrom(request);
   if (!cartId) return jsonError(409, "cart_empty", "Add something to your bag first.");

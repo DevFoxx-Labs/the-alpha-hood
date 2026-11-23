@@ -11,7 +11,7 @@ import { commerce } from "@/lib/commerce";
  * is managed in that platform and this is read-only.
  */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "catalog.read");
+  const auth = await requireStaff(request, "catalog.read");
   if (!auth.ok) return auth.response;
   const p = new URL(request.url).searchParams;
   const q = (p.get("q") ?? "").toLowerCase().slice(0, 60);

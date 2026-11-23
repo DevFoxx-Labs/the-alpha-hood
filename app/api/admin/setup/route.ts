@@ -12,7 +12,7 @@ import { asObject, rejectUnknownFields } from "@/lib/validation";
  */
 export async function GET() {
   try {
-    return NextResponse.json({ needed: resolveStaffStore().staff.size === 0 }, { headers: PRIVATE_NO_STORE });
+    return NextResponse.json({ needed: (await resolveStaffStore().count()) === 0 }, { headers: PRIVATE_NO_STORE });
   } catch (error) {
     return adminError(error);
   }
@@ -25,8 +25,10 @@ export async function POST(request: Request) {
     const input = asObject(guard.body);
     rejectUnknownFields(input, ["email", "name", "password", "token"]);
     const store = resolveStaffStore();
-    if (!setupAllowed(store, input.token)) throw new AdminAuthError(403, "setup_closed", "Setup is closed.");
-    const owner = await createOwner(store, { email: input.email, name: input.name, password: input.password });
+    // Closed setup answers the same way whatever was sent (no validation hints).
+    if (!(await setupAllowed(store, input.token))) throw new AdminAuthError(403, "setup_closed", "Setup is closed.");
+    // The "no staff yet" check is repeated with the insert under one lock inside createOwner (no two first owners).
+    const owner = await createOwner(store, { email: input.email, name: input.name, password: input.password, token: input.token });
     securityEvent("login", { staff: owner.id, kind: "admin_bootstrap" });
     return NextResponse.json({ ok: true }, { status: 201, headers: PRIVATE_NO_STORE });
   } catch (error) {

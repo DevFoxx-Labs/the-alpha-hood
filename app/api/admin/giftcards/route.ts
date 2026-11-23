@@ -18,7 +18,7 @@ const publicCard = (c: { hash: string; last4: string; initial: number; balance: 
 
 /** GET — gift cards (masked: last 4 characters only). PROMO-06, `giftcards.issue`. */
 export async function GET(request: Request) {
-  const auth = requireStaff(request, "giftcards.issue");
+  const auth = await requireStaff(request, "giftcards.issue");
   if (!auth.ok) return auth.response;
   try {
     return privateJson({ cards: (await resolveGiftCards().list()).map(publicCard), rules: GIFT_CARD_RULES });
