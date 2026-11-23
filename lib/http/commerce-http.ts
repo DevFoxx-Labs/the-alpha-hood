@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { TenderError } from "@/lib/wallet/tenders";
 import { AlertError } from "@/lib/alerts/service";
 import { LoyaltyError } from "@/lib/loyalty/service";
 import { UgcError } from "@/lib/ugc/service";
@@ -61,7 +62,7 @@ export function commerceErrorResponse(error: unknown): Response {
     return jsonError(error.status, error.code, error.message);
   }
   if (error instanceof AccountError) return jsonError(409, error.code, error.message);
-  if (error instanceof AlertError || error instanceof LoyaltyError || error instanceof UgcError) return jsonError(error.status, error.code, error.message);
+  if (error instanceof AlertError || error instanceof LoyaltyError || error instanceof UgcError || error instanceof TenderError) return jsonError(error.status, error.code, error.message);
   if (error instanceof OtpError) {
     const status = error.code === "cooldown" || error.code === "limited" ? 429 : 422;
     return jsonError(status, error.code, error.message, error.retryAfterSeconds ? { "Retry-After": String(error.retryAfterSeconds) } : undefined);

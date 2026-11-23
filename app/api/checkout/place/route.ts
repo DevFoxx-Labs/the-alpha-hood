@@ -1,4 +1,6 @@
 import { attributionFrom } from "@/lib/analytics/attribution";
+import { giftCardTriesLeft } from "@/lib/giftcards/limits";
+import { parseTenderChoice } from "@/lib/wallet/tenders";
 import { isVisitorId, readCookie, VISITOR_COOKIE } from "@/lib/consent/cookie";
 import { NOTICES } from "@/lib/legal";
 import { parseAddressId, parseAmount, parseIdempotencyKey, parsePayment, parseSpeed, parseUpiApp } from "@/lib/checkout/parse";
@@ -22,7 +24,9 @@ export async function POST(request: Request) {
   if (!perCustomer.ok) return jsonError(429, "rate_limited", "Too many order attempts. Please try again later.");
   try {
     const input = asObject(guard.body);
-    rejectUnknownFields(input, ["addressId", "speed", "payment", "expectedTotal", "upiApp"]);
+    rejectUnknownFields(input, ["addressId", "speed", "payment", "expectedTotal", "upiApp", "tenders"]);
+    const tenders = parseTenderChoice(input.tenders);
+    if (tenders.giftCardCode && !giftCardTriesLeft(auth.customerId, guard.ip)) return jsonError(429, "rate_limited", "Too many gift card attempts. Try again later.");
     const result = await placeOrder(defaultDeps(), {
       customerId: auth.customerId,
       cartId: cartIdFrom(request),
@@ -34,6 +38,7 @@ export async function POST(request: Request) {
       idempotencyKey: parseIdempotencyKey(request),
       attribution: attributionFrom(request, NOTICES.cookies.version),
       visitorId: visitorIdFrom(request),
+      tenders,
     });
     return privateJson(result, { status: 201 });
   } catch (error) {

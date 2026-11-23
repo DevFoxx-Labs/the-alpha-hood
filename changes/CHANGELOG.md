@@ -1,5 +1,71 @@
 # Change log
 
+## 2026-11-25 — M9 part 2: pay with Hood Coins, gift cards and store credit (High-risk tier: money)
+
+**Scope:** CHK-05, PROMO-06, LOY-01 (spending coins). The how-it-works guide is in
+`docs/features/m9-growth-pack.md` §12; all of M9 is documented there.
+
+**Added**
+- `lib/wallet/tenders.ts`, the one service for wallet payments:
+  - plan (server-side caps; coins ≤ 20% of the products' value; order of use: coins → gift card → store credit);
+  - hold (all or nothing, inside the order lock, unique references per hold);
+  - release (payment failed or expired, idempotent per hold);
+  - proportional refund split (never more than each part paid, whole coins) and refunds back to each instrument
+    (an expired or blocked gift card → store credit).
+- Treatment: tenders are payment instruments. `pricing.total`, the invoice and GST are unchanged; the new
+  `order.payable` is what the gateway or the courier collects. The CA must confirm this.
+- `lib/giftcards/store.ts`:
+  - 16-character random codes (80 bits), only the SHA-256 hash stored, last 4 shown;
+  - ₹500–₹10,000, valid 365 days, append-only ledger, never negative;
+  - block / unblock;
+  - failed attempts limited (`lib/giftcards/limits.ts`, plus a new `rateLimiter.peek`).
+- Checkout:
+  - quote and place accept `tenders`, and return `tenders`, `payable` and `wallet`;
+  - `expectedTotal` is now the amount to pay;
+  - a fully wallet-paid order is confirmed with no gateway payment;
+  - COD risk and the COD limit are judged on the amount to collect;
+  - retry takes the tenders again; reconciliation releases them on expiry;
+  - a late success after a release takes them again, or goes to review.
+- Cancellation returns all tenders in full. Return refunds (to source or UPI) are split in proportion.
+- UI:
+  - checkout step "Coins, credit & gift cards" (`components/checkout/wallet-step.tsx`);
+  - summary rows and a pay button showing only what's left;
+  - wallet lines on the order confirmation, account order detail, admin order view and invoice ("Paid by").
+- Courier label and manifest COD amounts are now the amount to collect, not the full total.
+- Admin:
+  - **Gift cards** screen and APIs (`giftcards.issue`: owner, finance);
+  - issue (code shown once), block and unblock, all audited.
+- Coins earn only on the value not paid with coins (no coin-on-coin loop).
+- Coin balances now use FIFO lots: spends and reversals come out of the right lot, so an old lot expiring can't make
+  a spent balance negative.
+- Legal (DPDP / Consumer Protection):
+  - Terms add paying with coins and "Gift cards and store credit";
+  - the Refund & Cancellation Policy adds how wallet-paid refunds are split;
+  - the Privacy Notice (EN + HI) adds wallet payment data;
+  - versions: Terms and Refund 2026-11-25.
+- "Using coins at checkout is coming soon" copy removed from `/alpha-club` and the dashboard.
+
+**Threat model (abuse case → layer)**
+- Client sends tender amounts, or more coins than allowed → only choices accepted; the server caps from live
+  balances (prevent, tested).
+- Double spend: two tabs, a retry, or a race → customer lock, all-or-nothing hold, unique references, ledgers
+  never negative (prevent, tested with a race).
+- Gift card guessing → 80-bit codes, hashed at rest, identical errors, failure rate limits (prevent, tested).
+- A stolen or lost card → staff block, audited (recover).
+- Wallet lost on a payment failure → released once, retried safely (prevent, tested).
+- Refund abuse (refund more than paid, cash out a gift card) → proportional split, per-instrument caps,
+  wallet-paid parts never go to the gateway (prevent, tested).
+- Overcharging COD → label and manifest collect only what's left (prevent, tested).
+- Coin farming by paying with coins → no earn on the coin-paid value (prevent, tested).
+
+**Verification**
+- `pnpm verify` ✓ (typecheck, lint, test 277/277, build) · `pnpm audit --prod`: no known vulnerabilities.
+- New `lib/wallet/tenders.test.ts` (13) and a wallet return test in `lib/returns/returns.test.ts`.
+- **Not done:**
+  - Browser check at 1440/390/360.
+  - Selling gift cards online (a payment flow for a non-physical product, and GST at issue vs redemption).
+  - `/security-review` (High tier: still required before launch).
+
 ## 2026-11-25 — M9 growth pack, part 1 (High-risk tier: loyalty value, referral discounts, personal data, UGC uploads)
 
 **Scope:** PRD M9 — LOY-01…04, PROMO-05, PDP-04/09/10, CART-03, HOME-07/09/10, ORD-02 WhatsApp, CHK-08, ANL-03/04,

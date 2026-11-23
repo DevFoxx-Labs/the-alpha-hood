@@ -143,9 +143,15 @@
   soft-404s, return 404 for unknown handles earlier (e.g. a proxy check against the catalogue).
 
 ## Growth pack (M9)
-- 🔴 Part 2 not built: spending Hood Coins, gift cards (PROMO-06) and store credit at checkout (CHK-05). They need
-  tender handling (order total vs amount payable, gateway amount, partial refunds back to each instrument, wallet
-  reversal on payment failure) and the CA's answer on GST treatment of coins.
+- 🔴 Wallet payments (coins, gift cards, store credit) are built as **payment instruments** (invoice/GST on the full
+  total). The CA must confirm this, especially for Hood Coins (a discount would reduce the taxable value). If the
+  answer is "discount", coins move into priceCart before launch.
+- 🟠 Gift cards can't be bought online yet: that needs a checkout for a non-physical product, a GST decision
+  (voucher taxed at issue vs redemption) and email delivery of the code. Staff issue them from the admin today.
+- 🟠 Gift card, coin and credit ledgers live in memory (dev) — production needs DB tables with UNIQUE(reference),
+  row locks (`SELECT … FOR UPDATE`) on balance changes, and the same all-or-nothing hold in one transaction.
+- 🟡 A late gateway success after the wallet was released, when the balance is gone, goes to `needs_review`; ops must
+  refund the card payment (admin queue for such cases not built).
 - 🔴 Alpha Club, alerts, UGC, flows and the outbox live in memory — production refuses them (fail closed) until the
   database exists. Coins also need a scheduled expiry job (today expiry is applied when balances are read).
 - 🟠 Referral fraud: a friend using a different device and a new address still passes. Add velocity limits

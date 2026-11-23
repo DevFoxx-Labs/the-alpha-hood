@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { priceRows } from "@/components/bag/price-rows";
 import { CheckoutStep, PaymentMethods, type PaymentChoice } from "@/components/store/checkout-blocks";
+import { type QuoteTenders, type WalletChoice, type WalletInfo, WalletStep } from "./wallet-step";
 import { OrderSummary } from "@/components/store/order-summary";
 import { useStoreUI } from "@/components/store/store-ui-provider";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,10 @@ interface Quote {
   speed: "standard" | "express";
   promise: DeliveryPromise | null;
   cod: { allowed: boolean; reasons: string[] } | null;
+  /** CHK-05 wallet: what the tenders pay and what is left to pay (server computed). */
+  tenders: QuoteTenders;
+  payable: number;
+  wallet: WalletInfo;
 }
 
 /**
@@ -58,6 +63,8 @@ export function CheckoutApp() {
   const [error, setError] = useState<string | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const idemKey = useRef<string | null>(null);
+  const [wallet, setWallet] = useState<WalletChoice>({ coins: 0, useStoreCredit: false, giftCardCode: null });
+  const [walletError, setWalletError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -90,19 +97,26 @@ export function CheckoutApp() {
   useEffect(() => {
     if (!state?.customer) return;
     let cancelled = false;
-    api<Quote>("/api/checkout/quote", { method: "POST", body: { addressId: addressId ?? undefined, speed, payment } })
+    api<Quote>("/api/checkout/quote", { method: "POST", body: { addressId: addressId ?? undefined, speed, payment, tenders: wallet } })
       .then((q) => {
         if (cancelled) return;
         setQuote(q);
+        setWalletError(null);
         if (q.speed !== speed) setSpeed(q.speed);
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof ApiError ? e.message : "Couldn't update your total.");
+        if (cancelled) return;
+        if (e instanceof ApiError && (e.code === "invalid_gift_card" || (e.code === "rate_limited" && wallet.giftCardCode))) {
+          setWalletError(e.message);
+          setWallet((w) => ({ ...w, giftCardCode: null }));
+          return;
+        }
+        setError(e instanceof ApiError ? e.message : "Couldn't update your total.");
       });
     return () => {
       cancelled = true;
     };
-  }, [state, addressId, speed, payment]);
+  }, [state, addressId, speed, payment, wallet]);
 
   // ANL-01 checkout funnel. Values come from the server cart / quote; consent is checked inside track().
   const began = useRef(false);
@@ -176,7 +190,7 @@ export function CheckoutApp() {
       const r = await api<{ orderNumber: string; status: string; redirectUrl: string }>("/api/checkout/place", {
         method: "POST",
         headers: { "Idempotency-Key": idemKey.current },
-        body: { addressId, speed, payment, expectedTotal: quote.pricing.total, ...(payment === "upi" ? { upiApp } : {}) },
+        body: { addressId, speed, payment, expectedTotal: quote.payable, tenders: wallet, ...(payment === "upi" ? { upiApp } : {}) },
       });
       void refreshCart();
       router.push(safeRedirect(r.redirectUrl));
@@ -192,9 +206,19 @@ export function CheckoutApp() {
 
   const payLabel = !quote
     ? "Pay securely"
-    : payment === "cod"
-      ? `Place order · ${formatINR(quote.pricing.total)}`
-      : `Pay ${formatINR(quote.pricing.total)} securely`;
+    : quote.payable === 0
+      ? "Place order · paid with your wallet"
+      : payment === "cod"
+        ? `Place order · ${formatINR(quote.payable)}`
+        : `Pay ${formatINR(quote.payable)} securely`;
+  const tenderRows = quote?.tenders.total
+    ? [
+        ...(quote.tenders.giftCard ? [{ label: `Gift card ••••${quote.tenders.giftCard.last4}`, amount: quote.tenders.giftCard.amount, discount: true }] : []),
+        ...(quote.tenders.storeCredit ? [{ label: "Store credit", amount: quote.tenders.storeCredit, discount: true }] : []),
+        ...(quote.tenders.coins ? [{ label: `Hood Coins (${quote.tenders.coins})`, amount: quote.tenders.coins * 100, discount: true }] : []),
+      ]
+    : [];
+  const toPay = quote?.payable ?? pricing.total;
   const disabledReason = !state.customer
     ? "Verify your phone number to continue."
     : !addressId
@@ -208,8 +232,8 @@ export function CheckoutApp() {
   const summary = (
     <OrderSummary
       lines={lines.filter((l) => l.status !== "unavailable")}
-      rows={priceRows(pricing)}
-      toPay={pricing.total}
+      rows={[...priceRows(pricing), ...(tenderRows.length ? [{ label: "Order total (incl. GST)", amount: pricing.total }, ...tenderRows] : [])]}
+      toPay={toPay}
       saving={pricing.savings}
       coupon={pricing.coupon?.ok ? { code: pricing.coupon.code, amount: pricing.couponDiscount } : undefined}
     />
@@ -232,7 +256,7 @@ export function CheckoutApp() {
             {summaryOpen ? "Hide" : "Show"} order summary
             <Icon icon={ArrowDown01Icon} size={14} className={cn("transition-transform", summaryOpen && "rotate-180")} />
           </span>
-          <span className="tabular">{formatINR(pricing.total)}</span>
+          <span className="tabular">{formatINR(toPay)}</span>
         </button>
         <div id="mobile-summary" hidden={!summaryOpen} className="mt-2">
           {summary}
@@ -265,7 +289,15 @@ export function CheckoutApp() {
             shippingFee={pricing.shipping}
             disabled={!state.customer}
           />
-          <CheckoutStep number={3} title="Payment" aside="All transactions are encrypted">
+          <WalletStep
+            choice={wallet}
+            onChange={setWallet}
+            wallet={quote?.wallet ?? null}
+            tenders={quote?.tenders ?? null}
+            error={walletError}
+            disabled={!state.customer || placing}
+          />
+          <CheckoutStep number={4} title="Payment" aside="All transactions are encrypted">
             <PaymentMethods
               value={payment}
               onChange={choosePayment}

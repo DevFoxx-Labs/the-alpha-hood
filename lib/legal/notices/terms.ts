@@ -6,8 +6,8 @@ import type { Notice } from "../types";
  */
 export const TERMS_NOTICE: Notice = {
   slug: "terms",
-  version: "2026-11-24",
-  lastUpdated: "2026-11-24",
+  version: "2026-11-25",
+  lastUpdated: "2026-11-25",
   text: {
     en: {
       title: "Terms of Service",
@@ -123,8 +123,25 @@ export const TERMS_NOTICE: Notice = {
                 "Tiers are based on what you spent in the last 12 months (after refunds): Elite from ₹15,000, Legend from ₹40,000.",
                 "Members get a 30-day return window on orders placed while they are members.",
                 "Invite a friend with your code: they get ₹200 off a first order of ₹999 or more, and you get 200 coins once their order is delivered and kept. Codes can't be used on your own account, address or device.",
+                "You can pay with Hood Coins at checkout: up to 20% of the products' value per order. If you return items, the coins used on them come back to you; coins paid back this way are valid for 365 days.",
                 "If you leave the Alpha Club or delete your account, unused coins (including pending ones) are forfeited.",
                 "We may change these rules with 30 days' notice on this page; coins you already have keep their expiry date. Abuse (fake accounts, self-referral) cancels coins.",
+              ],
+            },
+          ],
+        },
+        {
+          id: "gift-cards",
+          heading: "Gift cards and store credit",
+          blocks: [
+            {
+              type: "list",
+              items: [
+                "Gift cards are digital, from ₹500 to ₹10,000, and valid for 1 year from issue. Use them at checkout, fully or in parts; they can't be exchanged for cash.",
+                "Anyone with the code can use a gift card — keep it private. If you think it was misused, contact us and we can block it.",
+                "Store credit can be used at checkout and stays while your account is active.",
+                "Gift cards, store credit and Hood Coins are ways to pay: your invoice shows the full price and GST, and how it was paid.",
+                "If an order paid this way is cancelled, everything goes back where it came from. Refunds for returns are split in the same proportion as you paid; a gift card that has expired or been blocked is refunded as store credit.",
               ],
             },
           ],

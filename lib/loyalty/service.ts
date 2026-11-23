@@ -84,19 +84,42 @@ export async function leaveClub(customerId: string, ctx: RequestContext, store: 
   if (total > 0) await store.addCoins({ customerId, coins: -total, kind: "expired", reference: `leave:${customerId}:${now.getTime()}`, availableAt: now.toISOString(), expiresAt: null }, now);
 }
 
+/**
+ * Coin balances with FIFO lots: every positive entry is a lot (with its own availableAt / expiresAt); every
+ * negative entry (spend, reversal, forfeit) is taken from the matching lot first (a return takes back that order's
+ * earn), then from the lots that expire soonest. So spent coins never "come back negative" when an old lot expires.
+ */
 export function sumCoins(entries: CoinEntry[], now = new Date()) {
   const t = now.getTime();
+  const lots = entries
+    .filter((e) => e.coins > 0)
+    .map((e) => ({ ref: e.reference, left: e.coins, availableAt: Date.parse(e.availableAt), expiresAt: e.expiresAt ? Date.parse(e.expiresAt) : Infinity, createdAt: e.createdAt }));
+  const negatives = entries.filter((e) => e.coins < 0).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  for (const n of negatives) {
+    let need = -n.coins;
+    const at = Date.parse(n.createdAt);
+    const target = n.reference.startsWith("earn-reverse:") ? `earn:${n.reference.split(":")[1]}` : n.reference.startsWith("referral-reverse:") ? `referral:${n.reference.split(":")[1]}` : null;
+    const order = [...lots]
+      .filter((l) => l.left > 0 && l.expiresAt > at)
+      .sort((a, b) => Number(b.ref === target) - Number(a.ref === target) || a.expiresAt - b.expiresAt || a.availableAt - b.availableAt);
+    for (const l of order) {
+      if (need === 0) break;
+      const take = Math.min(l.left, need);
+      l.left -= take;
+      need -= take;
+    }
+  }
   let available = 0;
   let pending = 0;
   let expiringSoon = 0;
-  for (const e of entries) {
-    if (e.expiresAt && Date.parse(e.expiresAt) <= t && e.coins > 0) continue; // expired coins don't count
-    if (Date.parse(e.availableAt) <= t) {
-      available += e.coins;
-      if (e.coins > 0 && e.expiresAt && Date.parse(e.expiresAt) - t < 30 * DAY) expiringSoon += e.coins;
-    } else pending += e.coins;
+  for (const l of lots) {
+    if (l.left <= 0 || l.expiresAt <= t) continue;
+    if (l.availableAt <= t) {
+      available += l.left;
+      if (l.expiresAt - t < 30 * DAY) expiringSoon += l.left;
+    } else pending += l.left;
   }
-  return { available: Math.max(0, available), pending: Math.max(0, pending), total: Math.max(0, available + pending), expiringSoon };
+  return { available, pending, total: available + pending, expiringSoon };
 }
 
 /** Rolling 12-month spend: goods value of delivered orders, minus what was refunded (any method). */
@@ -128,7 +151,9 @@ export async function onDelivered(order: Order, store: LoyaltyStore = resolveLoy
   const availableAt = addDays(order.deliveredAt, returnWindowDays(order));
   const expiresAt = addDays(availableAt, CLUB.coinExpiryDays);
   if (order.club) {
-    const coins = coinsFor(order.pricing.goodsTotal, order.club.earnPercent);
+    // "% of the paid amount": value paid with Hood Coins doesn't earn new coins (no coin-on-coin loop).
+    const earnBase = Math.max(0, order.pricing.goodsTotal - (order.tenders?.coins ?? 0) * 100);
+    const coins = coinsFor(earnBase, order.club.earnPercent);
     if (coins > 0) await store.addCoins({ customerId: order.customerId, coins, kind: "earn", reference: `earn:${order.number}`, availableAt, expiresAt });
   }
   const ref = await store.referralFor(order.number);

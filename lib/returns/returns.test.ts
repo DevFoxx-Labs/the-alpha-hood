@@ -1,3 +1,5 @@
+import { createMemoryGiftCardStore } from "@/lib/giftcards/store";
+import { createMemoryLoyaltyStore } from "@/lib/loyalty/store";
 import { describe, expect, it } from "vitest";
 import { parseAddress } from "@/lib/checkout/address";
 import { placeOrder, quote, handlePaymentEvent, type CheckoutDeps } from "@/lib/checkout/service";
@@ -6,7 +8,7 @@ import { MOCK_PRODUCTS } from "@/lib/commerce/mock/data";
 import { createKeyedLock } from "@/lib/concurrency/lock";
 import { createMemoryCustomerStore } from "@/lib/customers/store";
 import { advanceFulfilment, cancelOrder, financialYear, TRANSITIONS } from "@/lib/orders/lifecycle";
-import { createMemoryOrderStore } from "@/lib/orders/store";
+import { createMemoryOrderStore, orderPayable } from "@/lib/orders/store";
 import { createDemoGateway } from "@/lib/payments/gateway";
 import { createMockShipping } from "@/lib/shipping";
 import { createMemoryCreditLedger } from "@/lib/wallet/store-credit";
@@ -280,5 +282,44 @@ describe("return photos (private uploads)", () => {
     expect(await store.get("cus_a", saved.id)).not.toBeNull();
     expect(await store.get("cus_b", saved.id)).toBeNull();
     await expect(store.save("cus_a", new Uint8Array(6 * 1024 * 1024))).rejects.toThrow();
+  });
+});
+
+describe("CHK-05 returns on a wallet-paid order", () => {
+  it("QC pass refunds the card/UPI share to source and the rest back to coins / store credit, once", async () => {
+    const { deps, gateway } = setup();
+    const loyalty = createMemoryLoyaltyStore();
+    const wallet = { loyalty, credit: deps.credit, giftCards: createMemoryGiftCardStore() };
+    deps.loyalty = loyalty;
+    deps.wallet = wallet;
+    const { customer } = await deps.customers.findOrCreateByPhone("+919877700001");
+    const address = await deps.customers.addAddress(customer.id, parseAddress(ADDRESS));
+    await deps.credit.add({ customerId: customer.id, amount: 20_000, reason: "adjustment", reference: "seed" }, T0);
+    await loyalty.join(customer.id, T0);
+    await loyalty.addCoins({ customerId: customer.id, coins: 100, kind: "adjustment", reference: "seed-coins", availableAt: new Date(T0.getTime() - 1000).toISOString(), expiresAt: new Date(T0.getTime() + 90 * 86_400_000).toISOString() }, T0);
+    const cart = await deps.commerce.cart.create();
+    await deps.commerce.cart.addLine(cart.id, { productId: shirt.id, size: sizeA, quantity: 2 });
+    const tenders = { coins: 100, useStoreCredit: true, giftCardCode: null };
+    const q = await quote(deps, { customerId: customer.id, cartId: cart.id, addressId: address.id, speed: "standard", payment: "upi", tenders, now: T0 });
+    const placed = await placeOrder(deps, { customerId: customer.id, cartId: cart.id, addressId: address.id, speed: "standard", payment: "upi", idempotencyKey: crypto.randomUUID(), expectedTotal: q.payable, tenders, now: T0 });
+    const signed = gateway.simulate(placed.redirectUrl.split("/").pop()!, "succeeded", T0.getTime())!;
+    await handlePaymentEvent(deps, gateway.verifyWebhook(signed.rawBody, signed.signature, signed.timestamp, T0.getTime())!, T0);
+    for (const to of ["packed", "shipped", "delivered"] as const) await advanceFulfilment(deps, placed.orderNumber, to, T0);
+    const order = (await deps.orders.get(placed.orderNumber))!;
+    expect(await deps.credit.balance(customer.id)).toBe(0);
+
+    const r = await createReturn(deps, customer.id, parseReturnInput(reqBody(order, address.id), order.number), T0);
+    await advanceReturn(deps, r.number, "picked_up", T0);
+    await advanceReturn(deps, r.number, "qc_passed", T0);
+    await expect(advanceReturn(deps, r.number, "qc_passed", T0)).rejects.toMatchObject({ code: "invalid_transition" });
+
+    const after = (await deps.orders.get(order.number))!;
+    const by = (to: string) => after.refunds.filter((x) => x.to === to).reduce((n, x) => n + x.amount, 0);
+    const refunded = by("source") + by("coins") + by("store_credit") + by("gift_card");
+    expect(refunded).toBe(r.amounts.payable);
+    expect(by("source")).toBeLessThanOrEqual(orderPayable(after));
+    expect(by("coins") % 100).toBe(0);
+    expect(by("coins")).toBeLessThanOrEqual(100 * 100);
+    expect(await deps.credit.balance(customer.id)).toBe(by("store_credit"));
   });
 });

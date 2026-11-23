@@ -1,3 +1,4 @@
+import { orderPayable } from "@/lib/orders/store";
 import { requireStaff } from "@/lib/admin/auth";
 import { adminError, privateJson } from "@/lib/admin/http";
 import { resolveOrders } from "@/lib/orders/store";
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
     const shipped = orders.filter((o) => o.timeline.some((t) => t.status === "shipped" && new Date(Date.parse(t.at) + 330 * 60_000).toISOString().slice(0, 10) === date));
     return privateJson({
       date,
-      rows: shipped.map((o) => ({ orderNumber: o.number, awb: o.tracking?.awb ?? "", courier: o.tracking?.courier ?? "", city: o.address.city, pincode: o.address.pincode, cod: o.paymentMethod === "cod" ? o.pricing.total : 0, items: o.lines.reduce((n, l) => n + l.quantity, 0) })),
+      rows: shipped.map((o) => ({ orderNumber: o.number, awb: o.tracking?.awb ?? "", courier: o.tracking?.courier ?? "", city: o.address.city, pincode: o.address.pincode, cod: o.paymentMethod === "cod" ? orderPayable(o) : 0 /* only what wallet tenders didn't pay */, items: o.lines.reduce((n, l) => n + l.quantity, 0) })),
     });
   } catch (error) {
     return adminError(error);

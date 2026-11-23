@@ -132,7 +132,7 @@ export function OrderConfirmation() {
         </p>
         {order.canRetryPayment ? (
           <Button className="mt-5" onClick={retry} loading={retrying}>
-            Try payment again · {formatINR(order.totals.total)}
+            Try payment again · {formatINR(order.payable)}
           </Button>
         ) : null}
       </section>
@@ -171,9 +171,37 @@ export function OrderConfirmation() {
               <dd>{formatINR(order.totals.codFee)}</dd>
             </div>
           ) : null}
+          {order.tenders ? (
+            <div className="flex justify-between">
+              <dt>Order total</dt>
+              <dd>{formatINR(order.totals.total)}</dd>
+            </div>
+          ) : null}
+          {order.tenders ? (
+            <>
+              {order.tenders.giftCard ? (
+                <div className="flex justify-between text-green">
+                  <dt>Gift card ••••{order.tenders.giftCardLast4}</dt>
+                  <dd>−{formatINR(order.tenders.giftCard)}</dd>
+                </div>
+              ) : null}
+              {order.tenders.storeCredit ? (
+                <div className="flex justify-between text-green">
+                  <dt>Store credit</dt>
+                  <dd>−{formatINR(order.tenders.storeCredit)}</dd>
+                </div>
+              ) : null}
+              {order.tenders.coins ? (
+                <div className="flex justify-between text-green">
+                  <dt>Hood Coins ({order.tenders.coins})</dt>
+                  <dd>−{formatINR(order.tenders.coins * 100)}</dd>
+                </div>
+              ) : null}
+            </>
+          ) : null}
           <div className="flex justify-between text-[15px] font-bold">
-            <dt>{order.paymentMethod === "cod" ? "To pay on delivery" : "Total"}</dt>
-            <dd>{formatINR(order.totals.total)}</dd>
+            <dt>{order.paymentMethod === "cod" && order.payable > 0 ? "To pay on delivery" : order.tenders ? "Paid by card / UPI" : "Total"}</dt>
+            <dd>{formatINR(order.payable)}</dd>
           </div>
           <p className="text-[11.5px] text-ink-2">Includes GST of {formatINR(order.totals.gst)}. GST invoice is sent when your order ships.</p>
           {order.totals.savings > 0 ? <p className="text-[12.5px] font-semibold text-green">You saved {formatINR(order.totals.savings)}</p> : null}

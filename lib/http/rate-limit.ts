@@ -15,6 +15,8 @@ export interface RateLimitResult {
 
 export interface RateLimiter {
   hit(key: string, limit: number, windowMs: number, now?: number): RateLimitResult;
+  /** True while the key is still under its limit; doesn't count as a hit. */
+  peek(key: string, limit: number, windowMs: number, now?: number): boolean;
   reset(): void;
 }
 
@@ -42,6 +44,10 @@ export function createRateLimiter(): RateLimiter {
         remaining: Math.max(0, limit - bucket.count),
         retryAfterSeconds: ok ? 0 : Math.ceil((bucket.resetAt - now) / 1000),
       };
+    },
+    peek(key, limit, _windowMs, now = Date.now()) {
+      const b = buckets.get(key);
+      return !b || b.resetAt <= now || b.count < limit;
     },
     reset() {
       buckets.clear();

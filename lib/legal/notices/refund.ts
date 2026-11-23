@@ -6,8 +6,8 @@ import type { Notice } from "../types";
  */
 export const REFUND_NOTICE: Notice = {
   slug: "refund-cancellation",
-  version: "2026-11-22",
-  lastUpdated: "2026-11-22",
+  version: "2026-11-25",
+  lastUpdated: "2026-11-25",
   text: {
     en: {
       title: "Refund & Cancellation Policy",
@@ -54,6 +54,7 @@ export const REFUND_NOTICE: Notice = {
                 "Prepaid orders are refunded to the original payment method. The time to reach your account depends on your bank or payment provider.",
                 "Cash on Delivery orders are refunded to a UPI ID or bank account you give us, or as store credit if you choose it.",
                 "You may choose store credit instead of a refund; it is never forced on you.",
+                "If you paid partly with Hood Coins, a gift card or store credit, the refund is split the same way: coins back as coins, store credit back as credit, and gift card value back to the card (or as store credit if the card has expired or been blocked). A cancelled order gets all of it back in full.",
               ],
             },
           ],

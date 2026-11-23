@@ -37,6 +37,9 @@ export async function GET(request: Request, { params }: RouteContext<"/api/order
         }),
         charges: { shipping: o.pricing.shipping, express: o.pricing.expressFee, cod: o.pricing.codFee },
         totals: { gst: o.pricing.gst, total: o.pricing.total },
+        paidBy: o.tenders
+          ? { coins: o.tenders.coins * 100, giftCard: o.tenders.giftCard?.amount ?? 0, storeCredit: o.tenders.storeCredit, balance: o.payable ?? o.pricing.total }
+          : null,
         paymentMethod: o.paymentMethod,
       },
     });

@@ -145,7 +145,7 @@ export function ClubView() {
           <p className="mt-2 font-display text-[56px] leading-none lg:text-[80px]">{data.coins.available}</p>
           <p className="text-[13px] text-white/75">Hood Coins ready to use{data.coins.pending ? ` · ${data.coins.pending} pending (after the return window)` : ""}</p>
           {data.coins.expiringSoon ? <p className="mt-1 text-[12px] text-volt">{data.coins.expiringSoon} coins expire in the next 30 days</p> : null}
-          <p className="mt-3 text-[12px] text-white/60">Using coins at checkout is coming soon.</p>
+          <p className="mt-3 text-[12px] text-white/60">Use them at checkout — up to 20% of an order&apos;s product value.</p>
         </div>
         <Mascot name="scene-24-club-card" sizes="320px" blend className="hidden w-[300px] lg:block" />
       </section>

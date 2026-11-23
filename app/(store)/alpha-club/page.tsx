@@ -4,6 +4,7 @@ import { Mascot } from "@/components/brand/mascot";
 import { Button } from "@/components/ui/button";
 import { formatINR } from "@/lib/format";
 import { CLUB, TIER_LABEL, type Tier } from "@/lib/loyalty/config";
+import { TENDER_RULES } from "@/lib/wallet/tenders";
 
 export const metadata: Metadata = {
   title: "Alpha Club",
@@ -63,7 +64,7 @@ export default function AlphaClubPage() {
           <ul className="mt-5 max-w-[620px] list-disc space-y-2 pl-5 text-[14px] leading-[1.6]">
             <li>1 Hood Coin = ₹1. You earn on the amount you pay for products (not shipping or fees), once the order is delivered.</li>
             <li>Coins become usable after the return window ends; returned items take their coins back.</li>
-            <li>Coins expire {CLUB.coinExpiryDays} days after they become usable. Using coins at checkout is coming soon.</li>
+            <li>Coins expire {CLUB.coinExpiryDays} days after they become usable. Pay with them at checkout — up to {TENDER_RULES.coinMaxPercent}% of an order&apos;s product value.</li>
             <li>
               Leaving the club forfeits unused coins. Full rules in the{" "}
               <Link href="/legal/terms#alpha-club" className="underline underline-offset-2">

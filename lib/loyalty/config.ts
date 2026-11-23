@@ -2,8 +2,7 @@ import { rupees, type Paise } from "@/lib/format";
 
 /**
  * LOY-01/02 Alpha Club rules. DEMO values — the owner confirms them, and the Terms (Alpha Club section) must
- * stay in sync. 1 Hood Coin = ₹1 of value. Spending coins at checkout is the next M9 step (tenders), so today
- * coins are earned, shown and expire; they can't be redeemed yet.
+ * stay in sync. 1 Hood Coin = ₹1 of value. Coins are spent at checkout as a tender (lib/wallet/tenders.ts).
  */
 export type Tier = "member" | "elite" | "legend";
 

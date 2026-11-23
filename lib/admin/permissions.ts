@@ -26,6 +26,7 @@ export const PERMISSIONS = [
   "staff.manage",
   "audit.read",
   "ugc.moderate",
+  "giftcards.issue",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -42,7 +43,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   support: ["dashboard", "orders.read", "orders.write", "returns.read", "refunds.issue", "customers.read", "privacy.read", "privacy.write"],
   warehouse: ["dashboard", "orders.read", "orders.ship", "returns.read", "returns.qc", "inventory.read", "inventory.write"],
   marketing: ["dashboard", "catalog.read", "promotions.read", "reports.read", "ugc.moderate"],
-  finance: ["dashboard", "orders.read", "returns.read", "refunds.issue", "customers.read", "reports.read"],
+  finance: ["dashboard", "orders.read", "returns.read", "refunds.issue", "customers.read", "reports.read", "giftcards.issue"],
 };
 
 /** Money limits per action (paise). Above the limit the action needs an owner or finance. */

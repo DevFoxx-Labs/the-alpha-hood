@@ -2,7 +2,8 @@ import { onDelivered } from "@/lib/loyalty/service";
 import { resolveLoyalty } from "@/lib/loyalty/store";
 import { queueRefund } from "@/lib/analytics/server";
 import { randomBytes } from "node:crypto";
-import type { CheckoutDeps } from "@/lib/checkout/service";
+import { type CheckoutDeps, tenderDeps } from "@/lib/checkout/service";
+import { releaseTenders } from "@/lib/wallet/tenders";
 import { notify, type Template } from "@/lib/notify/outbox";
 import type { FulfilmentStatus, Order, Refund } from "./store";
 
@@ -61,7 +62,8 @@ export function capturedAmount(o: Order): number {
 }
 
 export function refundedAmount(o: Order): number {
-  return o.refunds.filter((r) => r.to !== "store_credit").reduce((n, r) => n + r.amount, 0);
+  // Cash back to the customer (gateway source or UPI payout) — wallet refunds are tracked separately.
+  return o.refunds.filter((r) => r.to === "source" || r.to === "upi").reduce((n, r) => n + r.amount, 0);
 }
 
 export async function advanceFulfilment(deps: CheckoutDeps, orderNumber: string, to: FulfilmentStatus, now = new Date()): Promise<Order> {
@@ -134,11 +136,26 @@ export async function cancelOrder(
       const { refundId } = await deps.gateway.refund(attempt.paymentId, paid, reference);
       refunds.push({ id: refundId, reference, amount: paid, to: "source", status: "processing", createdAt: now.toISOString() });
     }
+    // CHK-05: coins / gift card / store credit used on this order go straight back (idempotent per hold).
+    const tenderRows: Refund[] = [];
+    if (order.tenders && order.tenderHold?.held) {
+      await releaseTenders(tenderDeps(deps), order, now);
+      const t = order.tenders;
+      const row = (to: Refund["to"], amount: number, k: string): Refund => ({ id: newId("RF"), reference: `cancel:${order.number}:tender:${k}`, amount, to, status: "completed", createdAt: now.toISOString() });
+      if (t.coins > 0) tenderRows.push(row("coins", t.coins * 100, "coins"));
+      if (t.giftCard) tenderRows.push(row("gift_card", t.giftCard.amount, "gift"));
+      if (t.storeCredit > 0) tenderRows.push(row("store_credit", t.storeCredit, "credit"));
+    }
 
     const updated = await deps.orders.update(order.number, (o) => {
       o.fulfilment = "cancelled";
       o.timeline.push({ status: "cancelled", at: now.toISOString(), note: by ? `Cancelled by The Alpha Hood: ${by.reason}` : "Cancelled by you" });
       o.hold = null;
+      if (tenderRows.length) {
+        o.tenderHold = { seq: o.tenderHold!.seq, held: false };
+        for (const r of tenderRows) if (!o.refunds.some((x) => x.reference === r.reference)) o.refunds.push(r);
+        o.timeline.push({ status: "refund", at: now.toISOString(), note: "Coins, gift card and store credit returned to your account" });
+      }
       for (const r of refunds) {
         if (!o.refunds.some((x) => x.reference === r.reference)) {
           o.refunds.push(r);

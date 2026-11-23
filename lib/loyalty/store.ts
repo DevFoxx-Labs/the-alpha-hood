@@ -16,7 +16,7 @@ export interface Membership {
   visitorId: string | null;
 }
 
-export type CoinKind = "earn" | "earn_reversal" | "referral" | "referral_reversal" | "ugc" | "adjustment" | "expired";
+export type CoinKind = "earn" | "earn_reversal" | "referral" | "referral_reversal" | "ugc" | "adjustment" | "expired" | "redeemed" | "redeem_release" | "refund";
 
 export interface CoinEntry {
   id: string;

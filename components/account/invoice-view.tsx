@@ -19,6 +19,8 @@ interface Invoice {
   lines: { title: string; size: string; quantity: number; gstRate: number; taxable: number; cgst: number; sgst: number; igst: number; total: number }[];
   charges: { shipping: number; express: number; cod: number };
   totals: { gst: { cgst: number; sgst: number; igst: number; total: number }; total: number };
+  /** How the invoice total was paid (wallet tenders don't change the taxable value). */
+  paidBy?: { coins: number; giftCard: number; storeCredit: number; balance: number } | null;
   paymentMethod: string;
 }
 
@@ -136,6 +138,11 @@ export function InvoiceView({ number }: { number: string }) {
             <dd>{formatINR(inv.totals.total)}</dd>
           </div>
         </dl>
+        {inv.paidBy ? (
+          <p className="mt-3 text-[12px] text-ink-2">
+            Paid by: {[inv.paidBy.giftCard ? `gift card ${formatINR(inv.paidBy.giftCard)}` : "", inv.paidBy.storeCredit ? `store credit ${formatINR(inv.paidBy.storeCredit)}` : "", inv.paidBy.coins ? `Hood Coins ${formatINR(inv.paidBy.coins)}` : "", inv.paidBy.balance ? `${formatINR(inv.paidBy.balance)} by ${"card / UPI / cash"}` : ""].filter(Boolean).join(" · ")}
+          </p>
+        ) : null}
         <p className="mt-6 text-[11px] text-ink-2">This is a computer-generated invoice. DRAFT layout — to be confirmed by the CA before launch.</p>
       </article>
     </div>

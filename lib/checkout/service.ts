@@ -1,3 +1,6 @@
+import { resolveGiftCards } from "@/lib/giftcards/store";
+import { resolveCredit } from "@/lib/wallet/store-credit";
+import { holdTenders, NO_TENDERS, planTenders, releaseTenders, type TenderChoice, type TenderDeps } from "@/lib/wallet/tenders";
 import type { Attribution } from "@/lib/analytics/attribution";
 import { queuePurchase } from "@/lib/analytics/server";
 import { loadCartView, priceLines } from "@/lib/cart/service";
@@ -10,6 +13,7 @@ import { resolveOrders, type Order, type OrderStore } from "@/lib/orders/store";
 import { resolveGateway, type PaymentEvent, type PaymentGateway } from "@/lib/payments/gateway";
 import type { PaymentMethod } from "@/lib/pricing/price-cart";
 import { lookupCoupon } from "@/lib/promotions/coupons";
+import { orderPayable } from "@/lib/orders/store";
 import { checkReferral, clubSnapshot, type ReferralCoupon } from "@/lib/loyalty/service";
 import { type LoyaltyStore, resolveLoyalty } from "@/lib/loyalty/store";
 import { notify } from "@/lib/notify/outbox";
@@ -61,6 +65,12 @@ export interface CheckoutDeps {
   env?: Record<string, string | undefined>;
   /** Alpha Club store (defaults to resolveLoyalty()). */
   loyalty?: LoyaltyStore;
+  /** CHK-05 / PROMO-06 wallet stores (default: the resolved coins / store credit / gift card stores). */
+  wallet?: TenderDeps;
+}
+
+export function tenderDeps(deps: Pick<CheckoutDeps, "loyalty" | "wallet">): TenderDeps {
+  return deps.wallet ?? { loyalty: deps.loyalty ?? resolveLoyalty(), credit: resolveCredit(), giftCards: resolveGiftCards() };
 }
 
 export function defaultDeps(): CheckoutDeps {
@@ -80,6 +90,8 @@ export interface QuoteInput {
   addressId: string | null;
   speed: "standard" | "express";
   payment: PaymentMethod | null;
+  /** CHK-05 wallet choices (coins / store credit / gift card code); amounts are decided on the server. */
+  tenders?: TenderChoice;
   now?: Date;
 }
 
@@ -109,13 +121,27 @@ export async function quote(deps: CheckoutDeps, input: QuoteInput) {
     address && promise
       ? codDecision({
           codEnabled: codEnabled(deps.env),
-          total: codPricing.total,
+          total: codPricing.total - (await planTenders(tenderDeps(deps), customer.id, codPricing, input.tenders ?? NO_TENDERS, input.now)).tenders.total,
           promise,
           customer,
           addressQuality: addressQuality(address),
         })
       : null;
-  return { view, pricing, promise, speed, cod: cod ? { allowed: cod.allowed, reasons: cod.reasons } : null, codTotal: codPricing.total };
+  const choice = input.tenders ?? NO_TENDERS;
+  const plan = await planTenders(tenderDeps(deps), customer.id, pricing, choice, input.now);
+  const codPlan = await planTenders(tenderDeps(deps), customer.id, codPricing, choice, input.now);
+  return {
+    view,
+    pricing,
+    promise,
+    speed,
+    cod: cod ? { allowed: cod.allowed, reasons: cod.reasons } : null,
+    codTotal: codPricing.total,
+    codPayable: codPlan.payable,
+    tenders: plan.tenders,
+    payable: plan.payable,
+    wallet: plan.wallet,
+  };
 }
 
 export interface PlaceInput {
@@ -126,8 +152,10 @@ export interface PlaceInput {
   payment: PaymentMethod;
   upiApp?: string;
   idempotencyKey: string;
-  /** The total the shopper saw; if the server total differs, the order is refused (no surprise charges). */
+  /** The amount to pay the shopper saw (after wallet tenders); if the server's differs, the order is refused. */
   expectedTotal: Paise;
+  /** CHK-05 wallet choices, same as the quote. */
+  tenders?: TenderChoice;
   /** ANL-01 consent snapshot from the request (lib/analytics/attribution.ts). */
   attribution?: Attribution | null;
   /** Random visitor id (ah_vid), used only for the referral same-device check. */
@@ -194,13 +222,16 @@ export async function placeOrder(deps: CheckoutDeps, input: PlaceInput): Promise
     });
     if (pricing.coupon && !pricing.coupon.ok) throw new CheckoutError("coupon_invalid", pricing.coupon.reason ?? "This coupon can't be used.", 409);
     if (!Number.isSafeInteger(pricing.total) || pricing.total <= 0) throw new CheckoutError("cart_empty", "Nothing to pay for.", 409);
-    if (pricing.total !== input.expectedTotal) {
-      throw new CheckoutError("total_changed", "Your total has changed. Please review it before paying.", 409, { total: pricing.total });
+    // CHK-05: wallet tenders decided on the server from live balances (inside this customer's lock).
+    const plan = await planTenders(tenderDeps(deps), customer.id, pricing, input.tenders ?? NO_TENDERS, input.now);
+    if (plan.payable !== input.expectedTotal) {
+      throw new CheckoutError("total_changed", "Your total has changed. Please review it before paying.", 409, { total: plan.payable });
     }
+    const paidInFull = plan.payable === 0;
 
     let codRisk: Order["codRisk"] = null;
     if (input.payment === "cod") {
-      const d = codDecision({ codEnabled: codEnabled(deps.env), total: pricing.total, promise: q.promise, customer, addressQuality: addressQuality(address) });
+      const d = codDecision({ codEnabled: codEnabled(deps.env), total: plan.payable, promise: q.promise, customer, addressQuality: addressQuality(address) });
       if (!d.allowed) {
         securityEvent("cod_blocked", { customer: customer.id, reasons: d.reasons.length });
         throw new CheckoutError("cod_unavailable", d.reasons[0] ?? "Cash on delivery isn't available.", 422, { reasons: d.reasons });
@@ -213,7 +244,7 @@ export async function placeOrder(deps: CheckoutDeps, input: PlaceInput): Promise
     const order = await deps.orders.create({
       customerId: customer.id,
       cartId: q.view.id,
-      status: input.payment === "cod" ? "confirmed" : "pending_payment",
+      status: input.payment === "cod" || paidInFull ? "confirmed" : "pending_payment",
       paymentMethod: input.payment,
       attempts: [],
       lines: pricing.lines.map((pl) => {
@@ -241,13 +272,16 @@ export async function placeOrder(deps: CheckoutDeps, input: PlaceInput): Promise
       codRisk,
       attribution: input.attribution ?? null,
       club: await clubSnapshot(customer.id, deps.orders, deps.loyalty ?? resolveLoyalty(), now).catch(() => null),
+      tenders: plan.tenders.total > 0 ? plan.tenders : null,
+      payable: plan.payable,
+      tenderHold: plan.tenders.total > 0 ? { seq: 0, held: false } : null,
       idempotencyKey: input.idempotencyKey,
       createdAt: now.toISOString(),
-      confirmedAt: input.payment === "cod" ? now.toISOString() : null,
+      confirmedAt: input.payment === "cod" || paidInFull ? now.toISOString() : null,
       notes: [],
-      fulfilment: input.payment === "cod" ? "confirmed" : "placed",
+      fulfilment: input.payment === "cod" || paidInFull ? "confirmed" : "placed",
       timeline:
-        input.payment === "cod"
+        input.payment === "cod" || paidInFull
           ? [
               { status: "placed", at: now.toISOString() },
               { status: "confirmed", at: now.toISOString() },
@@ -276,23 +310,38 @@ export async function placeOrder(deps: CheckoutDeps, input: PlaceInput): Promise
       throw e;
     }
 
+    // CHK-05: take the wallet tenders now (all or nothing). If anything changed, free the stock and refuse.
+    if (order.tenders) {
+      try {
+        const seq = await holdTenders(tenderDeps(deps), order, now);
+        await deps.orders.update(order.number, (o) => {
+          o.tenderHold = { seq, held: true };
+        });
+        order.tenderHold = { seq, held: true };
+      } catch (e) {
+        await deps.commerce.inventory.release(order.id);
+        await deps.orders.transition(order.number, ["pending_payment", "confirmed"], "expired", (o) => o.notes.push("wallet_changed_at_placement"));
+        throw new CheckoutError("total_changed", e instanceof Error ? e.message : "Your wallet changed.", 409);
+      }
+    }
+
     // LOY-02: the referrer is rewarded later, only if this order is delivered and kept (onDelivered).
     if (referral) {
       await (deps.loyalty ?? resolveLoyalty()).recordReferral({ code: referral.code, referrerId: referral.referrerId, friendId: customer.id, orderNumber: order.number }, now);
     }
 
-    if (input.payment === "cod") {
+    if (input.payment === "cod" || paidInFull) {
       await deps.commerce.inventory.commit(order.id);
       await finaliseConfirmed(deps, order);
-      securityEvent("order_placed", { order: order.number, method: "cod" });
+      securityEvent("order_placed", { order: order.number, method: paidInFull ? "wallet" : "cod" });
       return { orderNumber: order.number, status: "confirmed", redirectUrl: `/checkout/order/${order.number}` };
     }
 
     // Gateway order is created after our order exists (outbox-style: a crash here leaves a pending order
     // that reconciliation expires and releases).
-    const payment = await deps.gateway.createPayment({ orderNumber: order.number, amount: pricing.total, method: input.payment, upiApp: input.upiApp });
+    const payment = await deps.gateway.createPayment({ orderNumber: order.number, amount: plan.payable, method: input.payment, upiApp: input.upiApp });
     await deps.orders.update(order.number, (o) => {
-      o.attempts.push({ paymentId: payment.paymentId, amount: pricing.total, status: "pending", createdAt: now.toISOString() });
+      o.attempts.push({ paymentId: payment.paymentId, amount: plan.payable, status: "pending", createdAt: now.toISOString() });
     });
     securityEvent("order_placed", { order: order.number, method: input.payment });
     return { orderNumber: order.number, status: "pending_payment", redirectUrl: payment.redirectUrl };
@@ -325,11 +374,14 @@ export async function handlePaymentEvent(deps: CheckoutDeps, event: PaymentEvent
       const moved = await deps.orders.transition(order.number, ["pending_payment"], "payment_failed", (o) =>
         o.timeline.push({ status: "payment_failed", at: now.toISOString() }),
       );
-      if (moved) await deps.commerce.inventory.release(order.id);
+      if (moved) {
+        await deps.commerce.inventory.release(order.id);
+        await releaseHeldTenders(deps, order.number, now);
+      }
       return "failed";
     }
 
-    if (event.amount !== attempt.amount || attempt.amount !== order.pricing.total) {
+    if (event.amount !== attempt.amount || attempt.amount !== orderPayable(order)) {
       securityEvent("payment_amount_mismatch", { order: order.number });
       await deps.orders.update(order.number, (o) => {
         o.status = "needs_review";
@@ -360,6 +412,18 @@ export async function handlePaymentEvent(deps: CheckoutDeps, event: PaymentEvent
         );
         held = true;
       } catch {
+        held = false;
+      }
+    }
+    // Wallet tenders released after a failure/expiry must be taken again before a late success confirms.
+    if (held && order.tenders && !order.tenderHold?.held) {
+      try {
+        const seq = await holdTenders(tenderDeps(deps), order, now);
+        await deps.orders.update(order.number, (o) => {
+          o.tenderHold = { seq, held: true };
+        });
+      } catch {
+        await deps.commerce.inventory.release(order.id);
         held = false;
       }
     }
@@ -401,10 +465,21 @@ export async function retryPayment(deps: CheckoutDeps, customerId: string, order
     } catch {
       throw new CheckoutError("out_of_stock", "Some items sold out since. Please place a new order.", 409);
     }
+    if (order.tenders && !order.tenderHold?.held) {
+      try {
+        const seq = await holdTenders(tenderDeps(deps), order, now);
+        await deps.orders.update(order.number, (o) => {
+          o.tenderHold = { seq, held: true };
+        });
+      } catch (e) {
+        await deps.commerce.inventory.release(order.id);
+        throw new CheckoutError("not_retryable", e instanceof Error ? e.message : "Your wallet changed — please place a new order.", 409);
+      }
+    }
     const method = order.paymentMethod as Exclude<PaymentMethod, "cod">;
-    const payment = await deps.gateway.createPayment({ orderNumber: order.number, amount: order.pricing.total, method });
+    const payment = await deps.gateway.createPayment({ orderNumber: order.number, amount: orderPayable(order), method });
     await deps.orders.transition(order.number, ["payment_failed", "expired"], "pending_payment", (o) => {
-      o.attempts.push({ paymentId: payment.paymentId, amount: o.pricing.total, status: "pending", createdAt: now.toISOString() });
+      o.attempts.push({ paymentId: payment.paymentId, amount: orderPayable(o), status: "pending", createdAt: now.toISOString() });
     });
     return { orderNumber: order.number, redirectUrl: payment.redirectUrl };
   });
@@ -438,9 +513,23 @@ export async function reconcilePending(deps: CheckoutDeps, now = new Date()) {
       const expired = await deps.orders.transition(order.number, ["pending_payment"], "expired", (o) => {
         o.attempts.find((a) => a.paymentId === attempt.paymentId)!.status = "expired";
       });
-      if (expired) await deps.commerce.inventory.release(order.id);
+      if (expired) {
+        await deps.commerce.inventory.release(order.id);
+        await releaseHeldTenders(deps, order.number, now);
+      }
       results[order.number] = "expired";
     }
   }
   return results;
+}
+
+/** Gives back a not-yet-paid order's wallet tenders (idempotent: only while they are held). */
+export async function releaseHeldTenders(deps: CheckoutDeps, orderNumber: string, now = new Date()) {
+  const o = await deps.orders.get(orderNumber);
+  if (!o?.tenders || !o.tenderHold?.held) return false;
+  await releaseTenders(tenderDeps(deps), o, now);
+  await deps.orders.update(orderNumber, (x) => {
+    x.tenderHold = { seq: x.tenderHold!.seq, held: false };
+  });
+  return true;
 }

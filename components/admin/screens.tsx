@@ -233,6 +233,8 @@ interface OrderDetail extends OrderRow {
   paid: number;
   refunded: number;
   pricing: { total: number; codFee: number; shipping: number; gst: { total: number } };
+  payable: number;
+  tenders: { coins: number; giftCardLast4: string | null; giftCard: number; storeCredit: number; total: number } | null;
   customer: { id: string; phone: string; name: string | null; orderCount: number; rtoCount: number; codBlocked: boolean } | null;
   returns: { number: string; status: string; resolution: string }[];
 }
@@ -278,6 +280,10 @@ export function OrderScreen() {
               {o.pricing.codFee ? <Row k="COD fee" v={formatINR(o.pricing.codFee)} /> : null}
               <Row k="Total (incl. GST)" v={formatINR(o.pricing.total)} strong />
               <Row k="GST" v={formatINR(o.pricing.gst.total)} />
+              {o.tenders?.giftCard ? <Row k={`Gift card ••••${o.tenders.giftCardLast4}`} v={`−${formatINR(o.tenders.giftCard)}`} /> : null}
+              {o.tenders?.storeCredit ? <Row k="Store credit" v={`−${formatINR(o.tenders.storeCredit)}`} /> : null}
+              {o.tenders?.coins ? <Row k={`Hood Coins (${o.tenders.coins})`} v={`−${formatINR(o.tenders.coins * 100)}`} /> : null}
+              {o.tenders ? <Row k={o.paymentMethod === "cod" ? "To collect on delivery" : "Charged by card / UPI"} v={formatINR(o.payable)} strong /> : null}
               {o.refunded ? <Row k="Refunded" v={formatINR(o.refunded)} /> : null}
             </dl>
           </Card>
@@ -1218,6 +1224,97 @@ export function UgcScreen() {
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+// ── Gift cards (PROMO-06) ──────────────────────────────────────────────────────────────────────────
+
+interface GiftRow {
+  id: string;
+  last4: string;
+  initial: number;
+  balance: number;
+  issuedAt: string;
+  expiresAt: string;
+  issuedBy: string;
+  note: string;
+  disabled: boolean;
+}
+
+export function GiftCardsScreen() {
+  const { data, error, busy, reload } = useAdminData<{ cards: GiftRow[]; rules: { min: number; max: number; validityDays: number } }>("/api/admin/giftcards");
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [issued, setIssued] = useState<string | null>(null);
+  return (
+    <div className="space-y-5">
+      <PageHeader title="Gift cards" description="Issue digital gift cards (e.g. goodwill or prizes). The code is shown once — send it to the customer privately. Customers redeem it at checkout, partly or fully." />
+      <Card title="Issue a gift card">
+        <form
+          className="grid gap-3 sm:grid-cols-[160px_1fr_auto] sm:items-end"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const r = await act<{ code: string }>("/api/admin/giftcards", { amount: Number(amount), note }, "Gift card issued", reload);
+            if (r) {
+              setIssued(r.code);
+              setAmount("");
+              setNote("");
+            }
+          }}
+        >
+          <div className="space-y-1.5">
+            <ALabel htmlFor="gc-amt">Amount (₹)</ALabel>
+            <AInput id="gc-amt" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} placeholder={data ? `${data.rules.min / 100}–${data.rules.max / 100}` : ""} />
+          </div>
+          <div className="space-y-1.5">
+            <ALabel htmlFor="gc-note">Reason</ALabel>
+            <AInput id="gc-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Late delivery goodwill, order AH…" />
+          </div>
+          <AButton type="submit" disabled={!amount || note.trim().length < 3}>
+            Issue
+          </AButton>
+        </form>
+        {issued ? (
+          <div className="mt-3 rounded-md border border-border bg-muted/40 p-3 text-sm">
+            <p className="font-medium">Gift card code — shown only once:</p>
+            <p className="mt-1 select-all font-mono text-base tracking-wider">{issued}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Valid {data?.rules.validityDays ?? 365} days. Anyone with this code can spend it.</p>
+          </div>
+        ) : null}
+      </Card>
+      {error ? (
+        <ErrorState message={error} onRetry={reload} />
+      ) : (
+        <DataTable
+          rows={data?.cards ?? null}
+          busy={busy}
+          rowKey={(r) => r.id}
+          empty={{ title: "No gift cards yet", description: "Issued cards appear here (last 4 characters only)." }}
+          columns={[
+            { key: "c", header: "Card", cell: (r) => `••••${r.last4}` },
+            { key: "b", header: "Balance / value", cell: (r) => `${formatINR(r.balance)} / ${formatINR(r.initial)}` },
+            { key: "e", header: "Expires", cell: (r) => date(r.expiresAt) },
+            { key: "n", header: "Reason", cell: (r) => <span className="text-xs">{r.note} · {r.issuedBy}</span> },
+            { key: "s", header: "Status", cell: (r) => <StatusBadge status={r.disabled ? "blocked" : "active"} tone={r.disabled ? "danger" : "success"} label={r.disabled ? "blocked" : "active"} /> },
+            {
+              key: "x",
+              header: "",
+              className: "text-right",
+              cell: (r) => (
+                <Confirm
+                  trigger={<AButton size="sm" variant="ghost">{r.disabled ? "Unblock" : "Block"}</AButton>}
+                  title={r.disabled ? "Unblock this card?" : "Block this card?"}
+                  description={r.disabled ? "It can be used again." : "It can't be used at checkout until unblocked (e.g. reported lost)."}
+                  confirmLabel={r.disabled ? "Unblock" : "Block"}
+                  destructive={!r.disabled}
+                  onConfirm={() => act(`/api/admin/giftcards/${r.id}`, { disabled: !r.disabled }, "Saved", reload)}
+                />
+              ),
+            },
+          ]}
+        />
       )}
     </div>
   );

@@ -7,7 +7,7 @@ import type { CommunicationPurpose } from "@/lib/consent/purposes";
 import { nextStatus, publicHistory, type RequestContext } from "@/lib/consent/service";
 import { noticeVersion } from "@/lib/legal";
 import { canCustomerCancel, capturedAmount, refundedAmount } from "@/lib/orders/lifecycle";
-import type { Order } from "@/lib/orders/store";
+import { orderPayable, type Order } from "@/lib/orders/store";
 import { resolvePhotos } from "@/lib/returns/photos";
 import { returnEligibility } from "@/lib/returns/rules";
 import { publicReturn, resolveReturns, type ReturnDeps, type ReturnRequest } from "@/lib/returns/service";
@@ -63,6 +63,7 @@ export function orderDetail(o: Order, returns: ReturnRequest[], deps: Pick<Retur
     returnWindow: { open: elig.open, closesAt: elig.closesAt, reason: elig.reason },
     returns: returns.map(publicReturn),
     refunds: o.refunds.map((r) => ({ amount: r.amount, to: r.to, status: r.status, createdAt: r.createdAt })),
+    tenders: o.tenders ? { coins: o.tenders.coins, giftCardLast4: o.tenders.giftCard?.last4 ?? null, giftCard: o.tenders.giftCard?.amount ?? 0, storeCredit: o.tenders.storeCredit, total: o.tenders.total } : null,
     totals: {
       mrpTotal: o.pricing.mrpTotal,
       savings: o.pricing.savings,
@@ -73,6 +74,7 @@ export function orderDetail(o: Order, returns: ReturnRequest[], deps: Pick<Retur
       gst: o.pricing.gst.total,
       paid: capturedAmount(o),
       refunded: refundedAmount(o),
+      payable: orderPayable(o),
     },
     delivery: o.delivery,
     deliveredAt: o.deliveredAt,

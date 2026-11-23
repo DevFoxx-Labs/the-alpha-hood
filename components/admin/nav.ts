@@ -13,6 +13,7 @@ import {
   UserGroupIcon,
   UserLock01Icon,
   WarehouseIcon,
+  GiftIcon,
   Image01Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
@@ -38,6 +39,7 @@ const ALL: NavItem[] = [
   { label: "Inventory", icon: WarehouseIcon, route: "/admin/inventory", permission: "inventory.read" },
   { label: "Products", icon: PackageIcon, route: "/admin/catalog", permission: "catalog.read" },
   { label: "Promotions", icon: Discount01Icon, route: "/admin/promotions", permission: "promotions.read" },
+  { label: "Gift cards", icon: GiftIcon, route: "/admin/giftcards", permission: "giftcards.issue" },
   { type: "section", label: "People" },
   { label: "Customers", icon: UserGroupIcon, route: "/admin/customers", permission: "customers.read" },
   { label: "Privacy requests", icon: Shield01Icon, route: "/admin/privacy", permission: "privacy.read", badgeKey: "privacy" },

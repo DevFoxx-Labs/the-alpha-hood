@@ -2,7 +2,8 @@ import { onReturnSettled } from "@/lib/loyalty/service";
 import { resolveLoyalty } from "@/lib/loyalty/store";
 import { queueRefund } from "@/lib/analytics/server";
 import { randomBytes } from "node:crypto";
-import type { CheckoutDeps } from "@/lib/checkout/service";
+import { type CheckoutDeps, tenderDeps } from "@/lib/checkout/service";
+import { refundTenders, splitRefund } from "@/lib/wallet/tenders";
 import { CommerceError } from "@/lib/commerce/types";
 import type { Paise } from "@/lib/format";
 import { ValidationError } from "@/lib/http/guard";
@@ -374,17 +375,22 @@ export async function advanceReturn(deps: ReturnDeps, returnNumber: string, to: 
       await recordRefund(deps, order, reference, r.amounts.payable, "store_credit", "completed", now);
       note = "Store credit added to your account.";
     } else if (r.refundTo === "source") {
+      // CHK-05: the part paid with coins / gift card / store credit goes back there; the rest to the gateway.
+      const split = splitRefund(order, r.amounts.payable, refundedAmount(order));
       const remaining = capturedAmount(order) - refundedAmount(order);
-      const amount = Math.min(r.amounts.payable, remaining);
+      const amount = Math.min(split.source, remaining);
       if (amount > 0) {
         const attempt = order.attempts.find((a) => a.status === "succeeded")!;
         const { refundId } = await deps.gateway.refund(attempt.paymentId, amount, reference);
         await recordRefund(deps, order, reference, amount, "source", "processing", now, refundId);
       }
-      note = "Refund started to your original payment method.";
+      await recordTenderRefunds(deps, order, split, reference, now);
+      note = split.coins || split.wallet ? "Refund started — paid by card/UPI back to source, coins and wallet back to your account." : "Refund started to your original payment method.";
     } else if (r.refundTo === "upi") {
       // COD refund payout to the customer's UPI ID — needs the payout API (M7); queued for ops.
-      await recordRefund(deps, order, reference, r.amounts.payable, "upi", "payout_pending", now);
+      const split = splitRefund(order, r.amounts.payable, refundedAmount(order));
+      if (split.source > 0) await recordRefund(deps, order, reference, split.source, "upi", "payout_pending", now);
+      await recordTenderRefunds(deps, order, split, reference, now);
       note = "Refund queued to your UPI ID.";
     }
 
@@ -443,4 +449,14 @@ export function publicReturn(r: ReturnRequest) {
     timeline: r.timeline,
     createdAt: r.createdAt,
   };
+}
+
+/** Tender parts of a return refund: paid back to each instrument, recorded once per reference. */
+async function recordTenderRefunds(deps: ReturnDeps, order: Order, split: { coins: number; wallet: number }, reference: string, now: Date) {
+  if (!split.coins && !split.wallet) return;
+  const rows = await refundTenders(tenderDeps(deps), order, split, reference, now, () => `rf_${randomBytes(8).toString("hex")}`);
+  await deps.orders.update(order.number, (o) => {
+    for (const r of rows) if (!o.refunds.some((x) => x.reference === r.reference)) o.refunds.push(r);
+    if (rows.length) o.timeline.push({ status: "refund", at: now.toISOString(), note: "Coins / wallet part returned to your account" });
+  });
 }

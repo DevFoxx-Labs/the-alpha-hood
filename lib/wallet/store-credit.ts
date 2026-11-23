@@ -11,7 +11,7 @@ export interface CreditEntry {
   id: string;
   customerId: string;
   amount: Paise;
-  reason: "return_credit" | "return_bonus" | "adjustment" | "spent" | "expired";
+  reason: "return_credit" | "return_bonus" | "adjustment" | "spent" | "expired" | "released" | "tender_refund";
   reference: string;
   createdAt: string;
 }

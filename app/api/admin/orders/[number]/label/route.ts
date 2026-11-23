@@ -1,3 +1,4 @@
+import { orderPayable } from "@/lib/orders/store";
 import { audit, requireStaff } from "@/lib/admin/auth";
 import { adminError, privateJson } from "@/lib/admin/http";
 import { ORDER_NUMBER_RE } from "@/lib/checkout/parse";
@@ -21,7 +22,8 @@ export async function GET(request: Request, { params }: RouteContext<"/api/admin
         orderNumber: o.number,
         courier: o.tracking.courier,
         awb: o.tracking.awb,
-        cod: o.paymentMethod === "cod" ? o.pricing.total : 0,
+        // Collect only what wallet tenders (coins / gift card / credit) didn't pay (CHK-05).
+        cod: o.paymentMethod === "cod" ? orderPayable(o) : 0,
         to: { name: o.address.name, phone: o.address.phone, line1: o.address.line1, line2: o.address.line2, landmark: o.address.landmark, city: o.address.city, state: o.address.state, pincode: o.address.pincode },
         from: { name: LEGAL_CONFIG.entityName, address: LEGAL_CONFIG.registeredAddress, phone: LEGAL_CONFIG.supportPhone },
         items: o.lines.reduce((n, l) => n + l.quantity, 0),

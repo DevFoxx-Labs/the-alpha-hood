@@ -5,6 +5,7 @@ import type { Customer } from "@/lib/customers/store";
 import { resolveCustomers } from "@/lib/customers/store";
 import type { Paise } from "@/lib/format";
 import { capturedAmount, refundedAmount } from "@/lib/orders/lifecycle";
+import { orderPayable } from "@/lib/orders/store";
 import type { Order } from "@/lib/orders/store";
 import { RETURN_REASONS } from "@/lib/returns/rules";
 import { publicReturn, type ReturnRequest, resolveReturns } from "@/lib/returns/service";
@@ -87,6 +88,8 @@ export async function orderAdminView(number: string) {
     holdInfo: o.hold ?? null,
     paid: capturedAmount(o),
     refunded: refundedAmount(o),
+    payable: orderPayable(o),
+    tenders: o.tenders ? { coins: o.tenders.coins, giftCardLast4: o.tenders.giftCard?.last4 ?? null, giftCard: o.tenders.giftCard?.amount ?? 0, storeCredit: o.tenders.storeCredit, total: o.tenders.total } : null,
     customer: customer
       ? { id: customer.id, phone: maskPhone(customer.phone), name: customer.name, orderCount: customer.orderCount, rtoCount: customer.rtoCount, codBlocked: customer.codBlocked }
       : null,

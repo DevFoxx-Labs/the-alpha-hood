@@ -36,7 +36,8 @@ export interface Refund {
   /** Idempotency reference, e.g. `cancel:AH…` or `return:RT…` (UNIQUE per order). */
   reference: string;
   amount: Paise;
-  to: "source" | "upi" | "store_credit";
+  /** `coins` / `gift_card` = value returned to the instrument it was paid with (M9 part 2 tenders). */
+  to: "source" | "upi" | "store_credit" | "coins" | "gift_card";
   status: "processing" | "completed" | "payout_pending";
   createdAt: string;
 }
@@ -97,6 +98,28 @@ export interface Order {
   attribution?: Attribution | null;
   /** LOY-01 Alpha Club snapshot at placement (return window + earn rate the order was bought under). */
   club?: { tier: "member" | "elite" | "legend"; earnPercent: number; returnWindowDays: number } | null;
+  /**
+   * CHK-05 / PROMO-06 tenders: value paid with Hood Coins, a gift card or store credit (payment instruments —
+   * the invoice and GST stay on the full `pricing.total`). `payable` is what the gateway / courier collects.
+   */
+  tenders?: OrderTenders | null;
+  payable?: Paise;
+  /** Tender hold state: debited at placement, released if the payment fails / expires or the order is cancelled. */
+  tenderHold?: { seq: number; held: boolean } | null;
+}
+
+export interface OrderTenders {
+  /** Whole coins (1 coin = ₹1 = 100 paise). */
+  coins: number;
+  giftCard: { hash: string; last4: string; amount: Paise } | null;
+  storeCredit: Paise;
+  /** Sum in paise. */
+  total: Paise;
+}
+
+/** What the customer pays by gateway / at the door (total minus tenders). */
+export function orderPayable(o: Pick<Order, "payable" | "pricing">): Paise {
+  return o.payable ?? o.pricing.total;
 }
 
 export interface OrderStore {
@@ -238,6 +261,9 @@ export function publicOrder(o: Order) {
       total: o.pricing.total,
       gst: o.pricing.gst.total,
     },
+    // CHK-05 wallet tenders (payment instruments — the invoice total stays the full order total).
+    tenders: o.tenders ? { coins: o.tenders.coins, giftCardLast4: o.tenders.giftCard?.last4 ?? null, giftCard: o.tenders.giftCard?.amount ?? 0, storeCredit: o.tenders.storeCredit, total: o.tenders.total } : null,
+    payable: orderPayable(o),
     delivery: o.delivery,
     address: { name: o.address.name, city: o.address.city, pincode: o.address.pincode },
     createdAt: o.createdAt,

@@ -111,3 +111,12 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
       MoEngage / WebEngage) — each needs an integration and a Privacy Notice entry.
 - [ ] Give staff the moderation rules for #WearTheHood (store manager / marketing have `ugc.moderate`).
 - [ ] Review the demo looks ("The street uniform", "Winter layers") and real campaign photos for Shop the Look.
+
+## 2026-11-25 (after M9 part 2)
+- [ ] CA: confirm the wallet treatment — Hood Coins, gift cards and store credit are recorded as ways to pay (the
+      invoice and GST are on the full price). If coins must be a discount instead, tell us before launch.
+- [ ] Confirm: coins can pay up to 20% of an order's product value; order of use: coins → gift card → store credit;
+      gift cards ₹500–₹10,000, valid 1 year.
+- [ ] Decide whether to sell gift cards online (needs a payment flow + GST decision) — staff can issue them today.
+- [ ] Give finance staff the gift card process: issue with a reason, send the code privately, block if reported lost.
+

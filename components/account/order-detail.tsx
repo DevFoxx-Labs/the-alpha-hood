@@ -231,15 +231,43 @@ export function OrderDetailView({ number }: { number: string }) {
           ))}
         </ul>
         <dl className="tabular space-y-1.5 border-t border-line px-5 py-4 text-[13.5px]">
+          {order.tenders ? (
+            <div className="flex justify-between">
+              <dt>Order total</dt>
+              <dd>{formatINR(order.totals.total)}</dd>
+            </div>
+          ) : null}
+          {order.tenders ? (
+            <>
+              {order.tenders.giftCard ? (
+                <div className="flex justify-between text-green">
+                  <dt>Gift card ••••{order.tenders.giftCardLast4}</dt>
+                  <dd>−{formatINR(order.tenders.giftCard)}</dd>
+                </div>
+              ) : null}
+              {order.tenders.storeCredit ? (
+                <div className="flex justify-between text-green">
+                  <dt>Store credit</dt>
+                  <dd>−{formatINR(order.tenders.storeCredit)}</dd>
+                </div>
+              ) : null}
+              {order.tenders.coins ? (
+                <div className="flex justify-between text-green">
+                  <dt>Hood Coins ({order.tenders.coins})</dt>
+                  <dd>−{formatINR(order.tenders.coins * 100)}</dd>
+                </div>
+              ) : null}
+            </>
+          ) : null}
           <div className="flex justify-between font-bold">
-            <dt>{order.paymentMethod === "cod" ? "To pay on delivery" : "Paid"}</dt>
-            <dd>{formatINR(order.totals.total)}</dd>
+            <dt>{order.paymentMethod === "cod" && order.totals.payable > 0 ? "To pay on delivery" : order.tenders ? "Paid by card / UPI" : "Paid"}</dt>
+            <dd>{formatINR(order.totals.payable)}</dd>
           </div>
           {order.refunds.map((r, i) => (
             <div key={i} className="flex justify-between text-green">
               <dt className="flex items-center gap-1.5">
                 <Icon icon={CheckmarkCircle02Icon} size={14} />
-                {r.to === "store_credit" ? "Store credit" : r.to === "upi" ? "Refund to UPI" : "Refund to original payment"} · {r.status === "payout_pending" ? "queued" : r.status}
+                {r.to === "store_credit" ? "Store credit" : r.to === "upi" ? "Refund to UPI" : r.to === "coins" ? "Hood Coins returned" : r.to === "gift_card" ? "Back to gift card" : "Refund to original payment"} · {r.status === "payout_pending" ? "queued" : r.status}
               </dt>
               <dd>{formatINR(r.amount)}</dd>
             </div>
