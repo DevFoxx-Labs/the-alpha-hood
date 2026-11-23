@@ -1,5 +1,28 @@
 # Change log
 
+## 2026-11-25 — Security review M5–M9, fix R1, roadmap
+
+**Added**
+- `docs/security/2026-11-25-security-review-m5-m9.md`: the `/security-review` of M5–M9. It records what was checked
+  per milestone, 0 findings at confidence ≥ 8, the 6 candidates dropped (with reasons), 2 reliability issues and
+  the pre-launch security checklist.
+- `docs/roadmap.md`: what's left after M9.
+  - The PRD's M10 "Differentiation": PDP-11 Ask Alpha, SRCH-03 visual search, PROMO-07 final sale, apps,
+    personalisation.
+  - The proposed POS (`POS.md`, not in scope until approved).
+  - The ordered backend work (platform decision → DB → gateway → messaging → courier → storage → infra → CMS).
+  - Non-code launch blockers and missing quality gates.
+
+**Fixed**
+- **R1 (security review):** if the gateway's `createPayment` failed after wallet tenders were taken, the order was
+  left without a payment attempt, and reconciliation skipped it, so coins, gift card or store credit stayed on hold.
+  - Placement now expires the order and gives back the stock and the wallet at once.
+  - `reconcilePending` also expires attempt-less pending orders after the hold.
+  - New test in `lib/wallet/tenders.test.ts`.
+
+**Verification**
+- `pnpm verify` ✓ (typecheck, lint, test 278/278, build).
+
 ## 2026-11-25 — M9 part 2: pay with Hood Coins, gift cards and store credit (High-risk tier: money)
 
 **Scope:** CHK-05, PROMO-06, LOY-01 (spending coins). The how-it-works guide is in

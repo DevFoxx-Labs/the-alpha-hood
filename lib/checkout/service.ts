@@ -338,8 +338,18 @@ export async function placeOrder(deps: CheckoutDeps, input: PlaceInput): Promise
     }
 
     // Gateway order is created after our order exists (outbox-style: a crash here leaves a pending order
-    // that reconciliation expires and releases).
-    const payment = await deps.gateway.createPayment({ orderNumber: order.number, amount: plan.payable, method: input.payment, upiApp: input.upiApp });
+    // that reconciliation expires and releases). If the gateway refuses, free the stock and the wallet now.
+    let payment: Awaited<ReturnType<typeof deps.gateway.createPayment>>;
+    try {
+      payment = await deps.gateway.createPayment({ orderNumber: order.number, amount: plan.payable, method: input.payment, upiApp: input.upiApp });
+    } catch (e) {
+      const expired = await deps.orders.transition(order.number, ["pending_payment"], "expired", (o) => o.notes.push("gateway_create_failed"));
+      if (expired) {
+        await deps.commerce.inventory.release(order.id);
+        await releaseHeldTenders(deps, order.number, now);
+      }
+      throw e;
+    }
     await deps.orders.update(order.number, (o) => {
       o.attempts.push({ paymentId: payment.paymentId, amount: plan.payable, status: "pending", createdAt: now.toISOString() });
     });
@@ -493,7 +503,19 @@ export async function reconcilePending(deps: CheckoutDeps, now = new Date()) {
   const results: Record<string, string> = {};
   for (const order of await deps.orders.listByStatus("pending_payment")) {
     const attempt = order.attempts.at(-1);
-    if (!attempt) continue;
+    if (!attempt) {
+      // Crash between placement and the gateway call: no payment exists, so expire after the hold and give back
+      // the stock and any wallet tenders (security review 2026-11-25, R1).
+      if (now.getTime() - Date.parse(order.createdAt) > RESERVATION_TTL_MS) {
+        const expired = await deps.orders.transition(order.number, ["pending_payment"], "expired", (o) => o.notes.push("no_payment_attempt"));
+        if (expired) {
+          await deps.commerce.inventory.release(order.id);
+          await releaseHeldTenders(deps, order.number, now);
+        }
+        results[order.number] = "expired";
+      }
+      continue;
+    }
     const status = await deps.gateway.fetchStatus(attempt.paymentId);
     if (status && status.status !== "pending") {
       results[order.number] = await handlePaymentEvent(

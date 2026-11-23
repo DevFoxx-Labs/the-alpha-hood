@@ -250,3 +250,22 @@ describe("review fixes (CHK-05)", () => {
     expect(orderPayable(order)).toBeLessThan(order.pricing.total);
   });
 });
+
+describe("security review R1: a gateway failure never strands the wallet", () => {
+  it("createPayment throws → order expired, stock and store credit given back at once", async () => {
+    const { deps, wallet } = setup();
+    const b = await buyer(deps, "+919811100099");
+    await wallet.credit.add({ customerId: b.customer.id, amount: 30_000, reason: "adjustment", reference: "seed" }, NOW);
+    const before = await deps.commerce.inventory.available(item.id, size, NOW);
+    deps.gateway = { ...deps.gateway, createPayment: async () => { throw new Error("gateway down"); } };
+    const choice = { coins: 0, useStoreCredit: true, giftCardCode: null };
+    const q = await quote(deps, { customerId: b.customer.id, cartId: b.cartId, addressId: b.address.id, speed: "standard", payment: "upi", tenders: choice, now: NOW });
+    await expect(
+      placeOrder(deps, { customerId: b.customer.id, cartId: b.cartId, addressId: b.address.id, speed: "standard", payment: "upi", idempotencyKey: crypto.randomUUID(), expectedTotal: q.payable, tenders: choice, now: NOW }),
+    ).rejects.toThrow("gateway down");
+    expect(await wallet.credit.balance(b.customer.id)).toBe(30_000);
+    expect(await deps.commerce.inventory.available(item.id, size, NOW)).toBe(before);
+    const [order] = await deps.orders.listByCustomer(b.customer.id);
+    expect(order.status).toBe("expired");
+  });
+});

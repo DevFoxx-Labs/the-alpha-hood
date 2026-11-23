@@ -29,7 +29,9 @@
   configured (demo gateway/SMS only with `ALLOW_MOCK_PAYMENTS`); carts, orders, customers and sessions are in memory.
   With a DB: UNIQUE indexes (order number, customer+idempotency key, payment id, event id), row locks / conditional
   updates in transactions, and a cron for `reconcilePending` every few minutes.
-- 🔴 High-tier second review (`/security-review`) of M5 not yet run; pentest of checkout/OTP/webhook before launch.
+- 🔴 Pentest of the High-risk flows (OTP, checkout/payments, wallet/gift cards, refunds, admin/MFA, uploads, webhooks)
+  before launch. `/security-review` of M5–M9 done 2026-11-25: no high-confidence findings
+  (`docs/security/2026-11-25-security-review-m5-m9.md`); repeat it once the DB, gateway and providers are wired in.
 - 🟠 No bot protection (Turnstile) on OTP send, coupon apply and place order (PRD §7) — rate limits only.
 
 - 🟠 Guest cart is not merged into a signed-in customer's earlier cart (CART-04 merge on login — M6).
