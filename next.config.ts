@@ -52,6 +52,8 @@ const nextConfig: NextConfig = {
         headers: [{ key: "X-Robots-Tag", value: "noindex, follow" }],
       })),
       { source: "/search", headers: [{ key: "X-Robots-Tag", value: "noindex, follow" }] },
+      // PWA: the service worker must always be revalidated so a fix ships at once.
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }, { key: "Service-Worker-Allowed", value: "/" }] },
     ];
   },
 };

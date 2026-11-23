@@ -1163,3 +1163,62 @@ export function AuditScreen() {
     </div>
   );
 }
+
+// ── #WearTheHood moderation (LOY-03 / HOME-10) ───────────────────────────────────────────────────
+
+interface UgcRow {
+  id: string;
+  displayName: string;
+  caption: string;
+  productIds: string[];
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+  photo: string;
+}
+
+export function UgcScreen() {
+  const { params, set } = useUrlFilters("/admin/ugc");
+  const status = params.get("status") ?? "pending";
+  const { data, error, busy, reload } = useAdminData<{ posts: UgcRow[] }>(`/api/admin/ugc?status=${status}`);
+  return (
+    <div className="space-y-5">
+      <PageHeader title="#WearTheHood" description="Customer photos wait here until approved. Approve only real customer fits: no other people's faces, no children, nothing offensive. Approving gives Alpha Club members 50 Hood Coins." />
+      <div className="flex flex-wrap gap-3">
+        <ASelect label="Status" className="w-40" value={status} onValueChange={(v) => set({ status: v })} options={[{ value: "pending", label: "To review" }, { value: "approved", label: "Live" }, { value: "rejected", label: "Rejected" }]} />
+      </div>
+      {error ? (
+        <ErrorState message={error} onRetry={reload} />
+      ) : !data ? (
+        <div className="h-40 animate-pulse rounded-xl bg-muted" />
+      ) : data.posts.length === 0 ? (
+        <EmptyState title="Nothing here" description={status === "pending" ? "No photos waiting for review." : "Try another status."} />
+      ) : (
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-busy={busy}>
+          {data.posts.map((p) => (
+            <li key={p.id} className="overflow-hidden rounded-xl border border-border bg-card">
+              {/* eslint-disable-next-line @next/next/no-img-element -- private moderation preview from our API */}
+              <img src={p.photo} alt={`Photo by ${p.displayName}`} className="aspect-[4/5] w-full bg-muted object-cover" />
+              <div className="space-y-2 p-3 text-sm">
+                <p>
+                  <b>{p.displayName}</b> · {date(p.createdAt, true)}
+                </p>
+                {p.caption ? <p className="text-muted-foreground">{p.caption}</p> : null}
+                <p className="text-xs text-muted-foreground">{p.productIds.length} product(s) tagged</p>
+                <div className="flex gap-2">
+                  {p.status !== "approved" ? (
+                    <AButton size="sm" onClick={() => act(`/api/admin/ugc/${p.id}`, { decision: "approve" }, "Approved — now live", reload)}>
+                      Approve
+                    </AButton>
+                  ) : null}
+                  {p.status !== "rejected" ? (
+                    <Confirm trigger={<AButton size="sm" variant="ghost">{p.status === "approved" ? "Take down" : "Reject"}</AButton>} title={p.status === "approved" ? "Take this photo down?" : "Reject this photo?"} description="It won't show on the site. The customer still sees it in their account." confirmLabel={p.status === "approved" ? "Take down" : "Reject"} destructive onConfirm={() => act(`/api/admin/ugc/${p.id}`, { decision: "reject" }, "Rejected", reload)} />
+                  ) : null}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

@@ -13,6 +13,7 @@ import {
   UserGroupIcon,
   UserLock01Icon,
   WarehouseIcon,
+  Image01Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import { can, type Permission, type Role, ROLES } from "@/lib/admin/permissions";
@@ -40,6 +41,7 @@ const ALL: NavItem[] = [
   { type: "section", label: "People" },
   { label: "Customers", icon: UserGroupIcon, route: "/admin/customers", permission: "customers.read" },
   { label: "Privacy requests", icon: Shield01Icon, route: "/admin/privacy", permission: "privacy.read", badgeKey: "privacy" },
+  { label: "#WearTheHood", icon: Image01Icon, route: "/admin/ugc", permission: "ugc.moderate" },
   { type: "section", label: "Insights" },
   { label: "Reports", icon: Analytics01Icon, route: "/admin/reports", permission: "reports.read" },
   { type: "section", label: "Admin" },

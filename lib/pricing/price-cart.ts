@@ -3,13 +3,14 @@ import type { Paise } from "@/lib/format";
 import { automaticUnitDiscount, PREPAID_OFFER, type AutomaticDiscount, AUTOMATIC_DISCOUNTS } from "@/lib/promotions/automatic";
 import { applyCombos, COMBOS, type Combo, type ComboApplication, type ComboResult } from "@/lib/promotions/combos";
 import { evaluateCoupon, type Coupon } from "@/lib/promotions/coupons";
+import { applyLooks, type Look, type LookApplication, LOOKS } from "@/lib/promotions/looks";
 import { gstClassFor, inclusiveTax, isIntraState, rateFor, splitTax } from "./gst";
 
 /**
  * The ONE place money is computed (CART-02, CHK-05/07/10, PROMO-01…04). Bag, checkout quote, order
  * placement and the payment amount all call this on the server with catalogue prices — never client values.
  *
- * Order of operations: catalogue price → automatic discount → combos → coupon → prepaid offer → shipping,
+ * Order of operations: catalogue price → automatic discount → combos → Shop-the-Look → coupon → prepaid offer → shipping,
  * express and COD fees. Free shipping is judged on the goods value after combos and coupon (before the
  * prepaid offer, so choosing UPI never adds a shipping fee).
  */
@@ -41,7 +42,7 @@ export interface PricingInput {
   customer?: { orderCount: number; couponUses: Record<string, number> } | null;
   now?: Date;
   /** Overridable for tests. */
-  rules?: { combos?: Combo[]; automatic?: AutomaticDiscount[] };
+  rules?: { combos?: Combo[]; automatic?: AutomaticDiscount[]; looks?: Look[] };
 }
 
 export interface PricedLine {
@@ -51,6 +52,7 @@ export interface PricedLine {
   unitMrp: Paise;
   automaticDiscount: Paise;
   comboDiscount: Paise;
+  lookDiscount: Paise;
   couponDiscount: Paise;
   prepaidDiscount: Paise;
   /** What the customer pays for this line (tax inclusive). */
@@ -67,6 +69,7 @@ export interface PriceBreakdown {
   saleDiscount: Paise;
   automaticDiscount: Paise;
   comboDiscount: Paise;
+  lookDiscount: Paise;
   couponDiscount: Paise;
   prepaidDiscount: Paise;
   goodsTotal: Paise;
@@ -77,6 +80,7 @@ export interface PriceBreakdown {
   savings: Paise;
   gst: { cgst: Paise; sgst: Paise; igst: Paise; total: Paise };
   combos: ComboApplication[];
+  looks: LookApplication[];
   comboProgress: ComboResult["progress"];
   coupon: { code: string; ok: boolean; discount: Paise; reason?: string; provisional?: string | null } | null;
   freeShippingRemaining: Paise;
@@ -105,7 +109,16 @@ export function priceCart(input: PricingInput): PriceBreakdown {
     input.rules?.combos ?? COMBOS,
     now,
   );
-  const afterCombo = base.map((l) => ({ ...l, value: l.effectiveUnit * l.quantity - (combo.lineDiscounts.get(l.lineId) ?? 0) }));
+  // 2b. Shop the Look (PROMO-05): one unit of each item of a complete look, on units not used by a combo.
+  const look = applyLooks(
+    base.map((l) => ({ lineId: l.lineId, productId: l.productId, unitPrice: l.effectiveUnit, quantity: l.quantity, bundledUnits: combo.lineBundledUnits.get(l.lineId) ?? 0 })),
+    now,
+    input.rules?.looks ?? LOOKS,
+  );
+  const afterCombo = base.map((l) => ({
+    ...l,
+    value: l.effectiveUnit * l.quantity - (combo.lineDiscounts.get(l.lineId) ?? 0) - (look.lineDiscounts.get(l.lineId) ?? 0),
+  }));
 
   // 3. Coupon.
   const payment = input.payment ?? null;
@@ -117,7 +130,8 @@ export function priceCart(input: PricingInput): PriceBreakdown {
         lineId: l.lineId,
         category: l.category,
         value: l.value,
-        nonComboValue: (l.quantity - (combo.lineBundledUnits.get(l.lineId) ?? 0)) * l.effectiveUnit,
+        // Combo and look units are already discounted: "no stacking" coupons skip them.
+        nonComboValue: Math.max(0, l.quantity - (combo.lineBundledUnits.get(l.lineId) ?? 0) - (look.lookUnits.get(l.lineId) ?? 0)) * l.effectiveUnit,
       })),
       payment: payment === null ? null : payment === "cod" ? "cod" : "prepaid",
       customer: input.customer
@@ -168,6 +182,7 @@ export function priceCart(input: PricingInput): PriceBreakdown {
       unitMrp: l.unitMrp,
       automaticDiscount: l.autoTotal,
       comboDiscount: combo.lineDiscounts.get(l.lineId) ?? 0,
+      lookDiscount: look.lineDiscounts.get(l.lineId) ?? 0,
       couponDiscount: couponAlloc.get(l.lineId) ?? 0,
       prepaidDiscount: prepaidAlloc.get(l.lineId) ?? 0,
       net,
@@ -183,7 +198,7 @@ export function priceCart(input: PricingInput): PriceBreakdown {
   const shipping = !hasItems || goodsBeforePrepaid >= STORE_CONFIG.freeShippingThreshold ? 0 : SHIPPING_FEE;
   const expressFee = hasItems && input.speed === "express" && input.expressFee ? input.expressFee : 0;
   const codFee = hasItems && payment === "cod" ? COD_FEE : 0;
-  const sum = (k: keyof Pick<PricedLine, "automaticDiscount" | "comboDiscount" | "couponDiscount">) => lines.reduce((n, l) => n + l[k], 0);
+  const sum = (k: keyof Pick<PricedLine, "automaticDiscount" | "comboDiscount" | "lookDiscount" | "couponDiscount">) => lines.reduce((n, l) => n + l[k], 0);
 
   const breakdown: PriceBreakdown = {
     lines,
@@ -193,6 +208,7 @@ export function priceCart(input: PricingInput): PriceBreakdown {
     saleDiscount: Math.max(0, mrpTotal - sellingTotal),
     automaticDiscount: sum("automaticDiscount"),
     comboDiscount: sum("comboDiscount"),
+    lookDiscount: sum("lookDiscount"),
     couponDiscount: sum("couponDiscount"),
     prepaidDiscount,
     goodsTotal,
@@ -203,11 +219,12 @@ export function priceCart(input: PricingInput): PriceBreakdown {
     savings: 0,
     gst,
     combos: combo.applications,
+    looks: look.applications,
     comboProgress: combo.progress,
     coupon: couponInfo,
     freeShippingRemaining: hasItems ? Math.max(0, STORE_CONFIG.freeShippingThreshold - goodsBeforePrepaid) : STORE_CONFIG.freeShippingThreshold,
   };
   breakdown.savings =
-    breakdown.saleDiscount + breakdown.automaticDiscount + breakdown.comboDiscount + breakdown.couponDiscount + breakdown.prepaidDiscount;
+    breakdown.saleDiscount + breakdown.automaticDiscount + breakdown.comboDiscount + breakdown.lookDiscount + breakdown.couponDiscount + breakdown.prepaidDiscount;
   return breakdown;
 }

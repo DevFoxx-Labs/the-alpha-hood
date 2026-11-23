@@ -1,3 +1,5 @@
+import { onDelivered } from "@/lib/loyalty/service";
+import { resolveLoyalty } from "@/lib/loyalty/store";
 import { queueRefund } from "@/lib/analytics/server";
 import { randomBytes } from "node:crypto";
 import type { CheckoutDeps } from "@/lib/checkout/service";
@@ -93,6 +95,8 @@ export async function advanceFulfilment(deps: CheckoutDeps, orderNumber: string,
     });
     const template = NOTIFY[to];
     if (template) await notify(order.customerId, template, { orderNumber: order.number });
+    // LOY-01/02: coins and the referral reward are earned on delivery, spendable after the return window.
+    if (to === "delivered") await onDelivered(updated!, deps.loyalty ?? resolveLoyalty());
     return updated!;
   });
 }

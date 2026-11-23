@@ -147,10 +147,10 @@ describe("placing orders", () => {
   it("COD: confirms, commits stock, clears the bag, counts the order", async () => {
     const { deps } = setup();
     const b = await buyer(deps);
-    const before = await deps.commerce.inventory.available(inStock.id, size);
+    const before = await deps.commerce.inventory.available(inStock.id, size, NOW);
     const r = await place(deps, b, "cod");
     expect(r.status).toBe("confirmed");
-    expect(await deps.commerce.inventory.available(inStock.id, size)).toBe(before - 1);
+    expect(await deps.commerce.inventory.available(inStock.id, size, NOW)).toBe(before - 1);
     expect(await deps.commerce.cart.get(b.cartId)).toBeNull();
     expect((await deps.customers.get(b.customer.id))!.orderCount).toBe(1);
     const order = (await deps.orders.get(r.orderNumber))!;
@@ -192,7 +192,7 @@ describe("placing orders", () => {
     const results = await Promise.allSettled([place(deps, b1, "upi"), place(deps, b2, "upi")]);
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect(results.find((r) => r.status === "rejected")).toMatchObject({ reason: { code: "out_of_stock" } });
-    expect(await deps.commerce.inventory.available(lastUnit.p.id, lastUnit.size)).toBe(0);
+    expect(await deps.commerce.inventory.available(lastUnit.p.id, lastUnit.size, NOW)).toBe(0);
   });
 
   it("COD is refused above the limit (CHK-07)", async () => {
@@ -240,11 +240,11 @@ describe("payment events (CHK-06)", () => {
   it("failure releases stock and keeps the bag; retry creates a new attempt that can succeed", async () => {
     const { deps, gateway } = setup();
     const b = await buyer(deps);
-    const before = await deps.commerce.inventory.available(inStock.id, size);
+    const before = await deps.commerce.inventory.available(inStock.id, size, NOW);
     const r = await place(deps, b, "upi");
-    expect(await deps.commerce.inventory.available(inStock.id, size)).toBe(before - 1);
+    expect(await deps.commerce.inventory.available(inStock.id, size, NOW)).toBe(before - 1);
     expect(await pay(deps, gateway, r.redirectUrl, "failed").run()).toBe("failed");
-    expect(await deps.commerce.inventory.available(inStock.id, size)).toBe(before);
+    expect(await deps.commerce.inventory.available(inStock.id, size, NOW)).toBe(before);
     expect(await deps.commerce.cart.get(b.cartId)).not.toBeNull();
 
     await expect(retryPayment(deps, "cus_someoneelse", r.orderNumber, NOW)).rejects.toMatchObject({ status: 404 });

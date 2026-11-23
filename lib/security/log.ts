@@ -12,7 +12,8 @@ export type SecurityEvent =
   | "payment_amount_mismatch"
   | "payment_late_success"
   | "order_placed"
-  | "cod_blocked";
+  | "cod_blocked"
+  | "referral_refused";
 
 export function maskPhone(phone: string): string {
   return phone.length > 4 ? `${"*".repeat(Math.max(0, phone.length - 4))}${phone.slice(-4)}` : "****";

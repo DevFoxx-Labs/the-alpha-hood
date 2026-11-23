@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { DynamicMarker } from "@/components/store/dynamic-marker";
 import { Breadcrumbs } from "@/components/listing/listing-page";
+import { PdpRails, RecentlyViewed } from "@/components/pdp/pdp-extras";
 import { PdpSkeleton } from "@/components/pdp/pdp-skeleton";
 import { ProductDetail } from "@/components/pdp/purchase-panel";
 import { ReviewsSection } from "@/components/pdp/reviews-section";
@@ -59,7 +60,7 @@ async function ProductContent({ params }: Pick<PageProps<"/products/[handle]">, 
   const { handle } = await params;
   const data = await getProductPage(handle);
   if (!data) notFound();
-  const { product, category, reviewData, firstPage, coupon } = data;
+  const { product, category, reviewData, firstPage, coupon, completeLook, similar, look } = data;
   const categoryTitle = category?.title ?? product.category;
   const sub = category?.subcategories.find((s) => s.handle === product.subcategory);
   const crumbs = [
@@ -114,6 +115,8 @@ async function ProductContent({ params }: Pick<PageProps<"/products/[handle]">, 
           <p className="mt-3 text-[13px] text-ink-2">No reviews yet. Verified buyers can review after delivery.</p>
         </div>
       )}
+      <PdpRails completeLook={completeLook} similar={similar} look={look} />
+      <RecentlyViewed currentId={product.id} />
     </>
   );
 }

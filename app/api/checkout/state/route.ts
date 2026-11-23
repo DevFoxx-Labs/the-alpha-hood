@@ -1,4 +1,5 @@
 import { customerIdFromRequest } from "@/lib/auth/session";
+import { recordCheckoutStart } from "@/lib/flows/service";
 import { loadCartView, publicCartView } from "@/lib/cart/service";
 import { checkoutEnabled, codEnabled } from "@/lib/checkout/flags";
 import { publicCustomer, resolveCustomers } from "@/lib/customers/store";
@@ -15,6 +16,8 @@ export async function GET(request: Request) {
     const customerId = enabled ? customerIdFromRequest(request) : null;
     const customer = customerId ? await resolveCustomers().get(customerId) : null;
     const view = await loadCartView(cartIdFrom(request));
+    // LOY-04: remember (ids + time only) that this customer reached checkout, for the abandoned-checkout reminder.
+    if (customer && view.id && view.purchasable.length > 0) recordCheckoutStart(customer.id, view.id);
     return privateJson({
       enabled,
       codEnabled: codEnabled(),

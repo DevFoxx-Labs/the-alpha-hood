@@ -27,6 +27,9 @@ export function useMe() {
 const NAV = [
   { href: "/account", label: "Overview" },
   { href: "/account/orders", label: "Orders & returns" },
+  { href: "/account/club", label: "Alpha Club" },
+  { href: "/account/alerts", label: "Alerts" },
+  { href: "/account/wear-the-hood", label: "#WearTheHood" },
   { href: "/account/addresses", label: "Addresses" },
   { href: "/wishlist", label: "Wishlist" },
   { href: "/account/settings", label: "Settings & privacy" },

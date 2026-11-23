@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Anton, Inter } from "next/font/google";
 import { Analytics } from "@/components/analytics/analytics";
 import { WebVitals } from "@/components/analytics/web-vitals";
+import { ServiceWorker } from "@/components/store/service-worker";
 import { ConsentProvider } from "@/components/consent/consent-provider";
 import { CookieBanner, CookiePreferences } from "@/components/consent/cookie-banner";
 import { StoreUIProvider } from "@/components/store/store-ui-provider";
@@ -61,6 +62,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <CookiePreferences />
           <Analytics tracking={{ ...TRACKING, cookiesVersion: NOTICES.cookies.version }} />
           <WebVitals />
+          <ServiceWorker />
         </ConsentProvider>
       </body>
     </html>

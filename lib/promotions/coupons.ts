@@ -127,3 +127,14 @@ export function bestCouponFor(price: Paise, coupons: Coupon[] = DEMO_COUPONS, no
   }
   return best;
 }
+
+/**
+ * Every code a shopper can type: the live coupon list, then Alpha Club referral codes (LOY-02). Async because
+ * referral codes live in the loyalty store.
+ */
+export async function lookupCoupon(code: string): Promise<Coupon | null> {
+  const fixed = findCoupon(code);
+  if (fixed) return fixed;
+  const { referralCoupon } = await import("@/lib/loyalty/service");
+  return referralCoupon(code);
+}

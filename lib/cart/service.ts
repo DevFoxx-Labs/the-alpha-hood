@@ -2,7 +2,7 @@ import { commerce } from "@/lib/commerce";
 import type { CartLine, CommerceAdapter, Product, SizeOption } from "@/lib/commerce/types";
 import type { Paise } from "@/lib/format";
 import { priceCart, type PaymentMethod, type PriceBreakdown } from "@/lib/pricing/price-cart";
-import { DEMO_COUPONS, findCoupon, isCouponLive, type Coupon } from "@/lib/promotions/coupons";
+import { DEMO_COUPONS, isCouponLive, lookupCoupon, type Coupon } from "@/lib/promotions/coupons";
 
 /**
  * Bag service (CART-01/02/05): the one place a cart is read, validated and priced. Used by the bag,
@@ -102,7 +102,7 @@ export async function loadCartView(
     };
   });
   const purchasable = lines.filter((l) => l.status !== "unavailable");
-  const coupon = cart.couponCode ? findCoupon(cart.couponCode) : null;
+  const coupon = cart.couponCode ? await lookupCoupon(cart.couponCode) : null;
 
   return {
     id: cart.id,
@@ -136,9 +136,11 @@ export function priceLines(lines: CartLineView[], coupon: Coupon | null, ctx: Pr
 }
 
 /** "View all offers" (CART-02): every live coupon with its saving or the reason it doesn't apply. */
-export function listOffers(view: CartView, ctx: PricingContext = {}) {
+export function listOffers(view: CartView, ctx: PricingContext = {}, extra: Coupon | null = null) {
   const now = ctx.now ?? new Date();
-  return DEMO_COUPONS.filter((c) => isCouponLive(c, now)).map((c) => {
+  const list = DEMO_COUPONS.filter((c) => isCouponLive(c, now));
+  if (extra && !list.some((c) => c.code === extra.code)) list.push(extra);
+  return list.map((c) => {
     const p = priceLines(view.purchasable, c, ctx);
     return {
       code: c.code,

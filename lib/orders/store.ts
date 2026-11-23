@@ -95,6 +95,8 @@ export interface Order {
   hold?: { reason: string; by: string; at: string } | null;
   /** ANL-01 consent snapshot at placement; null = no analytics/ads consent → no server events. */
   attribution?: Attribution | null;
+  /** LOY-01 Alpha Club snapshot at placement (return window + earn rate the order was bought under). */
+  club?: { tier: "member" | "elite" | "legend"; earnPercent: number; returnWindowDays: number } | null;
 }
 
 export interface OrderStore {

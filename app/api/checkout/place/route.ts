@@ -1,4 +1,5 @@
 import { attributionFrom } from "@/lib/analytics/attribution";
+import { isVisitorId, readCookie, VISITOR_COOKIE } from "@/lib/consent/cookie";
 import { NOTICES } from "@/lib/legal";
 import { parseAddressId, parseAmount, parseIdempotencyKey, parsePayment, parseSpeed, parseUpiApp } from "@/lib/checkout/parse";
 import { defaultDeps, placeOrder } from "@/lib/checkout/service";
@@ -32,9 +33,15 @@ export async function POST(request: Request) {
       expectedTotal: parseAmount(input.expectedTotal),
       idempotencyKey: parseIdempotencyKey(request),
       attribution: attributionFrom(request, NOTICES.cookies.version),
+      visitorId: visitorIdFrom(request),
     });
     return privateJson(result, { status: 201 });
   } catch (error) {
     return commerceErrorResponse(error);
   }
+}
+
+function visitorIdFrom(request: Request): string | null {
+  const v = readCookie(request.headers.get("cookie"), VISITOR_COOKIE);
+  return isVisitorId(v) ? v : null;
 }

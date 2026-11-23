@@ -41,6 +41,11 @@ export function lineCategory(line: OrderLine, categoryOf: (productId: string) =>
 }
 
 /** Per-line eligibility for a return request right now. */
+/** RET-01: 7 days by default; Alpha Club members get the window stored on the order at placement (30 days). */
+export function windowDaysFor(order: Pick<Order, "club">): number {
+  return order.club?.returnWindowDays ?? RETURN_RULES.windowDays;
+}
+
 export function returnEligibility(order: Order, categoryOf: (productId: string) => string | undefined, now = new Date()): {
   open: boolean;
   closesAt: string | null;
@@ -50,9 +55,10 @@ export function returnEligibility(order: Order, categoryOf: (productId: string) 
   if (order.fulfilment !== "delivered" || !order.deliveredAt) {
     return { open: false, closesAt: null, reason: "Returns open once your order is delivered.", lines: [] };
   }
-  const closes = Date.parse(order.deliveredAt) + RETURN_RULES.windowDays * 86_400_000;
+  const days = windowDaysFor(order);
+  const closes = Date.parse(order.deliveredAt) + days * 86_400_000;
   const closesAt = new Date(closes).toISOString();
-  if (now.getTime() > closes) return { open: false, closesAt, reason: `The ${RETURN_RULES.windowDays}-day return window has closed.`, lines: [] };
+  if (now.getTime() > closes) return { open: false, closesAt, reason: `The ${days}-day return window has closed.`, lines: [] };
   const lines = order.lines.map((l) => {
     const left = l.quantity - (order.returnedQty[l.lineId] ?? 0);
     if (RETURN_RULES.nonReturnableCategories.includes(lineCategory(l, categoryOf))) {

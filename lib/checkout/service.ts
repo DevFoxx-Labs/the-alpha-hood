@@ -9,7 +9,9 @@ import type { Paise } from "@/lib/format";
 import { resolveOrders, type Order, type OrderStore } from "@/lib/orders/store";
 import { resolveGateway, type PaymentEvent, type PaymentGateway } from "@/lib/payments/gateway";
 import type { PaymentMethod } from "@/lib/pricing/price-cart";
-import { findCoupon } from "@/lib/promotions/coupons";
+import { lookupCoupon } from "@/lib/promotions/coupons";
+import { checkReferral, clubSnapshot, type ReferralCoupon } from "@/lib/loyalty/service";
+import { type LoyaltyStore, resolveLoyalty } from "@/lib/loyalty/store";
 import { notify } from "@/lib/notify/outbox";
 import { securityEvent } from "@/lib/security/log";
 import { shipping as defaultShipping, type ShippingAdapter } from "@/lib/shipping";
@@ -57,6 +59,8 @@ export interface CheckoutDeps {
   shipping: ShippingAdapter;
   locks: KeyedLock;
   env?: Record<string, string | undefined>;
+  /** Alpha Club store (defaults to resolveLoyalty()). */
+  loyalty?: LoyaltyStore;
 }
 
 export function defaultDeps(): CheckoutDeps {
@@ -89,7 +93,7 @@ export async function quote(deps: CheckoutDeps, input: QuoteInput) {
 
   const promise = address ? await deps.shipping.check(address.pincode, input.now) : null;
   const speed: "standard" | "express" = input.speed === "express" && promise?.express ? "express" : "standard";
-  const coupon = view.couponCode ? findCoupon(view.couponCode) : null;
+  const coupon = view.couponCode ? await lookupCoupon(view.couponCode) : null;
   const ctx = {
     payment: input.payment,
     speed,
@@ -126,6 +130,8 @@ export interface PlaceInput {
   expectedTotal: Paise;
   /** ANL-01 consent snapshot from the request (lib/analytics/attribution.ts). */
   attribution?: Attribution | null;
+  /** Random visitor id (ah_vid), used only for the referral same-device check. */
+  visitorId?: string | null;
   now?: Date;
 }
 
@@ -168,7 +174,16 @@ export async function placeOrder(deps: CheckoutDeps, input: PlaceInput): Promise
     }
 
     // The payment method changes the total (COD fee / prepaid offer) — price for the chosen method.
-    const coupon = q.view.couponCode ? findCoupon(q.view.couponCode) : null;
+    const coupon = q.view.couponCode ? await lookupCoupon(q.view.couponCode) : null;
+    // LOY-02: a friend's invite code is honoured only if it isn't the referrer under another account.
+    const referral = coupon && "referrerId" in coupon ? (coupon as ReferralCoupon) : null;
+    if (referral) {
+      const problem = await checkReferral(referral, customer, address, (id) => deps.customers.get(id), input.visitorId ?? null, deps.loyalty ?? resolveLoyalty());
+      if (problem) {
+        securityEvent("referral_refused", { customer: customer.id });
+        throw new CheckoutError("coupon_invalid", problem, 409);
+      }
+    }
     const pricing = priceLines(q.view.purchasable, coupon, {
       payment: input.payment,
       speed: q.speed,
@@ -225,6 +240,7 @@ export async function placeOrder(deps: CheckoutDeps, input: PlaceInput): Promise
       couponCode: pricing.coupon?.ok ? pricing.coupon.code : null,
       codRisk,
       attribution: input.attribution ?? null,
+      club: await clubSnapshot(customer.id, deps.orders, deps.loyalty ?? resolveLoyalty(), now).catch(() => null),
       idempotencyKey: input.idempotencyKey,
       createdAt: now.toISOString(),
       confirmedAt: input.payment === "cod" ? now.toISOString() : null,
@@ -258,6 +274,11 @@ export async function placeOrder(deps: CheckoutDeps, input: PlaceInput): Promise
         throw new CheckoutError("out_of_stock", "Some items just sold out. Please review your bag.", 409);
       }
       throw e;
+    }
+
+    // LOY-02: the referrer is rewarded later, only if this order is delivered and kept (onDelivered).
+    if (referral) {
+      await (deps.loyalty ?? resolveLoyalty()).recordReferral({ code: referral.code, referrerId: referral.referrerId, friendId: customer.id, orderNumber: order.number }, now);
     }
 
     if (input.payment === "cod") {

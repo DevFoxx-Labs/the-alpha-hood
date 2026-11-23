@@ -3,7 +3,7 @@ import { commerce } from "@/lib/commerce";
 import { clientIp, guardPublicWrite, jsonError } from "@/lib/http/guard";
 import { cartIdFrom, commerceErrorResponse, privateJson } from "@/lib/http/commerce-http";
 import { rateLimiter } from "@/lib/http/rate-limit";
-import { findCoupon, isCouponLive, normaliseCouponCode } from "@/lib/promotions/coupons";
+import { lookupCoupon, isCouponLive, normaliseCouponCode } from "@/lib/promotions/coupons";
 import { asObject, rejectUnknownFields } from "@/lib/validation";
 
 /**
@@ -32,13 +32,13 @@ export async function POST(request: Request) {
     const input = asObject(guard.body);
     rejectUnknownFields(input, ["code"]);
     const code = normaliseCouponCode(input.code);
-    const coupon = code ? findCoupon(code) : null;
+    const coupon = code ? await lookupCoupon(code) : null;
     // Same message for unknown and expired codes (no code enumeration).
     if (!coupon || !isCouponLive(coupon, new Date())) return jsonError(422, "invalid_coupon", "This coupon code isn't valid.");
 
     const view = await loadCartView(cartId);
     if (!view.id) return jsonError(409, "cart_empty", "Add something to your bag first.");
-    const trial = listOffers(view).find((o) => o.code === coupon.code);
+    const trial = listOffers(view, {}, coupon).find((o) => o.code === coupon.code);
     if (!trial?.ok) return jsonError(422, "coupon_not_applicable", trial?.reason ?? "This coupon can't be used on your bag.");
 
     await commerce.cart.setCoupon(cartId, coupon.code);

@@ -91,6 +91,7 @@ export const MOCK_HOMEPAGE: HomeBlock[] = [
       { label: "Shoes", category: "sneakers" },
     ],
   },
+  { id: "look-street-uniform", type: "shop_the_look", lookId: "street-uniform", lead: "Shop", title: "The look" },
   { id: "new-arrivals", type: "product_grid", lead: "Fresh", title: "New arrivals", viewAllHref: "/collections/new-in", sort: "newest", limit: 4 },
   {
     id: "the-pack",
@@ -101,6 +102,14 @@ export const MOCK_HOMEPAGE: HomeBlock[] = [
     cta: { label: "Meet the pack", href: "/about" },
     image: { ...MASCOT["scene-22-the-pack"], alt: "Alpha and three wolf friends in streetwear under a city underpass" },
   },
+  {
+    id: "alpha-club",
+    type: "club_band",
+    title: "Alpha Club",
+    text: "Free to join. Hood Coins on every order, 30-day returns, early access to drops and a code to share with friends.",
+    cta: { label: "Join the club", href: "/alpha-club" },
+  },
+  { id: "wear-the-hood", type: "ugc_grid", title: "#WearTheHood", text: "Real fits from the pack. Share yours from your account after delivery." },
   { id: "trust", type: "trust_strip" },
   {
     id: "seo",
@@ -189,6 +198,7 @@ export function mockFooter(env: Record<string, string | undefined>): FooterConte
         title: "Company",
         links: [
           { label: "About us", href: "/about" },
+          { label: "Alpha Club", href: "/alpha-club" },
           { label: "Grievance officer", href: "/grievance" },
           { label: "Privacy & your data", href: "/privacy" },
         ],

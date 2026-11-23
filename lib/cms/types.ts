@@ -73,6 +73,9 @@ export type HomeBlock = Targeting & { id: string } & (
         tabs: { label: string; category?: string }[];
       }
     | { type: "product_grid"; lead?: string; title: string; viewAllHref: string; sort: "featured" | "newest"; limit: number }
+    | { type: "shop_the_look"; lookId: string; lead: string; title: string }
+    | { type: "club_band"; title: string; text: string; cta: { label: string; href: string } }
+    | { type: "ugc_grid"; title: string; text: string }
     | { type: "trust_strip" }
     | {
         type: "seo";

@@ -25,6 +25,7 @@ export const PERMISSIONS = [
   "privacy.write",
   "staff.manage",
   "audit.read",
+  "ugc.moderate",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -35,12 +36,12 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   store_manager: [
     "dashboard", "orders.read", "orders.write", "orders.ship", "returns.read", "returns.qc", "refunds.issue",
     "customers.read", "customers.write", "inventory.read", "inventory.write", "catalog.read", "promotions.read",
-    "reports.read", "privacy.read",
+    "reports.read", "privacy.read", "ugc.moderate",
   ],
   catalog_editor: ["dashboard", "catalog.read", "inventory.read", "promotions.read"],
   support: ["dashboard", "orders.read", "orders.write", "returns.read", "refunds.issue", "customers.read", "privacy.read", "privacy.write"],
   warehouse: ["dashboard", "orders.read", "orders.ship", "returns.read", "returns.qc", "inventory.read", "inventory.write"],
-  marketing: ["dashboard", "catalog.read", "promotions.read", "reports.read"],
+  marketing: ["dashboard", "catalog.read", "promotions.read", "reports.read", "ugc.moderate"],
   finance: ["dashboard", "orders.read", "returns.read", "refunds.issue", "customers.read", "reports.read"],
 };
 

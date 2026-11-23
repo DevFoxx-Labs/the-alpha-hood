@@ -137,7 +137,7 @@ export function LineItem({ line, onNavigate, children }: { line: BagLine; onNavi
 export function MiniCart({ upsell = [] }: { upsell?: Product[] }) {
   const { cartOpen, setCartOpen, lines, itemCount, cart } = useStoreUI();
   const pricing = cart?.pricing;
-  const goods = pricing ? pricing.sellingTotal - pricing.automaticDiscount - pricing.comboDiscount - pricing.couponDiscount : 0;
+  const goods = pricing ? pricing.sellingTotal - pricing.automaticDiscount - pricing.comboDiscount - pricing.lookDiscount - pricing.couponDiscount : 0;
   const close = () => setCartOpen(false);
   const blocked = lines.some((l) => l.status === "unavailable");
   const nudge = pricing?.comboProgress[0];

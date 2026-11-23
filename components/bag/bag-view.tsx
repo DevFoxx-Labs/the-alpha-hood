@@ -61,7 +61,7 @@ export function BagView() {
   }
 
   const p = cart.pricing;
-  const goods = p.sellingTotal - p.automaticDiscount - p.comboDiscount - p.couponDiscount;
+  const goods = p.sellingTotal - p.automaticDiscount - p.comboDiscount - p.lookDiscount - p.couponDiscount;
   const blocked = lines.some((l) => l.status === "unavailable");
   const nudge = p.comboProgress[0];
   const by = delivery.promise?.serviceable && delivery.promise.standardBy ? formatDeliveryDate(delivery.promise.standardBy) : null;

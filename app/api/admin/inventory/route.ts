@@ -1,4 +1,5 @@
 import { audit, requireStaff } from "@/lib/admin/auth";
+import { resolveAlerts, sweepAlerts } from "@/lib/alerts/service";
 import { adminError, adminWrite, privateJson } from "@/lib/admin/http";
 import { commerce } from "@/lib/commerce";
 import { MOCK_PRODUCTS } from "@/lib/commerce/mock/data";
@@ -36,6 +37,8 @@ export async function POST(request: Request) {
     const reason = cleanText(input.reason, "Reason", { min: 3, max: 200 });
     const onHand = await commerce.inventory.adjust(input.productId, input.size, input.delta);
     await audit(w, "inventory.adjust", `${input.productId}:${input.size}`, { delta: input.delta, onHand, reason });
+    // PDP-10: a restock may make "notify me" alerts due — checked right away (each fires once).
+    if (input.delta > 0) await sweepAlerts({ commerce, alerts: resolveAlerts() }, input.productId).catch(() => 0);
     return privateJson({ ok: true, onHand });
   } catch (error) {
     return adminError(error);

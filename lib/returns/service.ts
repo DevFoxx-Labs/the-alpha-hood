@@ -1,3 +1,5 @@
+import { onReturnSettled } from "@/lib/loyalty/service";
+import { resolveLoyalty } from "@/lib/loyalty/store";
 import { queueRefund } from "@/lib/analytics/server";
 import { randomBytes } from "node:crypto";
 import type { CheckoutDeps } from "@/lib/checkout/service";
@@ -394,6 +396,10 @@ export async function advanceReturn(deps: ReturnDeps, returnNumber: string, to: 
       });
     }
     await deps.orders.update(order.number, (o) => o.timeline.push({ status: "return_completed", at, note: returnNumber }));
+    // LOY-01: coins earned on returned (not exchanged) items are taken back; a full return cancels a referral reward.
+    if (r.resolution !== "exchange") {
+      await onReturnSettled(order, returnNumber, r.amounts.payable, allReturned, deps.loyalty ?? resolveLoyalty());
+    }
     await notify(r.customerId, "return_completed", { orderNumber: order.number, returnNumber });
     return deps.returns.update(returnNumber, (x) => {
       x.status = "completed";

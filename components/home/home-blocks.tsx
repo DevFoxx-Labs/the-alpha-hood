@@ -5,6 +5,7 @@ import { deviceClass } from "@/lib/cms/schedule";
 import type { ResolvedHomeBlock } from "@/lib/storefront";
 import { cn } from "@/lib/utils";
 import { HeroCarousel } from "./hero-carousel";
+import { ClubBand, ShopTheLook, UgcGrid } from "./m9-sections";
 import { ProductGrid } from "./product-grid";
 import { SeoBlock } from "./seo-block";
 import { TrendingTabs } from "./trending-tabs";
@@ -95,6 +96,17 @@ function Block({ resolved }: { resolved: ResolvedHomeBlock }) {
         </section>
       );
     }
+
+    case "shop_the_look": {
+      if (!("look" in resolved) || !resolved.look) return null;
+      return <ShopTheLook look={resolved.look} products={resolved.products} lead={block.lead} title={block.title} />;
+    }
+
+    case "club_band":
+      return <ClubBand title={block.title} text={block.text} cta={block.cta} />;
+
+    case "ugc_grid":
+      return <UgcGrid title={block.title} text={block.text} />;
 
     case "trust_strip":
       return (

@@ -46,8 +46,11 @@ describe("CMS adapter", () => {
       "collection_tiles",
       "offer_tiles",
       "product_tabs",
+      "shop_the_look",
       "product_grid",
       "campaign_band",
+      "club_band",
+      "ugc_grid",
       "trust_strip",
       "seo",
     ]);

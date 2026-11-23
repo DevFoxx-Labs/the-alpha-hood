@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, useSyncExternalStore } from "react";
 import { showMessageToast } from "@/components/store/toast";
 import { CONSENT_COOKIE, type CookieChoice, parseChoice, readCookie } from "@/lib/consent/cookie";
-import { COOKIE_PURPOSES, type CookiePurpose, PURPOSE_COOKIE_PREFIXES } from "@/lib/consent/purposes";
+import { COOKIE_PURPOSES, type CookiePurpose, PURPOSE_COOKIE_PREFIXES, PURPOSE_STORAGE_KEYS } from "@/lib/consent/purposes";
 
 /**
  * Client side of cookie consent (DPDP rules §4–5):
@@ -83,6 +83,11 @@ export function ConsentProvider({
         window.dispatchEvent(new Event(CHANGE_EVENT));
         if (withdrawn.length > 0) {
           deleteCookiesWithPrefixes(withdrawn.flatMap((p) => PURPOSE_COOKIE_PREFIXES[p]));
+          try {
+            for (const k of withdrawn.flatMap((p) => PURPOSE_STORAGE_KEYS[p])) window.localStorage.removeItem(k);
+          } catch {
+            // storage unavailable — nothing stored
+          }
           window.location.reload();
         }
         return true;

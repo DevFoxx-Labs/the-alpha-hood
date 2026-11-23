@@ -11,8 +11,12 @@ export type CookiePurpose = (typeof COOKIE_PURPOSES)[number];
 export const COMMUNICATION_PURPOSES = ["marketing_email", "marketing_whatsapp"] as const;
 export type CommunicationPurpose = (typeof COMMUNICATION_PURPOSES)[number];
 
+/** M9 optional service purposes: each is off until the customer switches it on, and can be withdrawn. */
+export const SERVICE_PURPOSES = ["alpha_club", "whatsapp_updates", "ugc_publish"] as const;
+export type ServicePurpose = (typeof SERVICE_PURPOSES)[number];
+
 /** `terms_privacy` is recorded at every account-creation path (M6). */
-export type ConsentPurpose = "terms_privacy" | CookiePurpose | CommunicationPurpose;
+export type ConsentPurpose = "terms_privacy" | CookiePurpose | CommunicationPurpose | ServicePurpose;
 
 export const PURPOSES: Record<ConsentPurpose, { label: string; description: string; required: boolean }> = {
   terms_privacy: {
@@ -38,6 +42,21 @@ export const PURPOSES: Record<ConsentPurpose, { label: string; description: stri
   marketing_whatsapp: {
     label: "Offers on WhatsApp",
     description: "New drops, sales and offers on WhatsApp.",
+    required: false,
+  },
+  alpha_club: {
+    label: "Alpha Club",
+    description: "Earn Hood Coins on your orders, get a tier and a referral code. Uses your order history and spend.",
+    required: false,
+  },
+  whatsapp_updates: {
+    label: "Order updates on WhatsApp",
+    description: "Order, delivery, return and back-in-stock updates on WhatsApp, as well as SMS and email. No offers.",
+    required: false,
+  },
+  ugc_publish: {
+    label: "Publish my #WearTheHood photo",
+    description: "Show the photo you submit, with your first name, on our website after review.",
     required: false,
   },
 };
@@ -111,6 +130,34 @@ export const COOKIE_INVENTORY: CookieInfo[] = [
     provider: "The Alpha Hood (first party, this device only)",
   },
   {
+    name: "ah_ref",
+    purpose: "A friend's Alpha Club invite code from their link, so your bag can offer the discount. No personal data.",
+    category: "necessary",
+    lifetime: "30 days",
+    provider: "The Alpha Hood (first party)",
+  },
+  {
+    name: "ah_recent_products (local storage)",
+    purpose: "The last 12 products you looked at, shown as \"Recently viewed\". Stays on your device.",
+    category: "necessary",
+    lifetime: "Until you clear it",
+    provider: "The Alpha Hood (first party, this device only)",
+  },
+  {
+    name: "ah_ab_id (local storage)",
+    purpose: "A random id that keeps you in the same version of a page test. Only set if you accept analytics.",
+    category: "analytics",
+    lifetime: "Until you clear it",
+    provider: "The Alpha Hood (first party, this device only)",
+  },
+  {
+    name: "Service worker cache",
+    purpose: "Keeps our logo, images and scripts (never your pages or data) so the store loads fast and shows an offline page.",
+    category: "necessary",
+    lifetime: "Until the next app update",
+    provider: "The Alpha Hood (first party, this device only)",
+  },
+  {
     name: "_ga, _ga_<ID>",
     purpose: "Google Analytics 4: distinguishes visitors and sessions to measure site usage.",
     category: "analytics",
@@ -148,6 +195,12 @@ export const COOKIE_INVENTORY: CookieInfo[] = [
 ];
 
 /** Cookie name prefixes to delete immediately when a purpose is withdrawn. */
+/** Device storage keys (localStorage) to clear when a purpose is withdrawn. */
+export const PURPOSE_STORAGE_KEYS: Record<CookiePurpose, string[]> = {
+  analytics: ["ah_ab_id", "ah_tracked_orders"],
+  advertising: ["ah_tracked_orders"],
+};
+
 export const PURPOSE_COOKIE_PREFIXES: Record<CookiePurpose, string[]> = {
   analytics: ["_ga", "_gid", "_gat"],
   advertising: ["_fbp", "_fbc", "_gcl_"],

@@ -1,7 +1,7 @@
 "use client";
 
 import { Cancel01Icon, Ticket01Icon } from "@hugeicons/core-free-icons";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useStoreUI } from "@/components/store/store-ui-provider";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -25,6 +25,14 @@ export function CouponField() {
   const [offersOpen, setOffersOpen] = useState(false);
   const [offers, setOffers] = useState<Offer[] | null>(null);
   const applied = cart?.pricing.coupon;
+  // LOY-02: an invite code from /r/CODE (cookie `ah_ref`) is offered, never applied without the shopper's tap.
+  const [invite, setInvite] = useState<string | null>(null);
+  useEffect(() => {
+    // Read after hydration so the server and first client render match (no hydration mismatch).
+    const m = /(?:^|;\s*)ah_ref=(REF[A-HJ-NP-Z2-9]{6})(?:;|$)/.exec(document.cookie);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only cookie read
+    if (m) setInvite(m[1]);
+  }, []);
 
   const apply = async (value: string) => {
     setError(null);
@@ -94,6 +102,11 @@ export function CouponField() {
         <p id={`${id}-err`} role="alert" className="mt-1.5 text-[12px] text-accent">
           {error}
         </p>
+      ) : null}
+      {invite && !cart?.couponCode ? (
+        <button type="button" onClick={() => apply(invite)} disabled={cartBusy} className="mt-2 block text-left text-[12.5px] text-accent underline underline-offset-2">
+          Use your friend&apos;s invite {invite} — ₹200 off your first order
+        </button>
       ) : null}
       <button type="button" onClick={openOffers} className="mt-2 text-[11.5px] font-bold uppercase tracking-[0.1em] underline underline-offset-4">
         View all offers

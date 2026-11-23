@@ -8,6 +8,8 @@ import { OrderDetailView } from "./order-detail";
 import { AccountOverview, OrdersList } from "./overview";
 import { ReturnForm } from "./return-form";
 import { SettingsView } from "./settings";
+import { AlertsView, ClubView } from "./club-views";
+import { WearTheHoodView } from "./wear-the-hood";
 
 /** Client entry points for the /account routes (dynamic params read on the client). */
 export function AccountHome() {
@@ -65,6 +67,30 @@ export function AccountSettings() {
   return (
     <AccountFrame title="Settings & privacy">
       <SettingsView />
+    </AccountFrame>
+  );
+}
+
+export function AccountClub() {
+  return (
+    <AccountFrame title="Alpha Club">
+      <ClubView />
+    </AccountFrame>
+  );
+}
+
+export function AccountAlerts() {
+  return (
+    <AccountFrame title="Alerts">
+      <AlertsView />
+    </AccountFrame>
+  );
+}
+
+export function AccountWearTheHood() {
+  return (
+    <AccountFrame title="#WearTheHood">
+      <WearTheHoodView />
     </AccountFrame>
   );
 }

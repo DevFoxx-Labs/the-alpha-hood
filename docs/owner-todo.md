@@ -88,3 +88,26 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] Regenerate "Alpha Wolf Stride" (and a transparent "peek") if you want the runway banner and corner peek.
 - [ ] Before merch / trademark: designer recreation of the mascot (owned files).
 
+## 2026-11-23 (POS proposal — `docs/alpha-hood-store-kit/POS.md`)
+- [ ] Approve or reject the POS scope change (PRD §2 lists offline POS as a v1 non-goal) and build vs buy (POS.md §0).
+- [ ] Answer POS.md §13: stores and states (GSTIN per state), own vs franchise, hardware + EDC provider, store stock
+      online or not, store prices/offers/coupons, store return & cash-refund policy, discount limits / staff discount /
+      commission, offline need, GS1 vs internal barcodes.
+- [ ] CA: invoice + credit-note format and ≤ 16-character series (also fixes the online series), cash rounding,
+      e-invoice threshold, stock-transfer documents, s.269ST cash limit and Rule 114B PAN handling.
+
+## 2026-11-25 (after M9 part 1)
+- [ ] Confirm the Alpha Club rules (demo values in `lib/loyalty/config.ts` and the Terms): earn 5 / 7 / 10 per ₹100,
+      Elite ₹15,000 / Legend ₹40,000 a year, 30-day member returns, coins expire after 365 days, leaving forfeits
+      coins, referral ₹200 off ₹999+ and 200 coins, 50 coins per approved photo.
+- [ ] CA: are Hood Coins a discount (reduces taxable value) or a payment / tender? Needed before coins can be spent
+      at checkout (M9 part 2). Same question for gift cards (GST at issue vs redemption) and their expiry (RBI PPI
+      rules: at least 1 year).
+- [ ] Lawyer: review the new Terms sections (Alpha Club, #WearTheHood) and the Privacy Notice additions (2026-11-25).
+- [ ] Choose a WhatsApp Business provider (BSP) and get the templates approved; SMS DLT templates for review
+      request, back in stock and price drop.
+- [ ] Set `CRON_SECRET` (≥ 32 random chars) on the host and add a scheduled call to `/api/cron/sweep` (every 15 min).
+- [ ] Decide on one-click checkout (GoKwik / Razorpay Magic / Shiprocket) and marketing automation (Klaviyo /
+      MoEngage / WebEngage) — each needs an integration and a Privacy Notice entry.
+- [ ] Give staff the moderation rules for #WearTheHood (store manager / marketing have `ugc.moderate`).
+- [ ] Review the demo looks ("The street uniform", "Winter layers") and real campaign photos for Shop the Look.

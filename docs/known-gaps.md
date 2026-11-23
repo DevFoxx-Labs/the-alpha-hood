@@ -37,6 +37,16 @@
 - 🟠 Real gateway redirect will be an external URL — extend `safeRedirect` with the gateway host allow-list.
 - 🟡 Sentry not set up (needs owner account / DSN).
 
+- 🔴 **GST invoice number too long:** `lib/orders/store.ts` `nextInvoiceNumber` issues `INV/2026-27/000001`
+  (18 characters); CGST Rule 46(b) allows a consecutive serial of at most 16. Fix: a shorter format such as
+  `INV/2627/000001` (15), shared with the POS document series (POS.md BILL-02), update `lib/returns/returns.test.ts`.
+  CA to confirm before the first real invoice.
+
+## POS (proposed — `docs/alpha-hood-store-kit/POS.md`)
+- 🟡 POS is not in the PRD scope (PRD §2 non-goal) — waiting for the owner's approval and answers to POS.md §13.
+  Prerequisites already visible in the code: no variant barcodes, a single stock pool (no locations), orders require an
+  address + customer, GST assumes one warehouse state, consent sources are web/android/ios only.
+
 ## Product / design
 - 🟡 PLP-08 rail gallery (`components/listing/product-rail-gallery.tsx`): uses `GarmentArt` placeholders; the "Back"
   view is the mirrored placeholder until real front/back/side cut-out photos (transparent PNG/WebP) exist. Products are
@@ -132,3 +142,25 @@
   the shell has streamed, and `dynamicParams=false` is not supported with Cache Components. If search consoles report
   soft-404s, return 404 for unknown handles earlier (e.g. a proxy check against the catalogue).
 
+## Growth pack (M9)
+- 🔴 Part 2 not built: spending Hood Coins, gift cards (PROMO-06) and store credit at checkout (CHK-05). They need
+  tender handling (order total vs amount payable, gateway amount, partial refunds back to each instrument, wallet
+  reversal on payment failure) and the CA's answer on GST treatment of coins.
+- 🔴 Alpha Club, alerts, UGC, flows and the outbox live in memory — production refuses them (fail closed) until the
+  database exists. Coins also need a scheduled expiry job (today expiry is applied when balances are read).
+- 🟠 Referral fraud: a friend using a different device and a new address still passes. Add velocity limits
+  (referrals per code per month) and an admin review queue before referral rewards become spendable.
+- 🟠 No notification provider: WhatsApp (BSP + approved templates), SMS DLT templates and email are still pending;
+  the outbox only queues. The cron sweep needs a scheduler (e.g. Vercel Cron every 15 min) and `CRON_SECRET`.
+- 🟠 Early access to drops and a birthday reward (LOY-01) are not built (birthday needs a date of birth — new
+  personal data, optional, must be added to the notice first).
+- 🟠 Browse abandonment and wishlist reminders (LOY-04) need server-side browsing / wishlist data, which we don't
+  keep (the wishlist is device-only).
+- 🟠 Push notifications (PWA) need a push provider / VAPID keys and a consent purpose.
+- 🟠 #WearTheHood photos are stored with the return photos in memory — production needs a private bucket, signed
+  URLs and a purge job for rejected and withdrawn photos (retention: 30 days).
+- 🟡 One-click checkout (CHK-08) and marketing automation (ANL-03) are flags and seams only; each provider needs its
+  integration and a Privacy Notice entry before it is switched on.
+- 🟡 Shop the Look uses placeholder art and demo looks; the CMS / platform should own looks and hotspots.
+- 🟡 Size advice uses order history only; the height/weight quiz (PDP-04) is not built.
+- 🟡 Not browser-checked at 1440/390/360; homepage M9 blocks render only with demo data (`pnpm dev`).

@@ -2,6 +2,8 @@ import { cacheLife } from "next/cache";
 import { commerce } from "@/lib/commerce";
 import type { Category, Product } from "@/lib/commerce/types";
 import { cms } from "@/lib/cms";
+import { findLook, type Look } from "@/lib/promotions/looks";
+import { completeTheLook, lookFor, similarProducts } from "@/lib/recommend/service";
 import { bestCouponFor, DEMO_COUPONS } from "@/lib/promotions/coupons";
 import { reviews } from "@/lib/reviews";
 import { isLive, liveBlocks } from "@/lib/cms/schedule";
@@ -40,7 +42,8 @@ export type ResolvedHomeBlock =
   | { block: Extract<HomeBlock, { type: "category_rail" }>; categories: Category[] }
   | { block: Extract<HomeBlock, { type: "product_tabs" }>; tabs: { id: string; label: string; products: Product[] }[] }
   | { block: Extract<HomeBlock, { type: "product_grid" }>; products: Product[] }
-  | { block: Exclude<HomeBlock, { type: "category_rail" | "product_tabs" | "product_grid" }> };
+  | { block: Extract<HomeBlock, { type: "shop_the_look" }>; look: Look | null; products: Product[] }
+  | { block: Exclude<HomeBlock, { type: "category_rail" | "product_tabs" | "product_grid" | "shop_the_look" }> };
 
 export async function getHomePage(): Promise<ResolvedHomeBlock[] | null> {
   "use cache";
@@ -65,6 +68,11 @@ export async function getHomePage(): Promise<ResolvedHomeBlock[] | null> {
         }
         case "product_grid":
           return { block, products: (await commerce.listProducts({ sort: block.sort, limit: block.limit })).products };
+        case "shop_the_look": {
+          const look = findLook(block.lookId);
+          const products = look ? (await Promise.all(look.productIds.map((id) => commerce.getProductById(id)))).filter((p): p is Product => !!p) : [];
+          return { block, look: look && products.length === look.productIds.length ? look : null, products };
+        }
         default:
           return { block };
       }
@@ -160,7 +168,19 @@ export async function getProductPage(handle: string) {
   // Coupon liveness depends on the time — evaluated inside the cache scope (PDP-02).
   const best = bestCouponFor(product.price, DEMO_COUPONS, new Date());
   const coupon = best ? { code: best.coupon.code, description: best.coupon.description, finalPrice: best.finalPrice } : null;
-  return { product, category, reviewData, firstPage, coupon };
+  // PDP-09 rails (rule-based, from the cached catalogue).
+  const all = await getAllProducts();
+  const look = lookFor(product.id);
+  return {
+    product,
+    category,
+    reviewData,
+    firstPage,
+    coupon,
+    completeLook: completeTheLook(product, all),
+    similar: similarProducts(product, all),
+    look: look ? { id: look.id, title: look.title, percent: look.percent } : null,
+  };
 }
 
 export async function productParams(): Promise<{ handle: string }[]> {

@@ -6,8 +6,8 @@ import type { Notice } from "../types";
  */
 export const TERMS_NOTICE: Notice = {
   slug: "terms",
-  version: "2026-11-22",
-  lastUpdated: "2026-11-22",
+  version: "2026-11-24",
+  lastUpdated: "2026-11-24",
   text: {
     en: {
       title: "Terms of Service",
@@ -106,6 +106,42 @@ export const TERMS_NOTICE: Notice = {
             {
               type: "p",
               text: "The brand, logo, designs, photos and text on the store belong to us or our licensors. Do not copy them for commercial use without permission.",
+            },
+          ],
+        },
+        {
+          id: "alpha-club",
+          heading: "Alpha Club and Hood Coins",
+          blocks: [
+            {
+              type: "list",
+              items: [
+                "The Alpha Club is free and optional. You join by ticking the box in your account; you can leave at any time.",
+                "Members earn Hood Coins on the amount paid for products (not shipping or fees): 5 per ₹100 for Member, 7 for Elite and 10 for Legend. 1 Hood Coin is worth ₹1.",
+                "Coins are added when an order is delivered and become usable after its return window ends. Coins on items you return are taken back.",
+                "Coins expire 365 days after they become usable. They have no cash value and can't be transferred or sold.",
+                "Tiers are based on what you spent in the last 12 months (after refunds): Elite from ₹15,000, Legend from ₹40,000.",
+                "Members get a 30-day return window on orders placed while they are members.",
+                "Invite a friend with your code: they get ₹200 off a first order of ₹999 or more, and you get 200 coins once their order is delivered and kept. Codes can't be used on your own account, address or device.",
+                "If you leave the Alpha Club or delete your account, unused coins (including pending ones) are forfeited.",
+                "We may change these rules with 30 days' notice on this page; coins you already have keep their expiry date. Abuse (fake accounts, self-referral) cancels coins.",
+              ],
+            },
+          ],
+        },
+        {
+          id: "ugc",
+          heading: "#WearTheHood photos",
+          blocks: [
+            {
+              type: "list",
+              items: [
+                "You can share a photo of products you bought. It appears on our website only after we review it, with your first name.",
+                "Only share photos you took. Anyone else in the photo must have agreed, and no children may appear in it.",
+                "You let us show the photo on our website while it is published. We don't use it in ads without asking you separately.",
+                "You can remove your photo any time from your account; it stops showing at once.",
+                "We may refuse or remove photos that break these rules.",
+              ],
             },
           ],
         },

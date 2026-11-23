@@ -7,6 +7,7 @@ export function priceRows(p: PriceBreakdown, { showFees = true }: { showFees?: b
   if (p.saleDiscount) rows.push({ label: "Discount on MRP", amount: p.saleDiscount, discount: true });
   if (p.automaticDiscount) rows.push({ label: "Sale discount", amount: p.automaticDiscount, discount: true });
   for (const c of p.combos) rows.push({ label: `Combo · ${c.title}`, amount: c.discount, discount: true });
+  for (const l of p.looks ?? []) rows.push({ label: `Shop the look · ${l.title}`, amount: l.discount, discount: true });
   if (p.coupon?.ok && p.couponDiscount) rows.push({ label: `Coupon (${p.coupon.code})`, amount: p.couponDiscount, discount: true });
   if (p.prepaidDiscount) rows.push({ label: "UPI offer", amount: p.prepaidDiscount, discount: true });
   rows.push(p.shipping === 0 ? { label: "Shipping", amount: 0, freeLabel: "FREE" } : { label: "Shipping", amount: p.shipping });

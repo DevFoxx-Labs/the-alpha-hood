@@ -1,5 +1,131 @@
 # Change log
 
+## 2026-11-25 — M9 growth pack, part 1 (High-risk tier: loyalty value, referral discounts, personal data, UGC uploads)
+
+**Scope:** PRD M9 — LOY-01…04, PROMO-05, PDP-04/09/10, CART-03, HOME-07/09/10, ORD-02 WhatsApp, CHK-08, ANL-03/04,
+PWA. **Held back on purpose (part 2):** spending Hood Coins, gift cards (PROMO-06) and store credit at checkout
+(CHK-05). They change the order total, the gateway amount, refunds and the GST invoice, and the CA must first say
+whether coins are a discount or a payment.
+
+**Added**
+- **Alpha Club** (LOY-01, ACC-03): `lib/loyalty/{config,store,service}.ts`.
+  - Joining needs an unticked consent box, checked again on the server, and is recorded as the `alpha_club`
+    ledger purpose. Leaving withdraws consent and forfeits coins.
+  - Coins ledger: append-only, idempotent per reference, never negative.
+  - Coins are earned on delivery (5 / 7 / 10 % by tier), pending until the return window ends, and expire after
+    365 days. Returns (not exchanges) take coins back, never more than were earned.
+  - Tiers come from 12-month spend after refunds.
+  - Members get a 30-day return window, snapshotted on the order at placement (`order.club`). `windowDaysFor()`
+    in returns rules is the one place this is decided.
+  - Account deletion erases club data.
+  - UI: `/account/club` dashboard and the public `/alpha-club` page.
+- **Referral** (LOY-02):
+  - Each member has a random `REF…` code. It works as a coupon through `lookupCoupon()`: ₹200 off a first order
+    of ₹999+.
+  - Checked at placement: not your own account, not the referrer's phone, not a shared delivery address, not the
+    same browser (visitor id at joining).
+  - The referrer gets 200 coins on the friend's delivery (pending until the window ends); a full return reverses
+    it.
+  - `/r/CODE` sets `ah_ref` (30 days, necessary). The bag *offers* the code; it is never auto-applied.
+- **Shop the Look** (HOME-07, PROMO-05):
+  - `lib/promotions/looks.ts`. A new priceCart step after combos takes 10% off one unit of each item when the
+    whole look is in the bag. Combo units are excluded, and "no stacking" coupons skip look units.
+  - The `lookDiscount` and `looks` fields appear in the breakdown, with a bag row "Shop the look · …".
+  - Homepage block with numbered hotspots, a size per item and "Add full look". Placeholder art (never mascot).
+- **Alerts** (PDP-10, LOY-04): "Notify me" for sold-out sizes and "Price drop alert" on the product page.
+  - Signed-in only, validated on the server, each alert fires once, max 30 open.
+  - Swept by the cron and right after admin restocks. Managed in `/account/alerts`.
+- **Notifications** (ORD-02, LOY-04): the outbox picks channels from consent.
+  - WhatsApp only with the new optional `whatsapp_updates` purpose (a Settings toggle).
+  - Marketing messages (abandoned checkout at 1 h and 24 h) only with marketing consent, capped at 1 per day and 3
+    per week.
+  - New templates: review request (3 days after delivery), back in stock, price drop.
+  - `/api/cron/sweep` uses a Bearer `CRON_SECRET` (≥ 32 chars, constant-time compare) and fails closed.
+- **#WearTheHood** (HOME-10, LOY-03): `lib/ugc/service.ts`.
+  - Photo upload reuses the sanitised return-photo store (magic-byte check, EXIF/GPS stripped).
+  - The customer may only tag products from their own delivered orders. Captions may not contain links.
+  - Publishing needs an explicit consent per photo (`ugc_publish`), with the first name only.
+  - Staff moderate with the new `ugc.moderate` permission (store manager, marketing, owner). Moderation is
+    audited, and approval pays members 50 coins once.
+  - Only approved photos are public (`/api/ugc`, served with nosniff and a sandbox CSP). The customer can delete
+    a photo at once.
+  - The homepage grid shows an honest "be the first" call until real posts exist, never fake UGC.
+- **PDP** (PDP-04, PDP-09):
+  - Size advice from the sizes the customer kept, nudged by too-small / too-large returns.
+  - Rails: Complete the look (the curated look first, then rule-based) and You may also like.
+  - Recently viewed: ids kept on the device in `ah_recent_products`.
+- **Homepage:** Alpha Club band (HOME-09, mascot #2 and #24), Shop the Look and #WearTheHood blocks. The footer's
+  "Alpha Club" link now works.
+- **ANL-04 experiments** (`lib/experiments`):
+  - Static config with a kill switch. Assignment happens in the browser after hydration, and only with analytics
+    consent (`ah_ab_id`), so there is no layout shift and no SEO effect.
+  - Sends an `experiment_view` event. One demo test is set up, switched off.
+- **CHK-08** (`lib/checkout/one-click.ts`): fail-closed flag. The button cannot render until a provider
+  integration exists.
+- **ANL-03** (`lib/marketing/automation.ts`): a fail-closed seam with no network calls.
+- **PWA:** `public/sw.js` caches only versioned static assets and serves `/offline` when a page navigation fails.
+  Pages, API, account and checkout are never cached. Registered after `load` in production only; `sw.js` is served
+  `no-cache`.
+- **CART-03** was already covered: the mini-cart has the add-ons row and combo progress. The bag now also shows
+  look savings.
+- **DPDP:**
+  - The Privacy Notice (EN and HI) adds Alpha Club data (including the referral fraud checks), #WearTheHood
+    photos, alerts, WhatsApp updates, size advice and their retention.
+  - Terms add "Alpha Club and Hood Coins" and "#WearTheHood photos" sections.
+  - Cookie inventory adds `ah_ref`, `ah_recent_products`, `ah_ab_id` and the service-worker cache.
+  - Withdrawing analytics also clears `ah_ab_id` and `ah_tracked_orders`.
+  - New notice versions: Privacy and Cookie 2026-11-25, Terms 2026-11-24, so visitors are asked again.
+- **Fixed (pre-existing):** two checkout tests had a time bomb. They reserved stock at a fixed `NOW` but read
+  availability with the real clock, so they only passed within 15 minutes of that date. They now read at `NOW`.
+
+**Threat model (abuse case → layer)**
+- Coins farmed by buy-and-return → pending until the window ends, reversed on return, earned only after delivery
+  (prevent, tested).
+- Double earn or double referral reward on retries → unique references (prevent, tested).
+- Self-referral with a second account → phone, address and visitor checks at placement (prevent, tested); a
+  different device plus a new address still gets through, so it is logged as a gap (detect).
+- Tier or coin values sent by the client → unknown fields rejected; tier is computed on the server (prevent,
+  tested).
+- Look discount gamed with partial looks or stacked coupons → whole-look rule, combo units excluded, coupon skips
+  look units (prevent, tested).
+- Alerts used to spam or enumerate → signed-in only, own alerts only (others get 404), 30 open, 40 per day
+  (prevent, tested).
+- Marketing without consent, or too many messages → consent-picked channels and frequency cap (prevent, tested).
+- UGC abuse (malware or a polyglot file, GPS leak, spam links, tagging unbought items, publishing without
+  consent) → sniffed and stripped upload, link filter, purchase check, consent, moderation, sandboxed serving
+  (prevent and detect, tested).
+- Cron endpoint triggered by anyone → secret ≥ 32 chars, constant-time compare, fails closed (prevent, tested).
+- Service worker leaking personal pages → static-assets allow-list only (prevent).
+
+**Verification**
+- `pnpm verify` ✓ (typecheck, lint, test 263/263, build) · `pnpm audit --prod`: no known vulnerabilities.
+- New `app/api/m9-api.test.ts` (16 tests).
+- **Not done:**
+  - Browser check at 1440/390/360. The dev server wasn't running; the production build shows the coming-soon
+    page, so the homepage blocks are verified by tests only.
+  - Lighthouse not run.
+  - `/security-review` of M5–M9 not run.
+  - Part 2: tenders (coins, gift cards, store credit).
+
+## 2026-11-23 — POS (in-store Point of Sale) requirements & implementation plan (docs only, proposed scope)
+
+**Scope:** owner request — a POS for physical stores (staff sign-in, barcode scan, GST bill, payments, returns, shifts).
+PRD §2 lists "offline POS integration" as a v1 non-goal, so this is a **proposal** awaiting owner approval; no code changed.
+
+**Added**
+- `docs/alpha-hood-store-kit/POS.md`: build vs buy, roles (associate / cashier / store lead, store-scoped), devices
+  (HID scanner, 80 mm printer, EDC, enrolment), PIN-on-enrolled-device sign-in, shifts & blind cash count (X/Z), selling on
+  the shared `priceCart` with `channel: "pos"`, customers/consent at the counter (customer-verified OTP, `source: "pos"`),
+  tenders (cash, UPI QR confirmed by gateway only, EDC, split, s.269ST / Rule 114B checks), GST bill & ≤ 16-char series,
+  in-store returns incl. online orders, per-location stock / transfers / stock take / labels, reports & loss-prevention
+  exceptions, NFRs, threat model, reuse map onto existing modules, new `lib/pos/*` modules, routes, DB tables and
+  milestones POS-M0…M6.
+
+**Found while analysing:** the online GST invoice number `INV/2026-27/000001` is 18 characters; GST Rule 46 allows at
+most 16 (logged in `docs/known-gaps.md`, fix planned in POS-M0 / BILL-02, CA to confirm).
+
+**Verification:** docs only — no `pnpm verify` needed; nothing built or run.
+
 ## 2026-11-24 — Fix: instant navigation on dynamic routes ("URL data during prerendering")
 
 **Problem:** in dev, Next 16 (Cache Components + Partial Prefetching) flagged `/men/[category]`: `params` awaited

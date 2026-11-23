@@ -1,5 +1,6 @@
 "use client";
 
+import { ExchangeNote, ProductAlerts, SizeAdvice } from "./pdp-extras";
 import { CheckmarkCircle02Icon, DeliveryTruck01Icon, FavouriteIcon, ShoppingBag02Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -185,6 +186,18 @@ export function ProductDetail({
             </p>
           ) : null}
           {fitNote ? <p className="mt-3 text-[12px] text-ink-2">{fitNote}</p> : null}
+          {!oneSize ? (
+            <SizeAdvice
+              productId={product.id}
+              onPick={(s) => {
+                if (product.sizes.some((x) => x.label === s && x.stock > 0)) {
+                  setSize(s);
+                  setSizeError(false);
+                }
+              }}
+            />
+          ) : null}
+          <ProductAlerts product={product} soldOutSizes={product.sizes.filter((s) => s.stock === 0).map((s) => s.label)} />
         </div>
 
         <p className="mt-4 flex items-center gap-2 bg-soft px-3.5 py-2.5 text-[12.5px]">
@@ -219,6 +232,7 @@ export function ProductDetail({
               <Button size="lg" variant="outline" className="w-full" onClick={buyNow}>
                 Buy now
               </Button>
+              <ExchangeNote days={returnWindowDays} />
             </>
           )}
         </div>

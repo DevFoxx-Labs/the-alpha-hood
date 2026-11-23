@@ -17,8 +17,8 @@ const inUse = (c: (typeof COOKIE_INVENTORY)[number]["category"]) =>
 
 export const COOKIES_NOTICE: Notice = {
   slug: "cookies",
-  version: "2026-11-24",
-  lastUpdated: "2026-11-24",
+  version: "2026-11-25",
+  lastUpdated: "2026-11-25",
   text: {
     en: {
       title: "Cookie Policy",

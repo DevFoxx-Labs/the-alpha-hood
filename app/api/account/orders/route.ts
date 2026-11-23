@@ -20,6 +20,8 @@ export async function GET(request: Request) {
         total: o.pricing.total,
         itemCount: o.lines.reduce((n, l) => n + l.quantity, 0),
         images: o.lines.slice(0, 3).map((l) => l.image),
+        // Delivered items the customer can tag in a #WearTheHood post (ids + titles only).
+        delivered: o.deliveredAt ? o.lines.map((l) => ({ productId: l.productId, title: l.title })) : [],
         deliveryBy: o.delivery.by,
       })),
     });

@@ -40,6 +40,7 @@ export interface EventMap {
   search: { query: string; results: number };
   return_request: { reason: string };
   exchange_chosen: Record<string, never>;
+  experiment_view: { experiment: string; variant: string };
 }
 
 export type EventName = keyof EventMap;
@@ -138,6 +139,10 @@ export function toGa4<N extends EventName>(name: N, p: EventMap[N]): Record<stri
     case "coupon_apply": {
       const x = e as EventMap["coupon_apply"];
       return { coupon: safeCode(x.code.toUpperCase()) ?? "other", success: x.success };
+    }
+    case "experiment_view": {
+      const x = e as EventMap["experiment_view"];
+      return { experiment_id: x.experiment, variant_id: x.variant };
     }
     case "return_request":
       return { reason: (e as EventMap["return_request"]).reason };

@@ -12,6 +12,9 @@ import { resolvePhotos } from "@/lib/returns/photos";
 import { returnEligibility } from "@/lib/returns/rules";
 import { publicReturn, resolveReturns, type ReturnDeps, type ReturnRequest } from "@/lib/returns/service";
 import { resolveCredit } from "@/lib/wallet/store-credit";
+import { resolveLoyalty } from "@/lib/loyalty/store";
+import { resolveAlerts } from "@/lib/alerts/service";
+import { resolveUgc } from "@/lib/ugc/service";
 
 /** Builds return deps with catalogue lookups prefetched for the given products. */
 export async function returnDeps(productIds: string[]): Promise<ReturnDeps> {
@@ -80,7 +83,9 @@ export function orderDetail(o: Order, returns: ReturnRequest[], deps: Pick<Retur
 
 // ── Marketing preferences ↔ consent ledger (DPDP rule §4: toggles stay in sync with the ledger) ──
 
-export const MARKETING_PURPOSES: CommunicationPurpose[] = ["marketing_email", "marketing_whatsapp"];
+/** Settings toggles: two marketing purposes and the transactional WhatsApp opt-in (ORD-02). */
+export type PreferencePurpose = CommunicationPurpose | "whatsapp_updates";
+export const MARKETING_PURPOSES: PreferencePurpose[] = ["marketing_email", "marketing_whatsapp", "whatsapp_updates"];
 
 function latest(rows: ConsentRecord[], purpose: string) {
   for (let i = rows.length - 1; i >= 0; i--) if (rows[i].purpose === purpose) return rows[i].status;
@@ -92,6 +97,7 @@ export async function getPreferences(customerId: string, ledger: ConsentLedger =
   return {
     marketing_email: latest(rows, "marketing_email") === "granted",
     marketing_whatsapp: latest(rows, "marketing_whatsapp") === "granted",
+    whatsapp_updates: latest(rows, "whatsapp_updates") === "granted",
     history: publicHistory(rows),
   };
 }
@@ -99,7 +105,7 @@ export async function getPreferences(customerId: string, ledger: ConsentLedger =
 /** Writes a ledger row for every purpose whose value changed (granted / withdrawn / denied). */
 export async function setPreferences(
   customerId: string,
-  wanted: Partial<Record<CommunicationPurpose, boolean>>,
+  wanted: Partial<Record<PreferencePurpose, boolean>>,
   ctx: RequestContext,
   ledger: ConsentLedger = resolveLedger(),
   now = new Date(),
@@ -204,6 +210,9 @@ export async function deleteAccount(customerId: string, ctx: RequestContext, now
     );
   }
   await deps.customers.erase(customerId, now);
+  await resolveLoyalty().erase(customerId);
+  await resolveAlerts().erase(customerId);
+  await resolveUgc().erase(customerId);
   revokeAllSessions(customerId);
   return { erased: true, keptOrderRecords: orders.length };
 }
