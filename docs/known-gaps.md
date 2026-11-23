@@ -174,9 +174,14 @@
 - 🟡 Not browser-checked at 1440/390/360; homepage M9 blocks render only with demo data (`pnpm dev`).
 
 ## Own backend (2026-11-26 — `docs/backend/README.md`)
-- 🔴 Only phase 1 stores (consent, customers, sessions, OTP) are on the database. Carts, orders, payments, wallet,
-  returns, catalogue, staff, etc. are still memory-only — with `DATABASE_DRIVER` set in production those still refuse
-  (fail closed). Phases 2–6 pending.
+- 🔴 Phases 1–2 are on the database: consent, customers, sessions, OTP, locks, carts, inventory, orders, payments,
+  invoice series, store credit, Hood Coins, Alpha Club and gift cards. Still memory-only: returns, privacy inbox,
+  newsletter (phase 3); catalogue (phase 4); staff, MFA, audit log, alerts, UGC, outbox, rate limiter, flows
+  (phase 5). In production, everything that needs the catalogue still refuses (fail closed). Phases 3–6 pending.
+- 🟠 The catalogue still comes from the mock adapter. Inventory `on_hand` is seeded from its stock numbers once per
+  SKU (`lib/db/stores/commerce.ts` `ensureSku`). After phase 4, the seed must come from the real product data.
+- 🟡 SQL `app_locks` / `markers` / expired `inventory_reservations` rows aren't cleaned yet (harmless, they grow).
+  Add a cleanup to the cron sweep. Mongo has the same gap for expired reservations.
 - 🟠 MySQL and PostgreSQL stores are written but not yet run against a real server (contract tests skip without
   `TEST_MYSQL_URL` / `TEST_POSTGRES_URL`). Run them before relying on either engine.
 - 🟠 The local MongoDB replica set (port 27018) is a manual process (`pnpm db:mongo:dev`); it isn't a Windows service.

@@ -1,10 +1,17 @@
 import { existsSync, readFileSync } from "node:fs";
 import { createOtpStore } from "@/lib/auth/otp";
 import { createMemorySessionStore } from "@/lib/auth/session";
+import { createMockAdapter } from "@/lib/commerce/mock";
+import type { CommerceAdapter } from "@/lib/commerce/types";
+import { createKeyedLock } from "@/lib/concurrency/lock";
 import { createMemoryLedger } from "@/lib/consent/ledger";
 import { createMemoryCustomerStore } from "@/lib/customers/store";
+import { createMemoryGiftCardStore } from "@/lib/giftcards/store";
+import { createMemoryLoyaltyStore } from "@/lib/loyalty/store";
+import { createMemoryOrderStore } from "@/lib/orders/store";
+import { createMemoryCreditLedger } from "@/lib/wallet/store-credit";
 import { assertDestructiveAllowed, type DbConfig } from "./config";
-import { createDbStores, type DbStores } from "./index";
+import { createDbStores, type DbStores, forgetDbStores } from "./index";
 import { migrateDownAll, migrateLatest } from "./migrate";
 import { closeMongo } from "./mongo";
 import { closeSqlDb } from "./sql";
@@ -14,7 +21,7 @@ import { closeSqlDb } from "./sql";
  * Each database target must be a LOCAL database whose name ends in `_test` (checked before anything is wiped);
  * it is rolled back and re-migrated from scratch before the suite runs.
  */
-export type StoresUnderTest = Omit<DbStores, "config">;
+export type StoresUnderTest = Omit<DbStores, "config" | "primitives" | "commerce"> & { commerce: CommerceAdapter };
 
 export interface Target {
   name: string;
@@ -42,7 +49,18 @@ export function testTargets(): Target[] {
       name: "memory",
       cfg: null,
       async setup() {
-        return { ledger: createMemoryLedger(), customers: createMemoryCustomerStore(), sessions: createMemorySessionStore(), otp: createOtpStore() };
+        return {
+          locks: createKeyedLock(),
+          ledger: createMemoryLedger(),
+          customers: createMemoryCustomerStore(),
+          sessions: createMemorySessionStore(),
+          otp: createOtpStore(),
+          orders: createMemoryOrderStore(),
+          credit: createMemoryCreditLedger(),
+          loyalty: createMemoryLoyaltyStore(),
+          giftCards: createMemoryGiftCardStore(),
+          commerce: createMockAdapter(),
+        };
       },
       async teardown() {},
     },
@@ -57,12 +75,26 @@ export function testTargets(): Target[] {
         assertDestructiveAllowed(cfg, { NODE_ENV: "test" });
         await migrateDownAll(cfg);
         await migrateLatest(cfg);
-        const stores = createDbStores(cfg);
-        return { ledger: stores.ledger, customers: stores.customers, sessions: stores.sessions, otp: stores.otp };
+        const s = createDbStores(cfg);
+        return {
+          locks: s.locks,
+          ledger: s.ledger,
+          customers: s.customers,
+          sessions: s.sessions,
+          otp: s.otp,
+          orders: s.orders,
+          credit: s.credit,
+          loyalty: s.loyalty,
+          giftCards: s.giftCards,
+          commerce: s.commerce(createMockAdapter()),
+        };
       },
       async teardown() {
         if (driver === "mongodb") await closeMongo(cfg);
         else await closeSqlDb(cfg);
+        // Stores (and the dev commerce singleton) built on the closed connection must not be reused.
+        forgetDbStores();
+        delete (globalThis as Record<string, unknown>)[`__alpha_hood_commerce_db_${driver}`];
       },
     });
   };

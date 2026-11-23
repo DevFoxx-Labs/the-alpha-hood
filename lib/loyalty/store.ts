@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 
 /**
@@ -139,6 +140,8 @@ export function createMemoryLoyaltyStore(): LoyaltyStore {
 }
 
 export function resolveLoyalty(env: Env = process.env): LoyaltyStore {
+  const db = dbStores(env);
+  if (db) return db.loyalty;
   if (mockDataAllowed(env)) return devSingleton("loyalty", createMemoryLoyaltyStore);
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Alpha Club");

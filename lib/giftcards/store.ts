@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { rupees, type Paise } from "@/lib/format";
+import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 
 /**
@@ -122,6 +123,8 @@ export function createMemoryGiftCardStore(): GiftCardStore {
 }
 
 export function resolveGiftCards(env: Env = process.env): GiftCardStore {
+  const db = dbStores(env);
+  if (db) return db.giftCards;
   if (mockDataAllowed(env)) return devSingleton("gift_cards", createMemoryGiftCardStore);
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Gift cards");

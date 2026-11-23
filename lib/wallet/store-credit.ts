@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { Paise } from "@/lib/format";
+import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 
 /**
@@ -50,6 +51,8 @@ export function createMemoryCreditLedger(): StoreCreditLedger {
 }
 
 export function resolveCredit(env: Env = process.env): StoreCreditLedger {
+  const db = dbStores(env);
+  if (db) return db.credit;
   if (mockDataAllowed(env)) return devSingleton("store_credit", createMemoryCreditLedger);
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Store credit");

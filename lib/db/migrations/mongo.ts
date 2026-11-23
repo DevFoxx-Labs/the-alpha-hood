@@ -11,6 +11,21 @@ export interface MongoMigration {
   down(db: Db): Promise<void>;
 }
 
+const MONEY_COLLECTIONS = [
+  "app_locks",
+  "markers",
+  "counters",
+  "carts",
+  "orders",
+  "inventory_skus",
+  "inventory_reservations",
+  "ledger_owners",
+  "ledger_entries",
+  "loyalty_members",
+  "loyalty_referrals",
+  "gift_cards",
+];
+
 async function ensureCollection(db: Db, name: string) {
   const exists = await db.listCollections({ name }, { nameOnly: true }).hasNext();
   if (!exists) await db.createCollection(name);
@@ -47,6 +62,38 @@ export const MONGO_MIGRATIONS: MongoMigration[] = [
     },
     async down(db) {
       for (const c of ["otp_sends", "otp_challenges", "sessions", "customers", "consent_records"]) {
+        if (await db.listCollections({ name: c }, { nameOnly: true }).hasNext()) await db.collection(c).drop();
+      }
+    },
+  },
+  {
+    name: "2026_11_26_002_money",
+    async up(db) {
+      for (const c of MONEY_COLLECTIONS) await ensureCollection(db, c);
+      await db.collection("app_locks").createIndexes([{ key: { expires_at: 1 }, name: "app_locks_expires_idx" }]);
+      await db.collection("orders").createIndexes([
+        { key: { customerId: 1, idempotencyKey: 1 }, name: "orders_idem_uq", unique: true },
+        { key: { customerId: 1, createdAt: -1 }, name: "orders_customer_idx" },
+        { key: { status: 1 }, name: "orders_status_idx" },
+        { key: { createdAt: -1 }, name: "orders_created_idx" },
+        { key: { id: 1 }, name: "orders_id_uq", unique: true },
+        // One order per gateway payment id across all orders (multikey UNIQUE).
+        { key: { "attempts.paymentId": 1 }, name: "orders_payment_uq", unique: true, partialFilterExpression: { "attempts.paymentId": { $exists: true } } },
+      ]);
+      await db.collection("inventory_reservations").createIndexes([
+        { key: { state: 1, expires_at: 1 }, name: "inventory_res_state_idx" },
+        { key: { "items.key": 1 }, name: "inventory_res_items_idx" },
+      ]);
+      await db.collection("ledger_entries").createIndexes([
+        { key: { ledger: 1, reference: 1 }, name: "ledger_entries_ref_uq", unique: true },
+        { key: { ledger: 1, owner: 1, created_at: 1 }, name: "ledger_entries_owner_idx" },
+      ]);
+      await db.collection("loyalty_members").createIndexes([{ key: { referral_code: 1 }, name: "loyalty_members_code_uq", unique: true }]);
+      await db.collection("loyalty_referrals").createIndexes([{ key: { referrer_id: 1 }, name: "loyalty_referrals_referrer_idx" }]);
+      await db.collection("gift_cards").createIndexes([{ key: { issued_at: -1 }, name: "gift_cards_issued_idx" }]);
+    },
+    async down(db) {
+      for (const c of MONEY_COLLECTIONS) {
         if (await db.listCollections({ name: c }, { nameOnly: true }).hasNext()) await db.collection(c).drop();
       }
     },

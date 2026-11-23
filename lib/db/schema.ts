@@ -71,7 +71,109 @@ export interface OtpSendsTable {
   sent_at: Date;
 }
 
+export interface AppLocksTable {
+  lock_key: string;
+  owner: string;
+  expires_at: Date;
+}
+export interface MarkersTable {
+  namespace: string;
+  marker_key: string;
+  created_at: Date;
+}
+export interface CountersTable {
+  name: string;
+  value: number | string;
+}
+export interface CartsTable {
+  id: string;
+  doc: unknown;
+  version: number;
+  updated_at: Date;
+}
+export interface OrdersTable {
+  number: string;
+  id: string;
+  customer_id: string;
+  status: string;
+  idempotency_key: string;
+  created_at: Date;
+  doc: unknown;
+  version: number;
+}
+export interface OrderPaymentsTable {
+  payment_id: string;
+  order_number: string;
+}
+export interface InventorySkusTable {
+  product_id: string;
+  size: string;
+  on_hand: number;
+}
+export interface InventoryReservationsTable {
+  reference: string;
+  state: string;
+  expires_at: Date;
+}
+export interface InventoryReservationItemsTable {
+  reference: string;
+  product_id: string;
+  size: string;
+  quantity: number;
+}
+export interface LedgerOwnersTable {
+  ledger: string;
+  owner: string;
+  balance: number | string;
+}
+export interface LedgerEntriesTable {
+  id: string;
+  ledger: string;
+  owner: string;
+  amount: number | string;
+  reference: string;
+  meta: unknown;
+  created_at: Date;
+}
+export interface LoyaltyMembersTable {
+  customer_id: string;
+  joined_at: Date;
+  referral_code: string;
+  visitor_id: string | null;
+}
+export interface LoyaltyReferralsTable {
+  order_number: string;
+  code: string;
+  referrer_id: string;
+  friend_id: string;
+  created_at: Date;
+}
+export interface GiftCardsTable {
+  hash: string;
+  last4: string;
+  initial: number;
+  issued_at: Date;
+  expires_at: Date;
+  issued_by: string;
+  note: string;
+  disabled: boolean | number;
+}
+
 export interface Database {
+  app_locks: AppLocksTable;
+  markers: MarkersTable;
+  counters: CountersTable;
+  carts: CartsTable;
+  orders: OrdersTable;
+  order_payments: OrderPaymentsTable;
+  inventory_skus: InventorySkusTable;
+  inventory_reservations: InventoryReservationsTable;
+  inventory_reservation_items: InventoryReservationItemsTable;
+  ledger_owners: LedgerOwnersTable;
+  ledger_entries: LedgerEntriesTable;
+  loyalty_members: LoyaltyMembersTable;
+  loyalty_referrals: LoyaltyReferralsTable;
+  gift_cards: GiftCardsTable;
   consent_records: ConsentRecordsTable;
   customers: CustomersTable;
   customer_addresses: CustomerAddressesTable;

@@ -2,6 +2,7 @@ import type { Attribution } from "@/lib/analytics/attribution";
 import { randomBytes } from "node:crypto";
 import type { Address } from "@/lib/checkout/address";
 import type { Paise } from "@/lib/format";
+import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 import type { PaymentMethod, PriceBreakdown } from "@/lib/pricing/price-cart";
 
@@ -223,6 +224,8 @@ export function createMemoryOrderStore(): OrderStore {
 }
 
 export function resolveOrders(env: Env = process.env): OrderStore {
+  const db = dbStores(env);
+  if (db) return db.orders;
   if (mockDataAllowed(env)) return devSingleton("order_store", createMemoryOrderStore);
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Orders");

@@ -137,5 +137,165 @@ export function sqlMigrations(d: Driver): Record<string, Migration> {
         }
       },
     },
+
+    "2026_11_26_002_money": {
+      async up(db: AnyDb) {
+        const table = (name: string) => db.schema.createTable(name).ifNotExists();
+        const end = mysqlTable(d);
+
+        // Distributed mutex (replaces the in-process KeyedLock when a database is configured).
+        await table("app_locks")
+          .addColumn("lock_key", "varchar(190)", (col) => col.primaryKey())
+          .addColumn("owner", "varchar(64)", (col) => col.notNull())
+          .addColumn("expires_at", c.ts, (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+
+        // "Seen once" markers: processed webhook events, restock references … (UNIQUE = idempotency).
+        await table("markers")
+          .addColumn("namespace", "varchar(40)", (col) => col.notNull())
+          .addColumn("marker_key", "varchar(190)", (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addPrimaryKeyConstraint("markers_pk", ["namespace", "marker_key"])
+          .modifyEnd(end)
+          .execute();
+
+        // Gap-free counters (GST invoice series per financial year).
+        await table("counters")
+          .addColumn("name", "varchar(100)", (col) => col.primaryKey())
+          .addColumn("value", "bigint", (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+
+        await table("carts")
+          .addColumn("id", "varchar(64)", (col) => col.primaryKey())
+          .addColumn("doc", c.json, (col) => col.notNull())
+          .addColumn("version", "integer", (col) => col.notNull())
+          .addColumn("updated_at", c.ts, (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+
+        // Orders: indexed columns for every lookup + the full order document (JSON).
+        await table("orders")
+          .addColumn("number", "varchar(32)", (col) => col.primaryKey())
+          .addColumn("id", "varchar(64)", (col) => col.notNull().unique())
+          .addColumn("customer_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("status", "varchar(24)", (col) => col.notNull())
+          .addColumn("idempotency_key", "varchar(100)", (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addColumn("doc", c.json, (col) => col.notNull())
+          .addColumn("version", "integer", (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "orders_idem_uq", "orders", ["customer_id", "idempotency_key"], true);
+        await createIndex(db, d, "orders_customer_idx", "orders", ["customer_id", "created_at"]);
+        await createIndex(db, d, "orders_status_idx", "orders", ["status"]);
+        await createIndex(db, d, "orders_created_idx", "orders", ["created_at"]);
+
+        // One order per gateway payment id (UNIQUE) — a payment can never be attached to two orders.
+        await table("order_payments")
+          .addColumn("payment_id", "varchar(100)", (col) => col.primaryKey())
+          .addColumn("order_number", "varchar(32)", (col) => col.notNull().references("orders.number").onDelete("restrict"))
+          .modifyEnd(end)
+          .execute();
+
+        await table("inventory_skus")
+          .addColumn("product_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("size", "varchar(16)", (col) => col.notNull())
+          .addColumn("on_hand", "integer", (col) => col.notNull())
+          .addPrimaryKeyConstraint("inventory_skus_pk", ["product_id", "size"])
+          .modifyEnd(end)
+          .execute();
+
+        await table("inventory_reservations")
+          .addColumn("reference", "varchar(100)", (col) => col.primaryKey())
+          .addColumn("state", "varchar(12)", (col) => col.notNull())
+          .addColumn("expires_at", c.ts, (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+        await table("inventory_reservation_items")
+          .addColumn("reference", "varchar(100)", (col) => col.notNull().references("inventory_reservations.reference").onDelete("cascade"))
+          .addColumn("product_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("size", "varchar(16)", (col) => col.notNull())
+          .addColumn("quantity", "integer", (col) => col.notNull())
+          .addPrimaryKeyConstraint("inventory_reservation_items_pk", ["reference", "product_id", "size"])
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "inventory_res_items_sku_idx", "inventory_reservation_items", ["product_id", "size"]);
+
+        // Append-only money ledgers (store credit, Hood Coins, gift cards): UNIQUE(ledger, reference) makes every
+        // credit / debit idempotent; the owner balance row is locked to keep balances from going negative.
+        await table("ledger_owners")
+          .addColumn("ledger", "varchar(20)", (col) => col.notNull())
+          .addColumn("owner", "varchar(100)", (col) => col.notNull())
+          .addColumn("balance", "bigint", (col) => col.notNull())
+          .addPrimaryKeyConstraint("ledger_owners_pk", ["ledger", "owner"])
+          .modifyEnd(end)
+          .execute();
+        await table("ledger_entries")
+          .addColumn("id", "varchar(64)", (col) => col.primaryKey())
+          .addColumn("ledger", "varchar(20)", (col) => col.notNull())
+          .addColumn("owner", "varchar(100)", (col) => col.notNull())
+          .addColumn("amount", "bigint", (col) => col.notNull())
+          .addColumn("reference", "varchar(190)", (col) => col.notNull())
+          .addColumn("meta", c.json, (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "ledger_entries_ref_uq", "ledger_entries", ["ledger", "reference"], true);
+        await createIndex(db, d, "ledger_entries_owner_idx", "ledger_entries", ["ledger", "owner", "created_at"]);
+
+        await table("loyalty_members")
+          .addColumn("customer_id", "varchar(64)", (col) => col.primaryKey())
+          .addColumn("joined_at", c.ts, (col) => col.notNull())
+          .addColumn("referral_code", "varchar(16)", (col) => col.notNull().unique())
+          .addColumn("visitor_id", "varchar(64)")
+          .modifyEnd(end)
+          .execute();
+        await table("loyalty_referrals")
+          .addColumn("order_number", "varchar(32)", (col) => col.primaryKey())
+          .addColumn("code", "varchar(16)", (col) => col.notNull())
+          .addColumn("referrer_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("friend_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "loyalty_referrals_referrer_idx", "loyalty_referrals", ["referrer_id"]);
+
+        // Gift cards: only the SHA-256 of the code is stored.
+        await table("gift_cards")
+          .addColumn("hash", "char(64)", (col) => col.primaryKey())
+          .addColumn("last4", "varchar(4)", (col) => col.notNull())
+          .addColumn("initial", "integer", (col) => col.notNull())
+          .addColumn("issued_at", c.ts, (col) => col.notNull())
+          .addColumn("expires_at", c.ts, (col) => col.notNull())
+          .addColumn("issued_by", "varchar(254)", (col) => col.notNull())
+          .addColumn("note", "varchar(200)", (col) => col.notNull())
+          .addColumn("disabled", c.bool, (col) => col.notNull().defaultTo(c.falseDefault))
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "gift_cards_issued_idx", "gift_cards", ["issued_at"]);
+      },
+      async down(db: AnyDb) {
+        for (const t of [
+          "gift_cards",
+          "loyalty_referrals",
+          "loyalty_members",
+          "ledger_entries",
+          "ledger_owners",
+          "inventory_reservation_items",
+          "inventory_reservations",
+          "inventory_skus",
+          "order_payments",
+          "orders",
+          "carts",
+          "counters",
+          "markers",
+          "app_locks",
+        ]) {
+          await db.schema.dropTable(t).ifExists().execute();
+        }
+      },
+    },
   };
 }

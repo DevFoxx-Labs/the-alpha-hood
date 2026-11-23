@@ -1,3 +1,4 @@
+import { dbStores } from "@/lib/db";
 import { devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 import { createMockAdapter } from "./mock";
 import type { CommerceAdapter } from "./types";
@@ -20,7 +21,10 @@ export function resolveCommerce(env: Env): CommerceAdapter {
         );
       }
       // One instance per process: carts and stock must be shared by every route bundle.
-      return devSingleton("commerce_mock", createMockAdapter);
+      const catalog = devSingleton("commerce_mock", createMockAdapter);
+      // Own backend: bags and stock live in the database; products still come from the catalogue (phase 4).
+      const db = dbStores(env);
+      return db ? devSingleton(`commerce_db_${db.config.driver}`, () => db.commerce(catalog)) : catalog;
     }
     default:
       throw new Error(`Unknown COMMERCE_PROVIDER "${provider}"`);

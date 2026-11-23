@@ -1,5 +1,55 @@
 # Change log
 
+## 2026-11-26 — Own backend, phase 2: money stores on MySQL / PostgreSQL / MongoDB (High-risk tier: payments, wallet, stock)
+
+**Threat model:**
+- *Assets:* stock, order and payment state, store credit, Hood Coins, gift-card balances, invoice numbers.
+- *Actors:* shoppers double-clicking or retrying; racing webhooks; two app servers; someone guessing a cart id.
+- *Abuse cases and the layer that stops each:*
+  - overselling the last unit → SKU row lock + all-or-nothing hold in one transaction;
+  - spending a balance twice → locked owner balance + floor check, and UNIQUE(ledger, reference);
+  - the same payment confirming twice / a payment id attached to two orders → conditional transition + unique
+    payment id;
+  - duplicate orders on retry → UNIQUE(customer, idempotency key);
+  - duplicate or skipped invoice numbers → atomic counter in a transaction;
+  - lost cart edits → version check;
+  - two checkouts for the same customer on different servers → database lock;
+  - cart id path tricks → id regex.
+
+**Added**
+- Migrations `2026_11_26_002_money` (SQL + Mongo, additive, reversible on local `_dev` / `_test` databases only):
+  - `app_locks`, `markers`, `counters`;
+  - `carts`;
+  - `orders` and `order_payments`;
+  - `inventory_skus`, `inventory_reservations`, `inventory_reservation_items`;
+  - `ledger_owners` and `ledger_entries`;
+  - `loyalty_members`, `loyalty_referrals`, `gift_cards`.
+- `lib/db/primitives.ts`: lock, marker, counter and ledger (append-only, idempotent per reference, never below
+  zero), for SQL and Mongo.
+- `lib/db/stores/{orders,wallet,commerce}.ts`:
+  - order store with the invoice series and the webhook event marker;
+  - store credit, loyalty and gift cards on the ledger;
+  - database carts and inventory wrapped around the catalogue adapter.
+- `lib/commerce/cart-engine.ts`: the bag rules in one place, shared by the mock adapter and the database carts.
+- Tests: `lib/db/money-contract.ts`, the race-heavy money contract plus a checkout API end-to-end test
+  (gift card + COD → replay → cancel) on each database.
+
+**Changed**
+- `resolveOrders`, `resolveCredit`, `resolveLoyalty`, `resolveGiftCards`, `resolveLocks` and `resolveCommerce` use
+  the database when `DATABASE_DRIVER` + `DATABASE_URL` are set.
+- `lib/commerce/index.ts`: `commerce` now resolves the adapter on each access (the adapters are still cached
+  singletons). Before this, the choice was frozen at first import.
+- `lib/db/index.ts`: added `forgetDbStores()`; the test teardown drops stores built on a closed connection.
+
+**Verified**
+- `pnpm verify`: typecheck, lint, 315/315 tests (memory + local MongoDB replica set), build.
+- `pnpm audit --prod`: no known vulnerabilities.
+- `pnpm db:migrate` on local `alpha_hood_dev` (Mongo): 2 migrations applied.
+
+**Not verified**
+- MySQL / PostgreSQL. The contract skips them until `TEST_MYSQL_URL` / `TEST_POSTGRES_URL` are set (owner TODO).
+- No UI change, so no browser check.
+
 ## 2026-11-26 — Own backend, phase 1: MySQL / PostgreSQL / MongoDB foundation + identity stores (High-risk tier: auth, personal data)
 
 **Scope:** the store runs on its own backend, on any one of MySQL 8, PostgreSQL or MongoDB, selected by

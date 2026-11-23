@@ -1,3 +1,4 @@
+import { dbStores } from "@/lib/db";
 import { devSingleton } from "@/lib/mock-guard";
 
 /**
@@ -29,4 +30,11 @@ export function createKeyedLock(): KeyedLock {
   };
 }
 
-export const locks = devSingleton("keyed_lock", createKeyedLock);
+const memoryLocks = () => devSingleton("keyed_lock", createKeyedLock);
+
+/** Database-backed mutex when the own backend is configured (correct across servers), else in-process. */
+export function resolveLocks(env: Record<string, string | undefined> = process.env): KeyedLock {
+  return dbStores(env)?.locks ?? memoryLocks();
+}
+
+export const locks: KeyedLock = { run: (key, fn) => resolveLocks().run(key, fn) };
