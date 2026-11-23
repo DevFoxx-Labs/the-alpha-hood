@@ -1,4 +1,5 @@
-import { cacheLife } from "next/cache";
+import { cacheLife, cacheTag } from "next/cache";
+import { CATALOG_TAG } from "@/lib/catalog/cache-tag";
 import { commerce } from "@/lib/commerce";
 import type { Category, Product } from "@/lib/commerce/types";
 import { cms } from "@/lib/cms";
@@ -24,6 +25,7 @@ export function storefrontAvailable(): boolean {
 export async function getShell() {
   "use cache";
   cacheLife("minutes");
+  cacheTag(CATALOG_TAG);
   if (!storefrontAvailable()) return null;
   const [announcements, headerLinks, menu, footer, trendingSearches, catalogue] = await Promise.all([
     cms.getAnnouncements(),
@@ -48,6 +50,7 @@ export type ResolvedHomeBlock =
 export async function getHomePage(): Promise<ResolvedHomeBlock[] | null> {
   "use cache";
   cacheLife("minutes");
+  cacheTag(CATALOG_TAG);
   if (!storefrontAvailable()) return null;
 
   const blocks = liveBlocks(await cms.getHomepage(), new Date());
@@ -85,6 +88,7 @@ export async function getHomePage(): Promise<ResolvedHomeBlock[] | null> {
 export async function getCategoryNode(handle: string) {
   "use cache";
   cacheLife("minutes");
+  cacheTag(CATALOG_TAG);
   if (!storefrontAvailable()) return null;
   return commerce.getCategory(handle);
 }
@@ -92,6 +96,7 @@ export async function getCategoryNode(handle: string) {
 export async function getCollectionInfo(handle: string) {
   "use cache";
   cacheLife("minutes");
+  cacheTag(CATALOG_TAG);
   if (!storefrontAvailable()) return null;
   return commerce.getCollection(handle);
 }
@@ -99,6 +104,7 @@ export async function getCollectionInfo(handle: string) {
 export async function getCategoryTree() {
   "use cache";
   cacheLife("minutes");
+  cacheTag(CATALOG_TAG);
   if (!storefrontAvailable()) return null;
   return commerce.listCategoryTree();
 }
@@ -107,6 +113,7 @@ export async function getCategoryTree() {
 export async function getListing(scope: CatalogScope, query: CatalogQuery) {
   "use cache";
   cacheLife("minutes");
+  cacheTag(CATALOG_TAG);
   if (!storefrontAvailable()) return null;
   return commerce.searchCatalog(scope, query);
 }
@@ -114,6 +121,7 @@ export async function getListing(scope: CatalogScope, query: CatalogQuery) {
 export async function getListingTile() {
   "use cache";
   cacheLife("minutes");
+  cacheTag(CATALOG_TAG);
   if (!storefrontAvailable()) return null;
   const tile = await cms.getListingTile();
   return tile && isLive(tile, new Date()) ? tile : null;
@@ -123,6 +131,7 @@ export async function getListingTile() {
 export async function getBestsellers(limit = 4) {
   "use cache";
   cacheLife("minutes");
+  cacheTag(CATALOG_TAG);
   if (!storefrontAvailable()) return [];
   return (await commerce.listProducts({ limit })).products;
 }
@@ -152,6 +161,7 @@ export async function collectionParams(): Promise<{ handle: string }[]> {
 export async function getProductPage(handle: string) {
   "use cache";
   cacheLife("minutes");
+  cacheTag(CATALOG_TAG);
   if (!storefrontAvailable()) return null;
   const product = await commerce.getProduct(handle);
   if (!product) return null;
@@ -196,6 +206,7 @@ export async function productParams(): Promise<{ handle: string }[]> {
 export async function getAllProducts(max = 5000): Promise<Product[]> {
   "use cache";
   cacheLife("minutes");
+  cacheTag(CATALOG_TAG);
   if (!storefrontAvailable()) return [];
   const out: Product[] = [];
   for (let offset = 0; offset < max; offset += 60) {
@@ -209,6 +220,7 @@ export async function getAllProducts(max = 5000): Promise<Product[]> {
 export async function getSitemapData() {
   "use cache";
   cacheLife("hours");
+  cacheTag(CATALOG_TAG);
   if (!storefrontAvailable()) return null;
   const [products, tree, collections] = await Promise.all([getAllProducts(), commerce.listCategoryTree(), commerce.listCollections()]);
   return { products, tree, collections };

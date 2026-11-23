@@ -13,6 +13,8 @@ import { createMemoryOrderStore } from "@/lib/orders/store";
 import { createMemoryInbox } from "@/lib/privacy/requests";
 import { createMemoryPhotoStore } from "@/lib/returns/photos";
 import { createMemoryReturnStore } from "@/lib/returns/service";
+import { createMemoryCatalogStore } from "@/lib/catalog/store";
+import { createMemoryReviewStore } from "@/lib/reviews/store";
 import { createMemoryCreditLedger } from "@/lib/wallet/store-credit";
 import { assertDestructiveAllowed, type DbConfig } from "./config";
 import { createDbStores, type DbStores, forgetDbStores } from "./index";
@@ -25,7 +27,7 @@ import { closeSqlDb } from "./sql";
  * Each database target must be a LOCAL database whose name ends in `_test` (checked before anything is wiped);
  * it is rolled back and re-migrated from scratch before the suite runs.
  */
-export type StoresUnderTest = Omit<DbStores, "config" | "primitives" | "commerce"> & { commerce: CommerceAdapter };
+export type StoresUnderTest = Omit<DbStores, "config" | "primitives" | "commerce" | "own" | "reviews"> & { commerce: CommerceAdapter };
 
 export interface Target {
   name: string;
@@ -68,6 +70,8 @@ export function testTargets(): Target[] {
           photos: createMemoryPhotoStore(),
           inbox: createMemoryInbox(),
           newsletter: createMemoryNewsletterStore(),
+          catalog: createMemoryCatalogStore(),
+          reviewStore: createMemoryReviewStore(),
         };
       },
       async teardown() {},
@@ -99,6 +103,8 @@ export function testTargets(): Target[] {
           photos: s.photos,
           inbox: s.inbox,
           newsletter: s.newsletter,
+          catalog: s.catalog,
+          reviewStore: s.reviewStore,
         };
       },
       async teardown() {

@@ -127,3 +127,10 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
       in `.env.local` — then run `pnpm test` (contract suite on all three) and tell me the result.
 - [ ] Production database choice (MySQL / PostgreSQL / MongoDB Atlas) and hosting — the app supports all three.
 
+## 2026-11-26 (own backend, phase 4 — catalogue)
+- [ ] Decide when the store switches to `COMMERCE_PROVIDER=own` (own catalogue). Until phase 5 the admin staff store
+      is memory-only, so on a live server products can't be managed yet.
+- [ ] Prepare the real catalogue data: SKU, title, colour, sizes + opening stock, MRP and price, description,
+      Legal Metrology details (manufacturer / packer / importer, country of origin, net quantity) per product.
+      Demo products and reviews are only for local testing and must not be imported to the live store.
+- [ ] Product photos (shot list per DESIGN.md §5) — the upload feature is the next catalogue step.

@@ -8,7 +8,8 @@ import type { CommerceAdapter } from "./types";
  * - an unknown provider throws;
  * - the mock adapter is refused when NODE_ENV=production unless ALLOW_MOCK_DATA is exactly "true"
  *   (used only for preview builds — never set it on the live store).
- * Real adapters (shopify | medusa) are added once the PRD §4 platform decision is made.
+ * - `own`: the own backend (products, bag, stock in MySQL / PostgreSQL / MongoDB — docs/backend/README.md).
+ * Shopify / Medusa adapters come later.
  */
 export function resolveCommerce(env: Env): CommerceAdapter {
   const provider = env.COMMERCE_PROVIDER ?? "mock";
@@ -25,6 +26,12 @@ export function resolveCommerce(env: Env): CommerceAdapter {
       // Own backend: bags and stock live in the database; products still come from the catalogue (phase 4).
       const db = dbStores(env);
       return db ? devSingleton(`commerce_db_${db.config.driver}`, () => db.commerce(catalog)) : catalog;
+    }
+    case "own": {
+      // Own backend: catalogue, bag and stock in the configured database. Works in production; without a
+      // database it refuses (fail closed) instead of falling back to demo data.
+      const db = dbStores(env);
+      return db ? db.own().commerce : refusingAdapter("COMMERCE_PROVIDER=own needs DATABASE_DRIVER and DATABASE_URL.");
     }
     default:
       throw new Error(`Unknown COMMERCE_PROVIDER "${provider}"`);

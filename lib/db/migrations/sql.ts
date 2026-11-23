@@ -361,5 +361,62 @@ export function sqlMigrations(d: Driver): Record<string, Migration> {
         }
       },
     },
+
+    "2026_11_26_004_catalog": {
+      async up(db: AnyDb) {
+        const table = (name: string) => db.schema.createTable(name).ifNotExists();
+        const end = mysqlTable(d);
+
+        // Products: indexed / UNIQUE columns + the full product document; edits are version-checked.
+        await table("products")
+          .addColumn("id", "varchar(64)", (col) => col.primaryKey())
+          .addColumn("handle", "varchar(120)", (col) => col.notNull().unique())
+          .addColumn("sku", "varchar(40)", (col) => col.notNull().unique())
+          .addColumn("style_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("category", "varchar(64)", (col) => col.notNull())
+          .addColumn("status", "varchar(12)", (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addColumn("updated_at", c.ts, (col) => col.notNull())
+          .addColumn("version", "integer", (col) => col.notNull())
+          .addColumn("doc", c.json, (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "products_status_idx", "products", ["status"]);
+        await createIndex(db, d, "products_style_idx", "products", ["style_id"]);
+
+        // Category tree, homepage rail and collection rules (one versioned document).
+        await table("catalog_documents")
+          .addColumn("name", "varchar(40)", (col) => col.primaryKey())
+          .addColumn("doc", c.json, (col) => col.notNull())
+          .addColumn("updated_at", c.ts, (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+
+        await table("reviews")
+          .addColumn("id", "varchar(80)", (col) => col.primaryKey())
+          .addColumn("style_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("category", "varchar(64)", (col) => col.notNull())
+          .addColumn("rating", "integer", (col) => col.notNull())
+          .addColumn("helpful", "integer", (col) => col.notNull().defaultTo(0))
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addColumn("doc", c.json, (col) => col.notNull())
+          .modifyEnd(end)
+          .execute();
+        await createIndex(db, d, "reviews_style_idx", "reviews", ["style_id"]);
+        await createIndex(db, d, "reviews_category_idx", "reviews", ["category"]);
+
+        // One helpful vote per (review, voter): the PK makes a second vote fail.
+        await table("review_votes")
+          .addColumn("review_id", "varchar(80)", (col) => col.notNull().references("reviews.id").onDelete("cascade"))
+          .addColumn("voter_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addPrimaryKeyConstraint("review_votes_pk", ["review_id", "voter_id"])
+          .modifyEnd(end)
+          .execute();
+      },
+      async down(db: AnyDb) {
+        for (const t of ["review_votes", "reviews", "catalog_documents", "products"]) await db.schema.dropTable(t).ifExists().execute();
+      },
+    },
   };
 }

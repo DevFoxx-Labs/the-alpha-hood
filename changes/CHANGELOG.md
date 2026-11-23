@@ -1,5 +1,76 @@
 # Change log
 
+## 2026-11-26 — Own backend, phase 4: catalogue + reviews on the database, admin product editing, `COMMERCE_PROVIDER=own` (High-risk tier: admin powers, prices)
+
+**Threat model:**
+- *Assets:* prices and MRP (money), what the store shows (product content), stock, reviews.
+- *Actors:* staff without catalogue rights; a compromised or careless editor; two editors at once; shoppers
+  probing hidden products; anyone injecting markup through product text.
+- *Abuse cases and the layer that stops each:*
+  - editing without rights → `catalog.write` checked on the server (403), and the admin-route guard test;
+  - cross-site writes → same-origin check (403);
+  - a price above the MRP, fractional or negative paise, made-up categories/sizes/attributes, unknown fields → server
+    allow-list (422);
+  - script in text → plain text only, rendered escaped (JSON-LD through `toJsonLd`);
+  - two editors overwriting each other → version check (409);
+  - taking another product's URL or SKU → UNIQUE handle/SKU (409);
+  - drafts or archived products leaking → the storefront snapshot includes only `active` products;
+  - deleting history → archive only, no delete;
+  - repudiation → every create/update audited, with price and status before and after;
+  - ballot-stuffing helpful votes → UNIQUE (review, voter);
+  - demo products or fake reviews going live → `db:seed` refuses anything but a local `_dev` / `_test` database;
+  - SSRF through image URLs → no URL field at all.
+
+**Added**
+- Migrations `2026_11_26_004_catalog` (SQL + Mongo, additive): `products` (UNIQUE handle + SKU, status, version),
+  `catalog_documents`, `reviews`, `review_votes`.
+- `COMMERCE_PROVIDER=own` (`lib/commerce/resolve.ts`): catalogue, bag, stock and reviews on the database. Works in
+  production; refuses without a database.
+- `lib/catalog/reader.ts`: one read path (listing, filters, collections, search, suggestions) for the demo
+  catalogue and the database.
+- `lib/catalog/collection-rules.ts`: collection rules as data.
+- `lib/catalog/store.ts` + `own.ts`: snapshot assembly (active only, live stock, derived swatches, ratings) and a
+  10 s per-server cache.
+- `lib/reviews/store.ts`: one reviews service on any store.
+- `lib/db/stores/catalog.ts`: SQL + Mongo stores.
+- Admin product editing:
+  - `lib/catalog/admin.ts`: server validation and create/update;
+  - routes: `POST /api/admin/catalog` and `GET` / `PATCH /api/admin/catalog/[id]`;
+  - UI: `/admin/catalog/new` and `/admin/catalog/[id]` (`components/admin/product-editor.tsx`), plus a status filter
+    and "New product" button on the list;
+  - new permission `catalog.write` (owner, store manager, catalog editor);
+  - writes revalidate the `catalog` cache tag.
+- `pnpm db:seed`, with `scripts/alias-loader.mjs` so CLI scripts can import app code; local `_dev` / `_test` only.
+- Tests:
+  - `lib/db/catalog-contract.ts`:
+    - the seeded DB serves exactly the demo catalogue;
+    - review vote race;
+    - draft/active/archived behaviour;
+    - concurrent edits (one wins);
+    - handle/SKU conflicts;
+    - 15 validation probes;
+    - an end-to-end flow on each DB: owner signs in with MFA → creates a draft (invisible) → publishes (visible
+      through the public API) → stale edit refused → shopper's COD order takes the stock.
+  - `app/api/admin-api.test.ts`: `catalog.write` RBAC, read-only on mock (409), CSRF.
+
+**Changed**
+- `lib/commerce/mock` uses the shared reader (`mock/search.ts` removed). Behaviour unchanged; the existing catalogue
+  and search tests pass.
+- `reviews` and `commerce` exports resolve per call (they follow the current environment).
+- `/api/admin/inventory` takes product titles from the active adapter, no longer from the demo data.
+
+**Verified**
+- `pnpm verify`: typecheck, lint, 335/335 tests (memory + local MongoDB), build.
+- `pnpm audit --prod`: clean.
+- `pnpm db:migrate` + `pnpm db:seed` on local `alpha_hood_dev`: 4 migrations; 68 products and 686 demo reviews.
+- `next dev` with `COMMERCE_PROVIDER=own`, fetched over HTTP (no headless browser): `/`, a product page,
+  `/men/shirts` and `/collections/new-in` → 200 with the right titles; `/api/catalog` and `/api/products/by-ids`
+  serve data from the database; no errors in the server log.
+
+**Not verified**
+- MySQL / PostgreSQL (credentials pending).
+- The product editor UI hasn't been viewed in a browser at 1440 / 390 / 360 px or in dark mode.
+
 ## 2026-11-26 — Own backend, phase 3: returns, return photos, grievance inbox, newsletter on the database (High-risk tier: uploads, personal data)
 
 **Threat model:**

@@ -213,6 +213,8 @@ for (const target of testTargets().filter((t) => t.cfg)) {
 import "./money-contract";
 // ── Phase 3: returns, photos, grievance inbox, newsletter ─────────────────────────────────────────
 import "./aftersales-contract";
+// ── Phase 4: catalogue, reviews, admin product editing, COMMERCE_PROVIDER=own end to end ─────────
+import "./catalog-contract";
 
 // ── Guard: database code must never reach the browser bundle ─────────────────────────────────────
 import { existsSync as fileExists, readFileSync as readSource, readdirSync, statSync } from "node:fs";

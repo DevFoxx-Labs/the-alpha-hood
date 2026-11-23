@@ -26,7 +26,8 @@ const MONEY_COLLECTIONS = [
   "gift_cards",
 ];
 
-const AFTERSALES_COLLECTIONS = ["returns", "return_photos", "privacy_requests", "newsletter_subscribers"];
+const CATALOG_COLLECTIONS = ["products", "catalog_documents", "reviews", "review_votes"];
+const AFTERSALES_COLLECTIONS =["returns", "return_photos", "privacy_requests", "newsletter_subscribers"];
 
 async function ensureCollection(db: Db, name: string) {
   const exists = await db.listCollections({ name }, { nameOnly: true }).hasNext();
@@ -121,6 +122,27 @@ export const MONGO_MIGRATIONS: MongoMigration[] = [
     },
     async down(db) {
       for (const c of AFTERSALES_COLLECTIONS) {
+        if (await db.listCollections({ name: c }, { nameOnly: true }).hasNext()) await db.collection(c).drop();
+      }
+    },
+  },
+  {
+    name: "2026_11_26_004_catalog",
+    async up(db) {
+      for (const c of CATALOG_COLLECTIONS) await ensureCollection(db, c);
+      await db.collection("products").createIndexes([
+        { key: { handle: 1 }, name: "products_handle_uq", unique: true },
+        { key: { sku: 1 }, name: "products_sku_uq", unique: true },
+        { key: { status: 1 }, name: "products_status_idx" },
+        { key: { styleId: 1 }, name: "products_style_idx" },
+      ]);
+      await db.collection("reviews").createIndexes([
+        { key: { styleId: 1 }, name: "reviews_style_idx" },
+        { key: { category: 1 }, name: "reviews_category_idx" },
+      ]);
+    },
+    async down(db) {
+      for (const c of CATALOG_COLLECTIONS) {
         if (await db.listCollections({ name: c }, { nameOnly: true }).hasNext()) await db.collection(c).drop();
       }
     },

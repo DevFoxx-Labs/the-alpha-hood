@@ -105,8 +105,9 @@
 ## Admin & ops (M7)
 - 🔴 Staff, sessions, audit log and TOTP secrets live in memory (dev only, refused in production like every mock store).
   With the database: TOTP secrets encrypted at rest (envelope key in the secret store), audit log in an append-only table.
-- 🟠 Products, prices, images, coupons and combos are read-only in `/admin` — edited in the commerce platform's admin
-  once Shopify / Medusa is chosen (PRD §4).
+- 🟠 Products can be created, edited, published and archived in `/admin/catalog` on the own backend
+  (`COMMERCE_PROVIDER=own`). Still read-only: coupons and combos. On Shopify / Medusa, products stay read-only too
+  (edited in that platform).
 - 🟠 COD UPI payouts are recorded by hand (UTR) — needs the gateway payout API and a two-person approval above a limit.
 - 🟠 No new-device / new-IP alert for staff sign-ins, and no WebAuthn (phishing-resistant MFA) yet.
 - 🟠 Admin rate limits are per process (in memory) — move to the shared store with the database.
@@ -178,20 +179,32 @@
 - 🟡 Not browser-checked at 1440/390/360; homepage M9 blocks render only with demo data (`pnpm dev`).
 
 ## Own backend (2026-11-26 — `docs/backend/README.md`)
-- 🔴 Phases 1–3 are on the database:
+- 🔴 Phases 1–4 are on the database:
   - identity: consent, customers, sessions, OTP;
   - money: locks, carts, inventory, orders, payments, invoice series, store credit, Hood Coins, Alpha Club, gift cards;
-  - after-sales: returns, return photos, privacy inbox, newsletter.
+  - after-sales: returns, return photos, privacy inbox, newsletter;
+  - catalogue (`COMMERCE_PROVIDER=own`): products, categories, collections, reviews.
 
-  Still memory-only:
-  - catalogue (phase 4);
-  - staff, MFA, audit log, alerts, UGC, outbox, rate limiter, flows (phase 5).
-
-  In production, everything that needs the catalogue still refuses (fail closed). Phases 4–6 pending.
+  Still memory-only: staff, MFA, audit log, alerts, UGC, outbox, rate limiter, flows (phase 5). In production the
+  admin (staff store) therefore still refuses, so products can't be managed on a live server until phase 5.
+- 🟠 Product photos: there is no image upload yet. Products show the placeholder drawing, and there is no
+  user-supplied image URL field on purpose (no fetching of URLs). Needed: a private upload to a bucket/CDN with
+  type sniffing and EXIF stripping (same rules as return photos), and responsive variants.
+- 🟠 Category tree, homepage rail and collection rules are seeded documents. There is no admin screen to edit them
+  yet (`catalog_documents`).
+- 🟡 Each server caches the catalogue snapshot for 10 s. With several servers, an edit can take up to 10 s to show on
+  the others. The whole active catalogue is held in memory per server; that's fine for thousands of products, so
+  revisit if it grows to tens of thousands.
+- 🟡 Popularity (default sort) is 0 for new products and isn't computed from sales yet.
+- 🟡 Listings break popularity ties by product id (SQL `ORDER BY id`). On PostgreSQL / MySQL a non-C collation could
+  order `_`/digits differently from JavaScript. Only tie order is affected; the contract test will show it when it
+  runs on those engines.
+- 🟡 The product editor (`/admin/catalog/new`, `/admin/catalog/[id]`) is not browser-checked at 1440 / 390 / 360 px
+  yet. Its API is covered by tests, and the store pages were fetched over HTTP on the own backend.
 - 🟡 The per-contact privacy-request cap (3 a day) is a count followed by an insert. Two requests sent at the same
   instant could both get through. The per-IP route limit still applies; add a lock if this is ever abused.
-- 🟠 The catalogue still comes from the mock adapter. Inventory `on_hand` is seeded from its stock numbers once per
-  SKU (`lib/db/stores/commerce.ts` `ensureSku`). After phase 4, the seed must come from the real product data.
+- 🟡 Inventory `on_hand` is seeded per SKU from the product's opening stock the first time the SKU is used
+  (`ensureSku`). On `COMMERCE_PROVIDER=mock` that opening stock is the demo data's.
 - 🟡 SQL `app_locks` / `markers` / expired `inventory_reservations` rows aren't cleaned yet (harmless, they grow).
   Add a cleanup to the cron sweep. Mongo has the same gap for expired reservations.
 - 🟠 MySQL and PostgreSQL stores are written but not yet run against a real server (contract tests skip without

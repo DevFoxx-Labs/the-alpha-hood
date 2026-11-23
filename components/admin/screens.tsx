@@ -649,35 +649,69 @@ export function InventoryScreen() {
   );
 }
 
+type CatalogRow = { id: string; handle: string; title: string; sku: string; category: string; price: number; mrp: number; status: "draft" | "active" | "archived"; stock: number; image: { art: string; colour: string } };
+const PRODUCT_TONE = { draft: "warning", active: "success", archived: "neutral" } as const;
+
 export function CatalogScreen() {
   const { params, set } = useUrlFilters("/admin/catalog");
   const q = params.get("q") ?? "";
-  const { data, error, busy } = useAdminData<{ rows: { id: string; handle: string; title: string; sku: string; category: string; price: number; mrp: number; stock: number; image: { art: string; colour: string } }[] }>(`/api/admin/catalog${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+  const status = params.get("status") ?? "all";
+  const qs = new URLSearchParams({ ...(q ? { q } : {}), ...(status !== "all" ? { status } : {}) }).toString();
+  const { data, error, busy, reload } = useAdminData<{ editable: boolean; rows: CatalogRow[] }>(`/api/admin/catalog${qs ? `?${qs}` : ""}`);
+  const { me } = useAdmin();
+  const canEdit = !!data?.editable && me.permissions.includes("catalog.write");
   return (
     <div className="space-y-5">
-      <PageHeader title="Products" description="Read-only. Products, prices and images are managed in the commerce platform's admin once it's chosen (Shopify or Medusa)." />
+      <PageHeader
+        title="Products"
+        description={
+          data && !data.editable
+            ? "Read-only: this store's catalogue is managed in its commerce platform."
+            : "Create, edit, publish and archive products. Stock changes go through Inventory."
+        }
+        action={
+          canEdit ? (
+            <AButton asChild>
+              <Link href="/admin/catalog/new">New product</Link>
+            </AButton>
+          ) : undefined
+        }
+      />
       <div className="flex flex-wrap gap-3">
         <SearchBox value={q} onChange={(v) => set({ q: v || null })} placeholder="Product or SKU" />
+        {data?.editable ? (
+          <ASelect
+            label="Status"
+            value={status}
+            onValueChange={(v) => set({ status: v === "all" ? null : v })}
+            options={[{ value: "all", label: "All statuses" }, { value: "active", label: "Active" }, { value: "draft", label: "Drafts" }, { value: "archived", label: "Archived" }]}
+          />
+        ) : null}
       </div>
       {error ? (
-        <ErrorState message={error} />
+        <ErrorState message={error} onRetry={reload} />
       ) : (
         <DataTable
           rows={data?.rows ?? null}
           busy={busy}
           rowKey={(r) => r.id}
-          empty={{ title: "No products found", description: "Try adjusting your search." }}
+          empty={{ title: "No products found", description: canEdit ? "Try adjusting your search, or create a product." : "Try adjusting your search." }}
           columns={[
             { key: "t", header: "Product", cell: (r) => (
               <span className="flex items-center gap-3">
                 <GarmentArt image={{ art: r.image.art as never, colour: r.image.colour, alt: "" }} className="h-12 w-9 rounded" />
-                <Link href={`/products/${r.handle}`} target="_blank" className="hover:underline">{r.title}</Link>
+                {data?.editable ? (
+                  <Link href={`/admin/catalog/${r.id}`} className="font-medium text-foreground hover:underline">{r.title}</Link>
+                ) : (
+                  <Link href={`/products/${r.handle}`} target="_blank" className="font-medium text-foreground hover:underline">{r.title}</Link>
+                )}
               </span>
             ) },
             { key: "s", header: "SKU", cell: (r) => r.sku },
             { key: "c", header: "Category", cell: (r) => r.category },
             { key: "p", header: "Price / MRP", cell: (r) => `${formatINR(r.price)} / ${formatINR(r.mrp)}` },
             { key: "k", header: "Stock", cell: (r) => r.stock },
+            { key: "st", header: "Status", cell: (r) => <StatusBadge status={r.status} tone={PRODUCT_TONE[r.status]} label={r.status} /> },
           ]}
         />
       )}

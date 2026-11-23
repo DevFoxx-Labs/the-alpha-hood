@@ -11,6 +11,12 @@ import type { NewsletterStore } from "@/lib/newsletter/service";
 import type { GrievanceInbox } from "@/lib/privacy/requests";
 import type { PhotoStore } from "@/lib/returns/photos";
 import type { ReturnStore } from "@/lib/returns/service";
+import type { CartRepo } from "@/lib/commerce/cart-engine";
+import { createOwnCatalog } from "@/lib/catalog/own";
+import type { CatalogStore } from "@/lib/catalog/store";
+import { type ReviewStore, reviewsFromStore } from "@/lib/reviews/store";
+import type { ReviewsAdapter } from "@/lib/reviews/types";
+import { createMongoCatalogStore, createMongoReviewStore, createSqlCatalogStore, createSqlReviewStore } from "./stores/catalog";
 import type { StoreCreditLedger } from "@/lib/wallet/store-credit";
 import {
   createMongoInbox,
@@ -42,6 +48,7 @@ import { createDbCreditLedger, createMongoGiftCardStore, createMongoLoyaltyStore
  * Phase 2: locks, orders + payments + invoice series, carts + inventory (catalogue still from the adapter),
  *          store credit, Hood Coins + Alpha Club, gift cards.
  * Phase 3: returns + return photos, DPDP grievance inbox, newsletter subscribers.
+ * Phase 4: products, category tree + collections, reviews (COMMERCE_PROVIDER=own).
  */
 export interface DbStores {
   config: DbConfig;
@@ -61,11 +68,44 @@ export interface DbStores {
   photos: PhotoStore;
   inbox: GrievanceInbox;
   newsletter: NewsletterStore;
+  catalog: CatalogStore;
+  reviewStore: ReviewStore;
+  reviews: ReviewsAdapter;
+  /** COMMERCE_PROVIDER=own: catalogue, bag and stock all on this database (built once, cached). */
+  own(): OwnCommerce;
+}
+
+export interface OwnCommerce {
+  commerce: CommerceAdapter;
+  /** Drops this server's catalogue snapshot after an admin edit. */
+  invalidate(): void;
 }
 
 type Env = Record<string, string | undefined>;
 const g = globalThis as unknown as { __alpha_hood_db_stores?: Map<string, DbStores> };
 const cache = () => (g.__alpha_hood_db_stores ??= new Map());
+
+function catalogParts(
+  catalog: CatalogStore,
+  reviewStore: ReviewStore,
+  bag: (catalog: CommerceAdapter) => { repo: CartRepo; inventory: CommerceAdapter["inventory"] },
+): Pick<DbStores, "catalog" | "reviewStore" | "reviews" | "own"> {
+  let own: OwnCommerce | null = null;
+  return {
+    catalog,
+    reviewStore,
+    reviews: reviewsFromStore(reviewStore),
+    own() {
+      if (own) return own;
+      const cat = createOwnCatalog(catalog, reviewStore);
+      // The reader is the catalogue; bag + stock wrap it (inventory seeds a new SKU from the product's stock).
+      const readOnly = { ...cat.reader, name: "own" } as CommerceAdapter;
+      const { repo, inventory } = bag(readOnly);
+      own = { commerce: { ...createDbCommerce(readOnly, repo, inventory), name: "own" }, invalidate: cat.invalidate };
+      return own;
+    },
+  };
+}
 
 export function createDbStores(cfg: DbConfig): DbStores {
   if (cfg.driver === "mongodb") {
@@ -88,6 +128,7 @@ export function createDbStores(cfg: DbConfig): DbStores {
       photos: createMongoPhotoStore(conn),
       inbox: createMongoInbox(conn),
       newsletter: createMongoNewsletterStore(conn),
+      ...catalogParts(createMongoCatalogStore(conn), createMongoReviewStore(conn), (catalog) => ({ repo: createMongoCartRepo(conn), inventory: createMongoInventory(conn, p, catalog) })),
     };
   }
   const db = getSqlDb(cfg);
@@ -109,6 +150,7 @@ export function createDbStores(cfg: DbConfig): DbStores {
     photos: createSqlPhotoStore(db),
     inbox: createSqlInbox(db),
     newsletter: createSqlNewsletterStore(db),
+    ...catalogParts(createSqlCatalogStore(db), createSqlReviewStore(db), (catalog) => ({ repo: createSqlCartRepo(db), inventory: createSqlInventory(db, p, catalog) })),
   };
 }
 

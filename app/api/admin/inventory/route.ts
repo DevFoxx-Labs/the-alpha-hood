@@ -2,7 +2,6 @@ import { audit, requireStaff } from "@/lib/admin/auth";
 import { resolveAlerts, sweepAlerts } from "@/lib/alerts/service";
 import { adminError, adminWrite, privateJson } from "@/lib/admin/http";
 import { commerce } from "@/lib/commerce";
-import { MOCK_PRODUCTS } from "@/lib/commerce/mock/data";
 import { jsonError } from "@/lib/http/guard";
 import { asObject, cleanText, rejectUnknownFields } from "@/lib/validation";
 
@@ -15,9 +14,14 @@ export async function GET(request: Request) {
   const low = p.get("low") === "1";
   try {
     const snap = await commerce.inventory.snapshot();
-    const titles = new Map(MOCK_PRODUCTS.map((x) => [x.id, { title: x.title, sku: x.sku }]));
+    const titles = new Map<string, { title: string; sku: string }>();
+    for (let offset = 0; offset < 10_000; offset += 60) {
+      const { products, total } = await commerce.listProducts({ limit: 60, offset });
+      for (const x of products) titles.set(x.id, { title: x.title, sku: x.sku });
+      if (products.length === 0 || titles.size >= total) break;
+    }
     const rows = snap
-      .map((s) => ({ ...s, ...titles.get(s.productId)! }))
+      .map((s) => ({ ...s, ...(titles.get(s.productId) ?? { title: s.productId, sku: "" }) }))
       .filter((r) => (!q || r.title.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q)) && (!low || r.available <= 3));
     return privateJson({ rows: rows.slice(0, 500), total: rows.length });
   } catch (error) {

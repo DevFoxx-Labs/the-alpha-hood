@@ -12,6 +12,8 @@ import { GET as auditGET } from "./admin/audit/route";
 import { POST as creditPOST, GET as customerGET } from "./admin/customers/[id]/route";
 import { GET as dashGET } from "./admin/dashboard/route";
 import { POST as inventoryPOST } from "./admin/inventory/route";
+import { PATCH as productPATCH } from "./admin/catalog/[id]/route";
+import { GET as catalogGET, POST as catalogPOST } from "./admin/catalog/route";
 import { POST as acceptPOST } from "./admin/invite/accept/route";
 import { POST as loginPOST } from "./admin/login/route";
 import { POST as actionPOST } from "./admin/orders/[number]/action/route";
@@ -203,6 +205,22 @@ describe("RBAC on the server", () => {
   it("owner can't change themselves; the last owner can't be demoted", async () => {
     const me = (await (await staffGET(req("/api/admin/staff", "GET", undefined, { cookie: owner }))).json()).staff.find((s: { email: string }) => s.email === "owner@example.test");
     expect((await staffPATCH(req(`/api/admin/staff/${me.id}`, "PATCH", { role: "support" }, { cookie: owner }), p({ id: me.id }))).status).toBe(409);
+  });
+
+  it("product editing (ADM-01): catalog.write only; read-only unless the store runs on the own backend", async () => {
+    for (const role of ["owner", "store_manager", "catalog_editor"] as const) expect(can(role, "catalog.write")).toBe(true);
+    for (const role of ["support", "warehouse", "marketing", "finance"] as const) expect(can(role, "catalog.write")).toBe(false);
+    const body = { title: "Probe Tee — Black", sku: "AH-PRB-1" };
+    const wh = await invite(`wh-cat-${ip}@example.test`, "warehouse");
+    expect((await catalogPOST(req("/api/admin/catalog", "POST", body, { cookie: wh }))).status).toBe(403);
+    expect((await productPATCH(req("/api/admin/catalog/mock_011", "PATCH", body, { cookie: wh }), p({ id: "mock_011" }))).status).toBe(403);
+    // Mock / platform catalogue: the owner may read but nothing can be written here.
+    const list = await (await catalogGET(req("/api/admin/catalog", "GET", undefined, { cookie: owner }))).json();
+    expect(list.editable).toBe(false);
+    const res = await catalogPOST(req("/api/admin/catalog", "POST", body, { cookie: owner }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error.code).toBe("catalog_readonly");
+    expect((await catalogPOST(req("/api/admin/catalog", "POST", body, { cookie: owner, headers: { origin: "https://evil.example" } }))).status).toBe(403);
   });
 
   it("cross-site admin writes are refused (CSRF)", async () => {

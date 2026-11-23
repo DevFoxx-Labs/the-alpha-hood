@@ -1,5 +1,6 @@
 import { ATTRIBUTE_VALUES } from "@/lib/catalog/attributes";
-import { percentOff, rupees } from "@/lib/format";
+import type { CollectionRule } from "@/lib/catalog/collection-rules";
+import { rupees } from "@/lib/format";
 import { generateReviews } from "@/lib/reviews/mock-generate";
 import { summarise } from "@/lib/reviews/summary";
 import type { Review } from "@/lib/reviews/types";
@@ -258,28 +259,32 @@ export const MOCK_CATEGORIES: Category[] = [
   { handle: "cargo-pants", title: "Cargos", image: img("cargo", "#59603f", "Cargo pants") },
 ];
 
-const BOTTOMS = new Set(["jeans", "trousers", "cargo-pants", "joggers"]);
-const has3xl = (p: Product) => p.sizes.some((s) => s.label === "3XL" && s.stock > 0);
-const isNew = (p: Product) => p.badge === "NEW" || NOW - Date.parse(p.createdAt) < 21 * 86_400_000;
+const BOTTOMS = ["jeans", "trousers", "cargo-pants", "joggers"];
 
-/** Rule-based collections (PLP-07 auto-collections). Linked from the header, menu and homepage. */
-export const MOCK_COLLECTIONS: (Collection & { rule: (p: Product) => boolean })[] = [
-  { handle: "new-in", title: "New in", description: "Fresh drops from the last three weeks.", rule: isNew },
-  { handle: "bestsellers", title: "Bestsellers", description: "What everyone is wearing right now.", rule: (p) => p.badge === "BESTSELLER" || p.popularity >= 300 },
-  { handle: "sale", title: "Sale", description: "30% off or more.", rule: (p) => percentOff(p.price, p.mrp) >= 30 },
-  { handle: "price-drop", title: "Price drop", description: "Styles with a recent price drop.", rule: (p) => percentOff(p.price, p.mrp) >= 30 },
-  { handle: "winter-drop", title: "Winter drop", description: "Puffers, knits and heavyweight hoodies.", rule: (p) => p.attributes.occasion === "winter" },
-  { handle: "winter-edit", title: "Winter edit", description: "Layers for the cold.", rule: (p) => p.attributes.occasion === "winter" },
-  { handle: "puffer-season", title: "Puffer season", description: "Warmth with an attitude.", rule: (p) => p.category === "jackets" },
-  { handle: "knit-club", title: "Knit club", description: "Texture that talks.", rule: (p) => p.attributes.fabric === "knit" || p.attributes.fabric === "wool-blend" },
-  { handle: "smart-casuals", title: "Smart casuals", description: "Monday to Friday, sorted.", rule: (p) => p.attributes.occasion === "smart-casual" || p.attributes.occasion === "office" },
-  { handle: "office-ready", title: "Office ready", description: "Sharp without trying too hard.", rule: (p) => p.attributes.occasion === "office" },
-  { handle: "streetwear", title: "Streetwear", description: "Oversized, relaxed and loud.", rule: (p) => p.attributes.fit === "oversized" || p.attributes.fit === "relaxed" },
-  { handle: "weekend-uniform", title: "Weekend uniform", description: "Relaxed cargos, boxy overshirts and heavyweight tees.", rule: (p) => p.attributes.occasion === "casual" && p.category !== "sunglasses" && p.category !== "accessories" },
-  { handle: "under-999", title: "Under ₹999", description: "Everything at ₹999 or less.", rule: (p) => p.price <= rupees(999) },
-  { handle: "plus-size", title: "Plus size", description: "Styles available in 3XL.", rule: has3xl },
-  { handle: "combos", title: "Combos", description: "Mix-and-match eligible styles.", rule: (p) => BOTTOMS.has(p.category) || p.category === "hoodies" || p.category === "t-shirts" },
-  { handle: "combo-bottoms", title: "Combo: bottoms", description: "Mix-and-match eligible bottoms.", rule: (p) => BOTTOMS.has(p.category) },
-  { handle: "combo-hoodies", title: "Combo: hoodies", description: "Mix-and-match eligible hoodies.", rule: (p) => p.category === "hoodies" },
-  { handle: "combo-tees", title: "Combo: tees", description: "Mix-and-match eligible tees.", rule: (p) => p.category === "t-shirts" && p.subcategory !== "polos" },
+/** The reference "now" of the demo catalogue (its `createdAt` dates are relative to it). */
+export const MOCK_NOW = NOW;
+
+/**
+ * Rule-based collections (PLP-07 auto-collections), as data (lib/catalog/collection-rules.ts) so the same
+ * definitions can be seeded into the own backend. Linked from the header, menu and homepage.
+ */
+export const MOCK_COLLECTIONS: (Collection & { rule: CollectionRule })[] = [
+  { handle: "new-in", title: "New in", description: "Fresh drops from the last three weeks.", rule: { any: [{ badge: "NEW" }, { newWithinDays: 21 }] } },
+  { handle: "bestsellers", title: "Bestsellers", description: "What everyone is wearing right now.", rule: { any: [{ badge: "BESTSELLER" }, { minPopularity: 300 }] } },
+  { handle: "sale", title: "Sale", description: "30% off or more.", rule: { minPercentOff: 30 } },
+  { handle: "price-drop", title: "Price drop", description: "Styles with a recent price drop.", rule: { minPercentOff: 30 } },
+  { handle: "winter-drop", title: "Winter drop", description: "Puffers, knits and heavyweight hoodies.", rule: { attribute: "occasion", values: ["winter"] } },
+  { handle: "winter-edit", title: "Winter edit", description: "Layers for the cold.", rule: { attribute: "occasion", values: ["winter"] } },
+  { handle: "puffer-season", title: "Puffer season", description: "Warmth with an attitude.", rule: { category: ["jackets"] } },
+  { handle: "knit-club", title: "Knit club", description: "Texture that talks.", rule: { attribute: "fabric", values: ["knit", "wool-blend"] } },
+  { handle: "smart-casuals", title: "Smart casuals", description: "Monday to Friday, sorted.", rule: { attribute: "occasion", values: ["smart-casual", "office"] } },
+  { handle: "office-ready", title: "Office ready", description: "Sharp without trying too hard.", rule: { attribute: "occasion", values: ["office"] } },
+  { handle: "streetwear", title: "Streetwear", description: "Oversized, relaxed and loud.", rule: { attribute: "fit", values: ["oversized", "relaxed"] } },
+  { handle: "weekend-uniform", title: "Weekend uniform", description: "Relaxed cargos, boxy overshirts and heavyweight tees.", rule: { all: [{ attribute: "occasion", values: ["casual"] }, { not: { category: ["sunglasses", "accessories"] } }] } },
+  { handle: "under-999", title: "Under ₹999", description: "Everything at ₹999 or less.", rule: { maxPrice: rupees(999) } },
+  { handle: "plus-size", title: "Plus size", description: "Styles available in 3XL.", rule: { sizeInStock: "3XL" } },
+  { handle: "combos", title: "Combos", description: "Mix-and-match eligible styles.", rule: { category: [...BOTTOMS, "hoodies", "t-shirts"] } },
+  { handle: "combo-bottoms", title: "Combo: bottoms", description: "Mix-and-match eligible bottoms.", rule: { category: BOTTOMS } },
+  { handle: "combo-hoodies", title: "Combo: hoodies", description: "Mix-and-match eligible hoodies.", rule: { category: ["hoodies"] } },
+  { handle: "combo-tees", title: "Combo: tees", description: "Mix-and-match eligible tees.", rule: { all: [{ category: ["t-shirts"] }, { not: { subcategory: ["polos"] } }] } },
 ];

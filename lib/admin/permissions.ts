@@ -19,6 +19,7 @@ export const PERMISSIONS = [
   "inventory.read",
   "inventory.write",
   "catalog.read",
+  "catalog.write", // create / edit / archive products (own backend only)
   "promotions.read",
   "reports.read",
   "privacy.read",
@@ -36,10 +37,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   owner: ALL,
   store_manager: [
     "dashboard", "orders.read", "orders.write", "orders.ship", "returns.read", "returns.qc", "refunds.issue",
-    "customers.read", "customers.write", "inventory.read", "inventory.write", "catalog.read", "promotions.read",
+    "customers.read", "customers.write", "inventory.read", "inventory.write", "catalog.read", "catalog.write", "promotions.read",
     "reports.read", "privacy.read", "ugc.moderate",
   ],
-  catalog_editor: ["dashboard", "catalog.read", "inventory.read", "promotions.read"],
+  catalog_editor: ["dashboard", "catalog.read", "catalog.write", "inventory.read", "promotions.read"],
   support: ["dashboard", "orders.read", "orders.write", "returns.read", "refunds.issue", "customers.read", "privacy.read", "privacy.write"],
   warehouse: ["dashboard", "orders.read", "orders.ship", "returns.read", "returns.qc", "inventory.read", "inventory.write"],
   marketing: ["dashboard", "catalog.read", "promotions.read", "reports.read", "ugc.moderate"],

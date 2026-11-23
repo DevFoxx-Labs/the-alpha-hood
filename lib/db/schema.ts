@@ -192,7 +192,43 @@ export interface NewsletterSubscribersTable {
   created_at: Date;
 }
 
+export interface ProductsTable {
+  id: string;
+  handle: string;
+  sku: string;
+  style_id: string;
+  category: string;
+  status: string;
+  created_at: Date;
+  updated_at: Date;
+  version: number;
+  doc: unknown;
+}
+export interface CatalogDocumentsTable {
+  name: string;
+  doc: unknown;
+  updated_at: Date;
+}
+export interface ReviewsTable {
+  id: string;
+  style_id: string;
+  category: string;
+  rating: number;
+  helpful: number;
+  created_at: Date;
+  doc: unknown;
+}
+export interface ReviewVotesTable {
+  review_id: string;
+  voter_id: string;
+  created_at: Date;
+}
+
 export interface Database {
+  products: ProductsTable;
+  catalog_documents: CatalogDocumentsTable;
+  reviews: ReviewsTable;
+  review_votes: ReviewVotesTable;
   returns: ReturnsTable;
   return_photos: ReturnPhotosTable;
   privacy_requests: PrivacyRequestsTable;

@@ -1,3 +1,4 @@
+import { CatalogAdminError } from "@/lib/catalog/admin";
 import { commerceErrorResponse, privateJson } from "@/lib/http/commerce-http";
 import { guardPublicWrite, jsonError } from "@/lib/http/guard";
 import { AdminAuthError, requireStaff } from "./auth";
@@ -20,7 +21,7 @@ export async function adminWrite(
 }
 
 export function adminError(error: unknown): Response {
-  if (error instanceof AdminAuthError || error instanceof OpsError) return jsonError(error.status, error.code, error.message);
+  if (error instanceof AdminAuthError || error instanceof OpsError || error instanceof CatalogAdminError) return jsonError(error.status, error.code, error.message);
   return commerceErrorResponse(error);
 }
 

@@ -1,27 +1,21 @@
-import { CART_ID_RE as ID_RE, createCartOps, createMemoryCartRepo } from "../cart-engine";
-import { CommerceError, type CommerceAdapter, type ListOptions, type Product } from "../types";
-import { runQuery } from "@/lib/catalog/engine";
-import { MOCK_CATEGORIES, MOCK_CATEGORY_TREE, MOCK_COLLECTIONS, MOCK_PRODUCTS } from "./data";
-import { searchIndex } from "./search";
+import { type CatalogSnapshot, createCatalogReader } from "@/lib/catalog/reader";
+import { createCartOps, createMemoryCartRepo } from "../cart-engine";
+import { CommerceError, type CommerceAdapter } from "../types";
+import { MOCK_CATEGORIES, MOCK_CATEGORY_TREE, MOCK_COLLECTIONS, MOCK_NOW, MOCK_PRODUCTS } from "./data";
+
+/** The demo catalogue as a snapshot (also what `pnpm db:seed` writes into the own backend). */
+export const DEMO_SNAPSHOT: CatalogSnapshot = {
+  products: MOCK_PRODUCTS,
+  tree: MOCK_CATEGORY_TREE,
+  featured: MOCK_CATEGORIES,
+  collections: MOCK_COLLECTIONS,
+  now: MOCK_NOW,
+};
 
 /**
  * In-memory mock commerce adapter for local development and tests.
  * Cart state lives in this process only — never use it in production (see lib/commerce/index.ts).
  */
-
-const HANDLE_RE = /^[a-z0-9-]{1,120}$/;
-
-function page<T>(items: T[], { limit = 24, offset = 0 }: ListOptions = {}) {
-  const safeLimit = Math.min(Math.max(1, Math.trunc(limit)), 60);
-  const safeOffset = Math.max(0, Math.trunc(offset));
-  return items.slice(safeOffset, safeOffset + safeLimit);
-}
-
-/** Out-of-stock products go to the end of listings by default (CARD-02). */
-function inStockFirst(products: Product[]) {
-  const soldOut = (p: Product) => p.sizes.every((s) => s.stock === 0);
-  return [...products].sort((a, b) => Number(soldOut(a)) - Number(soldOut(b)));
-}
 
 interface Reservation {
   items: { key: string; quantity: number }[];
@@ -54,88 +48,8 @@ export function createMockAdapter(): CommerceAdapter {
   const adapter: CommerceAdapter = {
     name: "mock",
 
-    async getProduct(handle) {
-      if (!HANDLE_RE.test(handle)) return null;
-      return MOCK_PRODUCTS.find((p) => p.handle === handle) ?? null;
-    },
-
-    async getProductById(id) {
-      if (typeof id !== "string" || !ID_RE.test(id)) return null;
-      return MOCK_PRODUCTS.find((p) => p.id === id) ?? null;
-    },
-
-    async listProducts(options = {}) {
-      const filtered = options.category ? MOCK_PRODUCTS.filter((p) => p.category === options.category) : MOCK_PRODUCTS;
-      const ordered =
-        options.sort === "newest"
-          ? [...filtered].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-          : [...filtered].sort((a, b) => b.popularity - a.popularity);
-      const all = inStockFirst(ordered);
-      return { products: page(all, options), total: all.length };
-    },
-
-    async getCollection(handle) {
-      if (!HANDLE_RE.test(handle)) return null;
-      const found = MOCK_COLLECTIONS.find((c) => c.handle === handle);
-      return found ? { handle: found.handle, title: found.title, description: found.description } : null;
-    },
-
-    async listCollections() {
-      return MOCK_COLLECTIONS.map(({ handle, title, description }) => ({ handle, title, description }));
-    },
-
-    async listCategories() {
-      return MOCK_CATEGORIES;
-    },
-
-    async listCategoryTree() {
-      return MOCK_CATEGORY_TREE;
-    },
-
-    async getCategory(handle) {
-      if (!HANDLE_RE.test(handle)) return null;
-      return MOCK_CATEGORY_TREE.find((c) => c.handle === handle) ?? null;
-    },
-
-    async searchCatalog(scope, query) {
-      let scoped: Product[];
-      let relevance: Map<string, number> | undefined;
-      switch (scope.kind) {
-        case "all":
-          scoped = MOCK_PRODUCTS;
-          break;
-        case "category":
-          if (!HANDLE_RE.test(scope.category) || (scope.subcategory && !HANDLE_RE.test(scope.subcategory))) {
-            throw new CommerceError("invalid_input", "Invalid category");
-          }
-          scoped = MOCK_PRODUCTS.filter(
-            (p) => p.category === scope.category && (!scope.subcategory || p.subcategory === scope.subcategory),
-          );
-          break;
-        case "collection": {
-          const c = MOCK_COLLECTIONS.find((x) => x.handle === scope.collection);
-          if (!c) throw new CommerceError("not_found", "Collection not found");
-          scoped = MOCK_PRODUCTS.filter(c.rule);
-          break;
-        }
-        case "search": {
-          relevance = searchIndex().search(scope.q);
-          scoped = MOCK_PRODUCTS.filter((p) => relevance!.has(p.id));
-          break;
-        }
-      }
-      return runQuery(scoped, query, relevance);
-    },
-
-    async suggest(q, limit = 6) {
-      const term = q.slice(0, 80);
-      const scores = searchIndex().search(term);
-      const products = MOCK_PRODUCTS.filter((p) => scores.has(p.id))
-        .sort((a, b) => scores.get(b.id)! - scores.get(a.id)! || b.popularity - a.popularity)
-        .slice(0, Math.min(Math.max(1, limit), 10))
-        .map((p) => ({ handle: p.handle, title: p.title, price: p.price, mrp: p.mrp, image: p.images[0] }));
-      return { products, categories: searchIndex().categories(term) };
-    },
+    // Shared catalogue read rules (lib/catalog/reader.ts) on the static demo snapshot.
+    ...createCatalogReader(() => DEMO_SNAPSHOT),
 
     // Shared bag rules (lib/commerce/cart-engine.ts) on an in-process repository.
     cart: createCartOps({
