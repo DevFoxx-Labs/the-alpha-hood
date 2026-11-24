@@ -131,6 +131,22 @@ describe("guard: every admin route checks staff + permission", () => {
     }
   });
 
+  it("one persistent admin shell: it lives in the (panel) layout, never inside a page (no remount per click)", () => {
+    const panel = join(process.cwd(), "app", "admin", "(panel)");
+    expect(readFileSync(join(panel, "layout.tsx"), "utf8")).toContain("<AdminShell>");
+    const pages: string[] = [];
+    const walk = (d: string) => {
+      for (const n of readdirSync(d)) {
+        const f = join(d, n);
+        if (statSync(f).isDirectory()) walk(f);
+        else if (n === "page.tsx") pages.push(f);
+      }
+    };
+    walk(panel);
+    expect(pages.length).toBeGreaterThan(15);
+    for (const f of pages) expect(readFileSync(f, "utf8"), f).not.toContain("<AdminShell");
+  });
+
   it("permission map: only owners manage staff or read the audit log", () => {
     for (const [role, perms] of Object.entries(ROLE_PERMISSIONS)) {
       if (role !== "owner") {

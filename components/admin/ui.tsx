@@ -46,12 +46,19 @@ export function AButton({
   disabled,
   ...props
 }: React.ComponentProps<"button"> & VariantProps<typeof buttonVariants> & { asChild?: boolean; loading?: boolean }) {
-  const Comp = asChild ? Slot.Root : "button";
+  // asChild: Slot needs exactly ONE child element (the link) — no spinner sibling, not even a `null` slot.
+  if (asChild) {
+    return (
+      <Slot.Root className={cn(buttonVariants({ variant, size }), className)} aria-busy={loading || undefined} {...props}>
+        {children}
+      </Slot.Root>
+    );
+  }
   return (
-    <Comp className={cn(buttonVariants({ variant, size }), className)} disabled={asChild ? undefined : disabled || loading} aria-busy={loading || undefined} {...props}>
-      {loading && !asChild ? <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> : null}
+    <button className={cn(buttonVariants({ variant, size }), className)} disabled={disabled || loading} aria-busy={loading || undefined} {...props}>
+      {loading ? <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> : null}
       {children}
-    </Comp>
+    </button>
   );
 }
 

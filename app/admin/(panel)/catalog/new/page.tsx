@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
-import { AdminShell } from "@/components/admin/admin-shell";
 import { ProductEditorScreen } from "@/components/admin/product-editor";
 
 export const metadata: Metadata = { title: "New product" };
@@ -9,10 +7,6 @@ export const instant = false;
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-background" />}>
-      <AdminShell title="New product">
-        <ProductEditorScreen />
-      </AdminShell>
-    </Suspense>
+    <ProductEditorScreen />
   );
 }

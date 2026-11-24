@@ -4,7 +4,7 @@ import { Logout03Icon, Moon02Icon, Notification03Icon, SidebarLeftIcon, Sun03Ico
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { DropdownMenu, Tooltip as TooltipPrimitive } from "radix-ui";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, Suspense, useCallback, useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { type Permission, type Role, ROLE_META } from "@/lib/admin/permissions";
 import { cn } from "@/lib/utils";
@@ -56,8 +56,37 @@ function isActive(pathname: string, route: string) {
  * topbar (toggle · title + role · date · theme · bell · user menu), main, footer, and a fixed bottom bar on
  * mobile built from the same NAV_CONFIG. Authorization is enforced by every API, not by this menu.
  */
-export function AdminShell({ title, children }: { title: string; children: React.ReactNode }) {
+/** Page titles by route (the shell lives in the layout, so it names the page from the URL). */
+const PAGE_TITLES: [RegExp, string][] = [
+  [/^\/admin\/orders\/[^/]+\/label$/, "Shipping label"],
+  [/^\/admin\/orders\/[^/]+$/, "Order"],
+  [/^\/admin\/customers\/[^/]+$/, "Customer"],
+  [/^\/admin\/catalog\/new$/, "New product"],
+  [/^\/admin\/catalog\/[^/]+$/, "Edit product"],
+  [/^\/admin\/promotions$/, "Promotions"],
+  [/^\/admin\/customers$/, "Customers"],
+  [/^\/admin\/giftcards$/, "Gift cards"],
+  [/^\/admin\/inventory$/, "Inventory"],
+  [/^\/admin\/manifest$/, "Manifest"],
+  [/^\/admin\/catalog$/, "Products"],
+  [/^\/admin\/payouts$/, "Payouts"],
+  [/^\/admin\/privacy$/, "Privacy requests"],
+  [/^\/admin\/reports$/, "Reports"],
+  [/^\/admin\/returns$/, "Returns"],
+  [/^\/admin\/orders$/, "Orders"],
+  [/^\/admin\/audit$/, "Audit log"],
+  [/^\/admin\/staff$/, "Staff"],
+  [/^\/admin\/ugc$/, "#WearTheHood"],
+  [/^\/admin$/, "Dashboard"],
+];
+
+export function adminTitle(pathname: string): string {
+  return PAGE_TITLES.find(([re]) => re.test(pathname))?.[1] ?? "Admin";
+}
+
+export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const title = adminTitle(pathname);
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -218,7 +247,10 @@ export function AdminShell({ title, children }: { title: string; children: React
               </div>
             </header>
 
-            <main className="w-full max-w-full flex-1 overflow-x-clip bg-background px-3 py-2 pb-6 sm:p-6">{children}</main>
+            <main className="w-full max-w-full flex-1 overflow-x-clip bg-background px-3 py-2 pb-6 sm:p-6">
+              {/* Only the page area waits while a screen loads; the sidebar and topbar stay put. */}
+              <Suspense fallback={<div className="h-64 animate-pulse rounded-xl border border-border bg-card" aria-busy="true" />}>{children}</Suspense>
+            </main>
 
             <footer className="mb-14 flex shrink-0 items-center justify-between border-t border-border bg-card px-4 py-2 text-xs text-muted-foreground md:mb-0 md:px-6">
               <span>© {new Date().getFullYear()} The Alpha Hood — Admin</span>

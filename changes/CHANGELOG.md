@@ -1,5 +1,39 @@
 # Change log
 
+## 2026-11-27 — Fix: every admin sidebar click looked like a full page reload
+
+- **Cause:** each admin page rendered its own `<AdminShell>`, and `app/admin/(panel)` had no shared layout. Every
+  navigation therefore unmounted and rebuilt the whole shell (sidebar, topbar), re-fetched `/api/admin/me` and showed
+  the full-screen spinner until it answered. The links were already `next/link`, so it was a client navigation, but
+  it looked like a reload.
+- **Fix:**
+  - `app/admin/(panel)/layout.tsx` renders one persistent `AdminShell` around all panel pages;
+  - the 20 panel pages now render only their screen;
+  - the page title comes from the URL (`adminTitle` in `components/admin/admin-shell.tsx`);
+  - only the page area shows a loading placeholder (`<Suspense>` inside `<main>`), while the sidebar and topbar stay.
+- **Also related:** the Reports crash fixed earlier today made Fast Refresh do a real full reload; that is gone too.
+- **Test:** a guard in `app/api/admin-api.test.ts` checks that the shell is in the layout and that no panel page
+  renders `<AdminShell>` again.
+- **Verified:**
+  - typecheck and lint clean;
+  - admin tests 19/19;
+  - on `next dev` (port 3100), `/admin`, orders, an order, products, new product, reports, inventory and staff all
+    return 200.
+  - Not clicked through in a browser (no browser tool available here).
+
+## 2026-11-27 — Fix: admin Reports page crashed ("Slot failed to slot onto its children")
+
+- **Cause:** `AButton` with `asChild` (a link styled as a button) passed Radix `Slot` two children: the loading
+  spinner's slot (`null`) and the link. `Slot` needs exactly one element, so `/admin/reports` crashed when it
+  rendered the "Export orders CSV" link.
+- **Affected:** the same pattern sits under "New product", "View in store" and the other link-buttons in the admin.
+- **Fix:** `components/admin/ui.tsx` renders `asChild` as a bare `Slot` around the single child; the spinner only
+  belongs to the real `<button>`.
+- **Test:** `components/admin/ui.test.ts` checks that a link-button renders as an `<a>` with the button styles, and
+  that a loading button is disabled and shows the spinner.
+- **Verified:** the regression test passes (2/2); typecheck and lint are clean; `/admin/reports` on `next dev`
+  returns 200 with no Slot error in the log.
+
 ## 2026-11-27 — SMS pipeline: DLT templates, outbox delivery worker, provider registry (High-risk tier: auth OTP, personal data)
 
 **Not done:** the real provider adapter. I couldn't confirm MSG91's current v5 API from a first-party source (the

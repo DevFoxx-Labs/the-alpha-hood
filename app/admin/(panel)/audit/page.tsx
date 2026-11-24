@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
-import { AdminShell } from "@/components/admin/admin-shell";
 import { AuditScreen } from "@/components/admin/screens";
 
 export const metadata: Metadata = { title: "Audit log" };
@@ -9,10 +7,6 @@ export const instant = false;
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-background" />}>
-      <AdminShell title="Audit log">
-        <AuditScreen />
-      </AdminShell>
-    </Suspense>
+    <AuditScreen />
   );
 }
