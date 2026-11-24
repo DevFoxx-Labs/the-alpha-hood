@@ -554,5 +554,39 @@ export function sqlMigrations(d: Driver): Record<string, Migration> {
         }
       },
     },
+
+    "2026_11_27_006_switch_over": {
+      async up(db: AnyDb) {
+        const blob = d === "postgres" ? sql`bytea` : sql`mediumblob`; // ≤ 16 MB; photos are capped at 8 MB
+        // Product photos: immutable, public (served from /api/media/<id>), metadata stripped before insert.
+        await db.schema
+          .createTable("product_media")
+          .ifNotExists()
+          .addColumn("id", "varchar(40)", (col) => col.primaryKey())
+          .addColumn("type", "varchar(16)", (col) => col.notNull())
+          .addColumn("width", "integer", (col) => col.notNull())
+          .addColumn("height", "integer", (col) => col.notNull())
+          .addColumn("bytes", blob, (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addColumn("created_by", "varchar(64)", (col) => col.notNull())
+          .modifyEnd(mysqlTable(d))
+          .execute();
+        // Retention clean-up scans (cron sweep) by expiry column.
+        await createIndex(db, d, "otp_challenges_expires_idx", "otp_challenges", ["expires_at"]);
+        await createIndex(db, d, "otp_sends_sent_idx", "otp_sends", ["sent_at"]);
+        await createIndex(db, d, "app_locks_expires_idx", "app_locks", ["expires_at"]);
+        await createIndex(db, d, "inventory_res_expires_idx", "inventory_reservations", ["expires_at"]);
+        await createIndex(db, d, "carts_updated_idx", "carts", ["updated_at"]);
+        await createIndex(db, d, "return_photos_orphan_idx", "return_photos", ["attached_to", "created_at"]);
+        await createIndex(db, d, "staff_tickets_expires_idx", "staff_tickets", ["expires_at"]);
+        await createIndex(db, d, "staff_invites_expires_idx", "staff_invites", ["expires_at"]);
+      },
+      async down(db: AnyDb) {
+        await db.schema.dropTable("product_media").ifExists().execute();
+        for (const [t, i] of [["otp_challenges", "otp_challenges_expires_idx"], ["otp_sends", "otp_sends_sent_idx"], ["app_locks", "app_locks_expires_idx"], ["inventory_reservations", "inventory_res_expires_idx"], ["carts", "carts_updated_idx"], ["return_photos", "return_photos_orphan_idx"], ["staff_tickets", "staff_tickets_expires_idx"], ["staff_invites", "staff_invites_expires_idx"]]) {
+          await (d === "postgres" ? db.schema.dropIndex(i).ifExists() : db.schema.dropIndex(i).on(t)).execute().catch(() => {});
+        }
+      },
+    },
   };
 }

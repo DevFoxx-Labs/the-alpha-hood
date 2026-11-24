@@ -193,11 +193,15 @@
 
   Still memory-only: the analytics event queue and RUM samples (see SEO & analytics). The phase 6 switch-over
   checklist (production database, secrets, backups, real catalogue) is the remaining step before going live.
-- 🟠 Product photos: there is no image upload yet. Products show the placeholder drawing, and there is no
-  user-supplied image URL field on purpose (no fetching of URLs). Needed: a private upload to a bucket/CDN with
-  type sniffing and EXIF stripping (same rules as return photos), and responsive variants.
-- 🟠 Category tree, homepage rail and collection rules are seeded documents. There is no admin screen to edit them
-  yet (`catalog_documents`).
+- 🟡 Product photos are stored in the database (`product_media`) and resized by the Next.js image pipeline. At scale,
+  move the bytes to object storage + CDN (same id / URL), which also lightens database backups.
+- 🟡 Photos keep their pixel orientation, but the EXIF orientation flag is stripped. A phone photo shot sideways
+  shows sideways. Export photos upright, or add a server-side re-encode (needs an image library; owner OK for a
+  new package).
+- 🟡 Uploaded product photos that no product uses are never deleted. They are public but unlinked; add a purge
+  once storage grows.
+- 🟠 Category tree, homepage rail and collection rules have no admin screen yet. Change them with
+  `pnpm catalog:import` (validated `categories` block — see docs/backend/go-live.md).
 - 🟡 Each server caches the catalogue snapshot for 10 s. With several servers, an edit can take up to 10 s to show on
   the others. The whole active catalogue is held in memory per server; that's fine for thousands of products, so
   revisit if it grows to tens of thousands.
@@ -211,13 +215,10 @@
   instant could both get through. The per-IP route limit still applies; add a lock if this is ever abused.
 - 🟡 Inventory `on_hand` is seeded per SKU from the product's opening stock the first time the SKU is used
   (`ensureSku`). On `COMMERCE_PROVIDER=mock` that opening stock is the demo data's.
-- 🟡 SQL `app_locks` / `markers` / expired `inventory_reservations` rows aren't cleaned yet (harmless, they grow).
-  Add a cleanup to the cron sweep. Mongo has the same gap for expired reservations.
 - 🟠 MySQL and PostgreSQL stores are written but not yet run against a real server (contract tests skip without
   `TEST_MYSQL_URL` / `TEST_POSTGRES_URL`). Run them before relying on either engine.
 - 🟠 The local MongoDB replica set (port 27018) is a manual process (`pnpm db:mongo:dev`); it isn't a Windows service.
-- 🟡 Expired sessions / OTP rows: MongoDB TTL indexes clean them; SQL needs a scheduled cleanup (add to the cron sweep).
 - 🟡 No CI database matrix yet (MySQL + Postgres + Mongo service containers running the contract suite).
-- 🟡 Nothing deletes expired SQL rows yet: `staff_sessions`, `staff_tickets`, `rate_limits`, used `staff_invites`, sent
-  `notify_outbox` rows. MongoDB TTL indexes clean sessions, tickets and rate limits. Add a cleanup to the cron sweep.
+- 🟡 The retention clean-up runs only when `/api/cron/sweep` is called. Schedule it every 15 min (owner TODO). Queued
+  `notify_outbox` rows are kept until a delivery worker exists.
 - 🟡 There is no delivery worker reading `notify_outbox` yet (no SMS / email / WhatsApp provider).

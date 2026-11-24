@@ -149,3 +149,14 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
       master) before filing.
 - [ ] Provide applicant details (legal entity, address, entity type for the fee tier) and date of first use / evidence.
 - [ ] Decide B&W vs colour claim for the device marks, then file (word mark first). Use ™ only — never ® until registered.
+
+## 2026-11-27 (own backend, phase 6 — switch-over, see docs/backend/go-live.md)
+- [ ] Pick the production database host (Indian region, managed backups with point-in-time recovery) and create the
+      deploy + app users (app user: INSERT/SELECT only on `audit_log` and `consent_records`).
+- [ ] Put the secrets from go-live.md §3 in the host's secret store; keep `SECRET_BOX_KEY` in the password manager.
+- [ ] Schedule `GET /api/cron/sweep` every 15 minutes with `Authorization: Bearer $CRON_SECRET`.
+- [ ] Prepare the real catalogue file (template: docs/backend/catalog-import.example.json) and product photos.
+- [ ] Do the first restore test from a backup and note RTO / RPO.
+- [ ] Have a lawyer review the retention schedule (go-live.md §7) and set periods for the consent ledger, audit log
+      and privacy requests.
+

@@ -74,8 +74,10 @@ describe("public write guards (CSRF, size, content type)", () => {
         // Admin writes: adminWrite = guardPublicWrite + requireStaff + permission (lib/admin/http.ts).
         expect(src, r).not.toContain("guardPublicWrite(request, { name: \"admin-\"");
       } else if (src.includes("guardPublicUpload(")) {
-        // Binary uploads: same-origin + rate limit + size cap, binary instead of JSON.
-        expect(src, r).toContain("requireAccount(");
+        // Binary uploads: same-origin + rate limit + size cap, binary instead of JSON — and always an
+        // authenticated uploader: a signed-in customer, or staff with a permission (admin routes).
+        const staffUpload = r.includes(join("api", "admin")) && /await requireStaff\(request, "[a-z.]+"\)/.test(src);
+        expect(src.includes("requireAccount(") || staffUpload, r).toBe(true);
       } else {
         expect(src, r).toContain("guardPublicWrite(");
       }

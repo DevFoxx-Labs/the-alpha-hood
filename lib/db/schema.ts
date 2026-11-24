@@ -312,7 +312,18 @@ export interface FlowCheckoutsTable {
   sent_h24: boolean | number;
 }
 
+export interface ProductMediaTable {
+  id: string;
+  type: string;
+  width: number;
+  height: number;
+  bytes: Uint8Array;
+  created_at: Date;
+  created_by: string;
+}
+
 export interface Database {
+  product_media: ProductMediaTable;
   staff: StaffTable;
   staff_invites: StaffInvitesTable;
   staff_tickets: StaffTicketsTable;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Add01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, ArrowLeft01Icon, ArrowRight01Icon, Delete02Icon, ImageUpload01Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -41,7 +41,7 @@ interface Record {
   colourFamily: string;
   styleId: string;
   sizes: { label: string; stock: number }[];
-  images: { art: GarmentKind }[];
+  images: { art: GarmentKind; url?: string; alt: string }[];
   attributes: { [k: string]: string | undefined };
   tags: string[];
   description: string;
@@ -82,6 +82,7 @@ const blank = {
   countryOfOrigin: "India",
   netQuantity: "1 N (one piece)",
   status: "draft" as Record["status"],
+  photos: [] as { id: string; alt: string }[],
 };
 type Form = typeof blank;
 
@@ -114,6 +115,7 @@ function fromRecord(r: Record): Form {
     countryOfOrigin: r.legal.countryOfOrigin,
     netQuantity: r.legal.netQuantity,
     status: r.status,
+    photos: r.images.filter((i) => i.url?.startsWith("/api/media/")).map((i) => ({ id: i.url!.slice("/api/media/".length), alt: i.alt })),
   };
 }
 
@@ -143,6 +145,7 @@ function toBody(f: Form, status: Form["status"], isNew: boolean) {
     model: f.modelHeight && f.modelSize ? { height: f.modelHeight, size: f.modelSize } : undefined,
     legal: { manufacturer: f.manufacturer, packer: f.packer || undefined, importer: f.importer || undefined, countryOfOrigin: f.countryOfOrigin, netQuantity: f.netQuantity },
     status,
+    photos: f.photos,
   };
 }
 
@@ -294,6 +297,10 @@ export function ProductEditorScreen({ id }: { id?: string }) {
               {price > 0 ? `Shoppers see ${formatINR(price)}${off ? ` · ${off}% off ${formatINR(mrp)}` : ""}.` : "Enter a price."}
               {price > mrp && mrp > 0 ? <span className="ml-1 text-destructive">The price can&apos;t be higher than the MRP.</span> : null}
             </p>
+          </Card>
+
+          <Card title="Photos">
+            <PhotoManager photos={form.photos} title={form.title} onChange={(photos) => set("photos", photos)} />
           </Card>
 
           <Card title="Colour, picture and sizes">
@@ -456,4 +463,73 @@ export function ProductEditorScreen({ id }: { id?: string }) {
 export function ProductEditorRoute() {
   const { id } = useParams<{ id: string }>();
   return <ProductEditorScreen id={id} />;
+}
+
+/**
+ * Product photos: upload (JPEG / PNG, ≤ 8 MB, 600–6000 px — checked again on the server), reorder, describe and
+ * remove. The first photo is the one on product cards and the product page's main image. Every photo needs a
+ * description (alt text) for screen readers and image search.
+ */
+function PhotoManager({ photos, title, onChange }: { photos: { id: string; alt: string }[]; title: string; onChange: (p: { id: string; alt: string }[]) => void }) {
+  const [busy, setBusy] = useState(false);
+  async function upload(files: FileList | null) {
+    if (!files?.length) return;
+    setBusy(true);
+    const added: { id: string; alt: string }[] = [];
+    for (const file of Array.from(files).slice(0, 8 - photos.length)) {
+      if (file.type !== "image/jpeg" && file.type !== "image/png") {
+        notify("error", `${file.name}: use a JPEG or PNG photo.`);
+        continue;
+      }
+      try {
+        const res = await fetch("/api/admin/media", { method: "POST", headers: { "Content-Type": file.type }, body: file, cache: "no-store" });
+        const data = (await res.json().catch(() => null)) as { id?: string; error?: { message?: string } } | null;
+        if (!res.ok || !data?.id) throw new Error(data?.error?.message ?? "Upload failed.");
+        added.push({ id: data.id, alt: title ? `${title}, photo ${photos.length + added.length + 1}` : "" });
+      } catch (e) {
+        notify("error", `${file.name}: ${e instanceof Error ? e.message : "upload failed"}`);
+      }
+    }
+    if (added.length) {
+      onChange([...photos, ...added]);
+      notify("success", added.length === 1 ? "Photo uploaded — save the product to use it" : `${added.length} photos uploaded — save the product to use them`);
+    }
+    setBusy(false);
+  }
+  const move = (i: number, d: -1 | 1) => {
+    const next = [...photos];
+    [next[i], next[i + d]] = [next[i + d], next[i]];
+    onChange(next);
+  };
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">JPEG or PNG, at least 600 × 600 px, up to 8 MB, max 8 photos. The first photo leads on cards and the product page. Without photos the placeholder drawing is shown.</p>
+      {photos.length ? (
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {photos.map((p, i) => (
+            <li key={p.id} className="space-y-1.5">
+              <GarmentArt image={{ art: "tee", colour: "#e5e5e5", alt: p.alt, url: `/api/media/${p.id}` }} sizes="160px" className="aspect-[4/5] w-full rounded-md" />
+              <AInput aria-label={`Description of photo ${i + 1}`} maxLength={140} value={p.alt} placeholder="Describe the photo" onChange={(e) => onChange(photos.map((x, j) => (j === i ? { ...x, alt: e.target.value } : x)))} />
+              <div className="flex justify-between">
+                <AButton type="button" size="icon" variant="ghost" aria-label={`Move photo ${i + 1} earlier`} disabled={i === 0} onClick={() => move(i, -1)}>
+                  <AIcon icon={ArrowLeft01Icon} />
+                </AButton>
+                <AButton type="button" size="icon" variant="ghost" aria-label={`Remove photo ${i + 1}`} onClick={() => onChange(photos.filter((_, j) => j !== i))}>
+                  <AIcon icon={Delete02Icon} />
+                </AButton>
+                <AButton type="button" size="icon" variant="ghost" aria-label={`Move photo ${i + 1} later`} disabled={i === photos.length - 1} onClick={() => move(i, 1)}>
+                  <AIcon icon={ArrowRight01Icon} />
+                </AButton>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <label className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent ${busy || photos.length >= 8 ? "pointer-events-none opacity-50" : ""}`}>
+        <AIcon icon={ImageUpload01Icon} />
+        {busy ? "Uploading…" : "Upload photos"}
+        <input type="file" accept="image/jpeg,image/png" multiple className="sr-only" disabled={busy || photos.length >= 8} onChange={(e) => void upload(e.target.files).finally(() => (e.target.value = ""))} />
+      </label>
+    </div>
+  );
 }

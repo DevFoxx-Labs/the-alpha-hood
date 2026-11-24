@@ -4,7 +4,6 @@ import type { Env } from "@/lib/mock-guard";
 import type { CatalogAdminDeps } from "./admin";
 import { CATALOG_TAG } from "./cache-tag";
 
-
 /**
  * Product editing exists only on the own backend (COMMERCE_PROVIDER=own + a database). Anywhere else the
  * catalogue belongs to its platform and the admin is read-only — returns null (fail closed).
@@ -15,6 +14,7 @@ export function catalogAdminDeps(env: Env = process.env): CatalogAdminDeps | nul
   if (!db) return null;
   return {
     store: db.catalog,
+    media: db.media,
     invalidate() {
       db.own().invalidate();
       try {

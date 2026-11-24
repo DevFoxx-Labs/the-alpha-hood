@@ -185,4 +185,16 @@ export const MONGO_MIGRATIONS: MongoMigration[] = [
       }
     },
   },
+  {
+    name: "2026_11_27_006_switch_over",
+    async up(db) {
+      await ensureCollection(db, "product_media");
+      await db.collection("carts").createIndexes([{ key: { updated_at: 1 }, name: "carts_updated_idx" }]);
+      await db.collection("return_photos").createIndexes([{ key: { attached_to: 1, created_at: 1 }, name: "return_photos_orphan_idx" }]);
+      await db.collection("inventory_reservations").createIndexes([{ key: { expires_at: 1 }, name: "inventory_res_expires_idx" }]);
+    },
+    async down(db) {
+      if (await db.listCollections({ name: "product_media" }, { nameOnly: true }).hasNext()) await db.collection("product_media").drop();
+    },
+  },
 ];

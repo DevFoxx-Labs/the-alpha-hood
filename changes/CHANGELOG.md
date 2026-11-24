@@ -1,5 +1,73 @@
 # Change log
 
+## 2026-11-27 — Own backend, phase 6: switch-over (readiness gate, catalogue import, product photos, retention clean-up) (High-risk tier: uploads, production data)
+
+**Threat model:**
+- *Assets:* the live catalogue and prices, the public image host, personal data kept past its purpose, production
+  configuration.
+- *Actors:* staff uploading files; an operator running an import against the wrong database; an attacker probing
+  `/api/media`; a deploy with a missing secret or leftover demo data.
+- *Abuse cases and the layer that stops each:*
+  - script or SVG disguised as a photo → magic-byte sniffing (JPEG/PNG only), served with `nosniff` + `sandbox` CSP;
+  - GPS leak → EXIF and text chunks stripped;
+  - decompression bomb / thumbnail spam → 600–6000 px from the header, 8 MB cap, 60 uploads per hour per IP;
+  - linking a product to a foreign / remote image → only ids of uploaded media are accepted, and there is no URL
+    field at all (no SSRF);
+  - path tricks on `/api/media` → id regex;
+  - an unauthorised upload → staff with `catalog.write` only;
+  - bad data through an import → the admin form's exact validation;
+  - an import against production by accident → dry run by default, plus `--apply` and `--production` for remote
+    databases;
+  - demo data going live → `ops:check` blocker, and the import refuses demo SKUs on remote databases;
+  - personal data kept too long → retention clean-up (cron);
+  - going live with a missing secret, no TLS, mock data or payments, or placeholder legal details → `ops:check`
+    blockers.
+
+**Added**
+- `lib/ops/readiness.ts` + `pnpm ops:check`: configuration and data checks, never printing secrets; exits 1 on a
+  blocker.
+- `lib/catalog/import.ts` + `pnpm catalog:import`:
+  - plan / apply, upsert by SKU, version-checked;
+  - strict category, homepage-rail and collection-rule validation;
+  - only `/men/…` links;
+  - every run audited;
+  - example file `docs/backend/catalog-import.example.json`.
+- Product photos:
+  - `lib/catalog/media.ts`: intake rules plus a JPEG/PNG size reader;
+  - `POST /api/admin/media` and public `GET /api/media/<id>` (immutable, `nosniff`, sandbox CSP);
+  - `GarmentArt` renders a real photo through `next/image` when the image has a media URL, else the drawing;
+  - product editor: upload, reorder, describe and remove photos (max 8).
+- Retention:
+  - `lib/db/retention.ts`: one written schedule;
+  - `lib/db/stores/maintenance.ts`: SQL + Mongo purge, run by `/api/cron/sweep`, which returns counts only.
+- Migrations `2026_11_27_006_switch_over`: `product_media`, plus expiry indexes for the clean-up scans.
+- `docs/backend/go-live.md`: decisions, database users and TLS, secrets, deploy order, catalogue load, cron,
+  retention table, backups and quarterly restore test, rollback, breach steps.
+- `lib/db/switchover-contract.ts`: intake rules with a real PNG; readiness checks per blocker; TLS per engine;
+  media round-trip; products referencing only uploaded photos; import dry run / apply / update / all-or-nothing;
+  category validation against the new tree; retention purge (idempotent, consent proof kept); an end-to-end flow on
+  each DB (staff MFA sign-in → upload (fake and tiny files refused) → product → public API shows the photo → served
+  with safe headers → cron needs the secret and returns counts only).
+
+**Changed**
+- `ReviewStore.countByIdPrefix` (go-live check for demo reviews).
+- The upload guard's size message follows its cap.
+- The public-write guard test now also accepts staff-authenticated binary uploads under `/api/admin` (permission
+  required).
+
+**Verified**
+- `pnpm verify`: typecheck, lint, 372/372 tests (memory + local MongoDB), build.
+- `pnpm audit --prod`: clean.
+- `pnpm db:migrate` on local `alpha_hood_dev`: 6 migrations.
+- `pnpm ops:check` on the local dev environment: reports 14 blockers as expected (not production, demo data, no
+  MFA owner, missing secrets and legal details).
+- `pnpm catalog:import docs/backend/catalog-import.example.json`: dry run OK, nothing written.
+
+**Not verified**
+- MySQL / PostgreSQL (credentials pending).
+- The product editor's photo section hasn't been viewed in a browser at 1440 / 390 / 360 px.
+- Not done this phase: admin screen for categories and collections (import file instead); payment gateway adapter.
+
 ## 2026-11-24 — Trademark filing files
 
 **Threat model:** static image and docs files only. There is no new route, personal data, tracker or processor, and

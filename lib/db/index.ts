@@ -20,6 +20,10 @@ import type { RateCounterStore } from "@/lib/http/rate-limit";
 import type { OutboxStore } from "@/lib/notify/outbox";
 import type { UgcStore } from "@/lib/ugc/service";
 import { createSecretBox } from "./secret-box";
+import type { MediaStore } from "@/lib/catalog/media";
+import type { Maintenance } from "./retention";
+import { createMongoMaintenance, createSqlMaintenance } from "./stores/maintenance";
+import { createMongoMediaStore, createSqlMediaStore } from "./stores/media";
 import { createMongoAudit, createMongoRateCounters, createMongoStaffStore, createSqlAudit, createSqlRateCounters, createSqlStaffStore } from "./stores/admin";
 import {
   createMongoAlertStore,
@@ -99,6 +103,8 @@ export interface DbStores {
   ugc: UgcStore;
   outbox: OutboxStore;
   flows: FlowStore;
+  media: MediaStore;
+  maintenance: Maintenance;
   /** COMMERCE_PROVIDER=own: catalogue, bag and stock all on this database (built once, cached). */
   own(): OwnCommerce;
 }
@@ -166,6 +172,8 @@ export function createDbStores(cfg: DbConfig): DbStores {
       ugc: createMongoUgcStore(conn),
       outbox: createMongoOutbox(conn),
       flows: createMongoFlowStore(conn, p),
+      media: createMongoMediaStore(conn),
+      maintenance: createMongoMaintenance(conn),
       ...catalogParts(createMongoCatalogStore(conn), createMongoReviewStore(conn), (catalog) => ({ repo: createMongoCartRepo(conn), inventory: createMongoInventory(conn, p, catalog) })),
     };
   }
@@ -195,6 +203,8 @@ export function createDbStores(cfg: DbConfig): DbStores {
     ugc: createSqlUgcStore(db),
     outbox: createSqlOutbox(db),
     flows: createSqlFlowStore(db, p),
+    media: createSqlMediaStore(db),
+    maintenance: createSqlMaintenance(db),
     ...catalogParts(createSqlCatalogStore(db), createSqlReviewStore(db), (catalog) => ({ repo: createSqlCartRepo(db), inventory: createSqlInventory(db, p, catalog) })),
   };
 }

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { useId } from "react";
 import type { GarmentKind, ProductImage } from "@/lib/commerce/types";
 import { cn } from "@/lib/utils";
@@ -176,13 +177,28 @@ export function GarmentArt({
   image,
   className,
   artClassName,
+  priority = false,
+  sizes = "(min-width: 1024px) 25vw, 50vw",
 }: {
-  image: Pick<ProductImage, "art" | "colour" | "alt" | "view">;
+  image: Pick<ProductImage, "art" | "colour" | "alt" | "view" | "url">;
   className?: string;
   /** Size of the drawing inside the well. Default 74% like the prototype. */
   artClassName?: string;
+  /** Real photos only: the LCP image of the page (never lazy, fetchpriority high). */
+  priority?: boolean;
+  /** Real photos only: rendered width hint for the srcset. */
+  sizes?: string;
 }) {
   const patternId = useId().replace(/:/g, "");
+  // A real product photo (own-backend media, served from /api/media/<id>) replaces the drawing. The container keeps
+  // its own aspect ratio, so swapping art for a photo never shifts layout (CLS).
+  if (image.url && /^\/api\/media\/med_[a-f0-9]{32}$/.test(image.url)) {
+    return (
+      <div className={cn("relative overflow-hidden bg-soft", className)}>
+        <Image src={image.url} alt={image.alt} fill sizes={sizes} priority={priority} className="object-cover" />
+      </div>
+    );
+  }
   const colour = HEX_RE.test(image.colour) ? image.colour : "#333333";
   const a11y = image.alt ? { role: "img" as const, "aria-label": image.alt } : { "aria-hidden": true as const };
 

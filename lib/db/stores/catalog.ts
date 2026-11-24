@@ -124,6 +124,11 @@ export function createSqlReviewStore(db: SqlDb): ReviewStore {
         }
       }
     },
+    async countByIdPrefix(prefix) {
+      const safe = prefix.replace(/[^A-Za-z0-9_]/g, "");
+      const r = await db.selectFrom("reviews").select((eb) => eb.fn.countAll<number>().as("c")).where("id", "like", `${safe.replace(/_/g, "\\_")}%`).executeTakeFirst();
+      return Number(r?.c ?? 0);
+    },
   };
 }
 
@@ -222,6 +227,10 @@ export function createMongoReviewStore(conn: Promise<MongoConn>): ReviewStore {
       if (!list.length) return;
       const ops = list.map((r) => ({ updateOne: { filter: { _id: r.id }, update: { $setOnInsert: { ...r } }, upsert: true } }));
       await (await col()).bulkWrite(ops, { ordered: false, ignoreUndefined: true });
+    },
+    async countByIdPrefix(prefix) {
+      const safe = prefix.replace(/[^A-Za-z0-9_]/g, "");
+      return (await col()).countDocuments({ _id: { $regex: `^${safe}` } });
     },
   };
 }

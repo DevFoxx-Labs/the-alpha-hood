@@ -3,6 +3,7 @@ import { ATTRIBUTE_VALUES, COLOUR_FAMILIES, SIZE_ORDER } from "@/lib/catalog/att
 import type { GarmentKind, Product, ProductAttributes, SizeChartKind } from "@/lib/commerce/types";
 import { ValidationError } from "@/lib/http/guard";
 import { asObject, cleanText, rejectUnknownFields } from "@/lib/validation";
+import { MEDIA_ID_RE, type MediaStore, mediaUrl } from "./media";
 import { GARMENT_KINDS, SIZE_CHARTS } from "./product-options";
 import { HANDLE_RE } from "./reader";
 import { CatalogConflictError, type CatalogDocs, type CatalogStore, PRODUCT_STATUSES, type ProductRecord, type ProductStatus } from "./store";
@@ -56,6 +57,8 @@ export interface ProductInput {
   model?: { height: string; size: string };
   legal: Product["legal"];
   status: ProductStatus;
+  /** Uploaded photos in display order (first = card + LCP image); empty = placeholder drawings. */
+  photos: { id: string; alt: string }[];
 }
 
 export function slugify(text: string): string {
@@ -77,7 +80,7 @@ const oneOf = <T extends string>(v: unknown, list: readonly T[], field: string):
 };
 const optText = (v: unknown, field: string, max: number) => (v === undefined || v === null || v === "" ? undefined : cleanText(v, field, { max }));
 
-const FIELDS = ["title", "handle", "sku", "category", "subcategory", "price", "mrp", "badge", "colour", "colourFamily", "styleId", "sizes", "art", "attributes", "tags", "description", "specs", "sizeChart", "model", "legal", "status", "version"];
+const FIELDS = ["title", "handle", "sku", "category", "subcategory", "price", "mrp", "badge", "colour", "colourFamily", "styleId", "sizes", "art", "attributes", "tags", "description", "specs", "sizeChart", "model", "legal", "status", "photos", "version"];
 
 /** Strict parse of the product form (create and edit share it). `docs` supplies the category tree. */
 export function parseProductInput(body: unknown, docs: CatalogDocs | null): ProductInput {
@@ -171,11 +174,25 @@ export function parseProductInput(body: unknown, docs: CatalogDocs | null): Prod
   };
   const status = oneOf(b.status, PRODUCT_STATUSES, "status");
 
-  return { title, handle, sku, category: cat.handle, subcategory, price, mrp, badge, colour, colourFamily, styleId, sizes, art, attributes, tags, description, specs, sizeChart, model, legal, status };
+  const photosIn = b.photos === undefined || b.photos === null ? [] : b.photos;
+  if (!Array.isArray(photosIn) || photosIn.length > 8) throw new ValidationError("Up to 8 photos.");
+  const seenPhotos = new Set<string>();
+  const photos = photosIn.map((raw) => {
+    const ph = asObject(raw);
+    rejectUnknownFields(ph, ["id", "alt"]);
+    if (typeof ph.id !== "string" || !MEDIA_ID_RE.test(ph.id)) throw new ValidationError("Unknown photo.");
+    if (seenPhotos.has(ph.id)) throw new ValidationError("The same photo is listed twice.");
+    seenPhotos.add(ph.id);
+    return { id: ph.id, alt: cleanText(ph.alt, "Photo description", { min: 3, max: 140 }) };
+  });
+
+  return { title, handle, sku, category: cat.handle, subcategory, price, mrp, badge, colour, colourFamily, styleId, sizes, art, attributes, tags, description, specs, sizeChart, model, legal, status, photos };
 }
 
 export interface CatalogAdminDeps {
   store: CatalogStore;
+  /** Product photos; when absent, products can't reference uploaded photos. */
+  media?: MediaStore;
   /** Clears cached catalogue snapshots / pages after a write. */
   invalidate(): void;
 }
@@ -202,7 +219,9 @@ function apply(input: ProductInput, base: { id: string; styleId: string; created
     badge: input.badge,
     colour: { ...input.colour, handle: input.handle },
     sizes: input.sizes.map((s) => ({ label: s.label, stock: prior.has(s.label) ? prior.get(s.label)! : s.stock })),
-    images: imagesFor(input.title, input.art, input.colour.hex),
+    images: input.photos.length
+      ? input.photos.map((ph, i) => ({ url: mediaUrl(ph.id), alt: ph.alt, art: input.art, colour: input.colour.hex, view: i === 0 ? ("front" as const) : undefined }))
+      : imagesFor(input.title, input.art, input.colour.hex),
     attributes: input.attributes,
     colourFamily: input.colourFamily,
     createdAt: base.createdAt,
@@ -226,8 +245,16 @@ function conflict(e: unknown): never {
   throw e;
 }
 
+/** Every referenced photo must have been uploaded (no linking to made-up or foreign files). */
+async function checkPhotos(deps: CatalogAdminDeps, input: ProductInput) {
+  if (input.photos.length === 0) return;
+  const found = deps.media ? await deps.media.existing(input.photos.map((p) => p.id)) : new Set<string>();
+  if (input.photos.some((p) => !found.has(p.id))) throw new ValidationError("A photo wasn't found — upload it again.");
+}
+
 export async function createProduct(deps: CatalogAdminDeps, body: unknown, now = new Date()): Promise<ProductRecord> {
   const input = parseProductInput(body, await deps.store.getDocs());
+  await checkPhotos(deps, input);
   let styleId = `style_${randomBytes(6).toString("hex")}`;
   if (input.styleId) {
     // Adding a colour to an existing style: the style must exist (no attaching to made-up groups).
@@ -248,6 +275,7 @@ export async function updateProduct(deps: CatalogAdminDeps, id: string, body: un
   const current = await deps.store.getRecord(id);
   if (!current) throw new CatalogAdminError("not_found", "Product not found.", 404);
   const input = parseProductInput(b, await deps.store.getDocs());
+  await checkPhotos(deps, input);
   // The style can't be moved on edit (it would silently change another product's colour swatches).
   const next = apply(input, { ...current, version: version + 1 }, now);
   const ok = await deps.store.replace(next, version).catch(conflict);

@@ -131,7 +131,7 @@ export async function guardPublicUpload(
   const type = (request.headers.get("content-type") ?? "").toLowerCase();
   if (type !== "image/jpeg" && type !== "image/png") return { ok: false, response: jsonError(415, "unsupported_media_type", "Upload a JPEG or PNG photo.") };
   if (Number(request.headers.get("content-length") ?? "0") > maxBytes) {
-    return { ok: false, response: jsonError(413, "payload_too_large", "Photos must be 5 MB or smaller.") };
+    return { ok: false, response: jsonError(413, "payload_too_large", `Photos must be ${Math.round(maxBytes / 1_048_576)} MB or smaller.`) };
   }
   if (!request.body) return { ok: false, response: jsonError(400, "empty", "No file received.") };
   const reader = request.body.getReader();
@@ -143,7 +143,7 @@ export async function guardPublicUpload(
     total += value.byteLength;
     if (total > maxBytes) {
       await reader.cancel();
-      return { ok: false, response: jsonError(413, "payload_too_large", "Photos must be 5 MB or smaller.") };
+      return { ok: false, response: jsonError(413, "payload_too_large", `Photos must be ${Math.round(maxBytes / 1_048_576)} MB or smaller.`) };
     }
     chunks.push(value);
   }

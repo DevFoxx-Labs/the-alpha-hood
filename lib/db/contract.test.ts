@@ -217,6 +217,8 @@ import "./aftersales-contract";
 import "./catalog-contract";
 // ── Phase 5: staff + MFA, audit, rate limits, alerts, UGC, outbox, flows ─────────────────────────
 import "./admin-contract";
+// ── Phase 6: retention clean-up, product photos, catalogue import, go-live readiness ─────────────
+import "./switchover-contract";
 
 // ── Guard: database code must never reach the browser bundle ─────────────────────────────────────
 import { existsSync as fileExists, readFileSync as readSource, readdirSync, statSync } from "node:fs";
