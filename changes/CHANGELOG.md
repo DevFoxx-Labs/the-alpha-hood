@@ -1,5 +1,26 @@
 # Change log
 
+## 2026-11-27 — Fix: admin sidebar clicks looked like they did nothing
+
+- **Cause:**
+  - Admin pages are dynamic and personal (`instant = false`), and the `(panel)` group had no `loading.tsx`. After a
+    click, the router kept the old page on screen until the new one was rendered on the server. On a busy dev machine
+    (Turbopack compiling each admin route on first visit) that took seconds, with no feedback, so it looked like the
+    link didn't open.
+  - A browser tab opened before this morning's layout change also kept the old JavaScript; it needs one hard refresh.
+- **Fix:**
+  - `app/admin/(panel)/loading.tsx`: the page area switches to a skeleton at once on every sidebar click, inside the
+    persistent shell;
+  - sidebar and mobile-menu links show a small spinner while their page loads (`useLinkStatus` from `next/link`, per
+    the Next 16 docs).
+- **Test:** the admin shell guard also requires the `(panel)` loading boundary.
+- **Verified:**
+  - typecheck and lint clean;
+  - the admin pages return 200 on `next dev`;
+  - no new errors in the dev log;
+  - the guard test passes.
+  - Not clicked in a browser (no browser tool here).
+
 ## 2026-11-27 — Fix: every admin sidebar click looked like a full page reload
 
 - **Cause:** each admin page rendered its own `<AdminShell>`, and `app/admin/(panel)` had no shared layout. Every

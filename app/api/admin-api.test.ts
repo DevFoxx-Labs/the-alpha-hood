@@ -134,6 +134,8 @@ describe("guard: every admin route checks staff + permission", () => {
   it("one persistent admin shell: it lives in the (panel) layout, never inside a page (no remount per click)", () => {
     const panel = join(process.cwd(), "app", "admin", "(panel)");
     expect(readFileSync(join(panel, "layout.tsx"), "utf8")).toContain("<AdminShell>");
+    // A loading boundary makes sidebar clicks switch the page area at once (dynamic, personal pages).
+    expect(readFileSync(join(panel, "loading.tsx"), "utf8")).toContain("aria-busy");
     const pages: string[] = [];
     const walk = (d: string) => {
       for (const n of readdirSync(d)) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { Logout03Icon, Moon02Icon, Notification03Icon, SidebarLeftIcon, Sun03Icon } from "@hugeicons/core-free-icons";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { DropdownMenu, Tooltip as TooltipPrimitive } from "radix-ui";
 import { createContext, Suspense, useCallback, useContext, useEffect, useState } from "react";
@@ -282,12 +282,19 @@ function NavLeaf({ item, active, collapsed, count }: { item: Exclude<NavItem, { 
     >
       <AIcon icon={item.icon} />
       {!collapsed ? <span className="flex-1 truncate">{item.label}</span> : null}
+      <PendingDot />
       {!collapsed && count ? (
         <span className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">{count > 99 ? "99+" : count}</span>
       ) : null}
     </Link>
   );
   return collapsed ? <Tip label={item.label}>{link}</Tip> : link;
+}
+
+/** Inline feedback on the clicked sidebar link while its page loads (must sit inside the <Link>). */
+function PendingDot() {
+  const { pending } = useLinkStatus();
+  return pending ? <span aria-hidden="true" className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent" /> : null;
 }
 
 function ThemeToggle({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
@@ -349,7 +356,8 @@ function MobileBar({
             {panel.items.map((i) => (
               <Link key={i.route} href={i.route} onClick={() => setOpen(null)} className="flex items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-accent">
                 <AIcon icon={i.icon} />
-                {i.label}
+                <span className="flex-1">{i.label}</span>
+                <PendingDot />
               </Link>
             ))}
           </div>
