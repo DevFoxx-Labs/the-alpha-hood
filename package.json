@@ -15,7 +15,7 @@
     "db:reset": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/db.ts reset",
     "db:seed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-transform-types --import ./scripts/alias-loader.mjs scripts/db-seed.ts",
     "db:test:migrate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/db.ts migrate --env-file=.env.test.local",
-    "db:mongo:dev": "\"C:/Program Files/MongoDB/Server/8.3/bin/mongod.exe\" --replSet rs0 --port 27018 --bind_ip 127.0.0.1 --dbpath .data/mongo-rs --logpath .data/mongo-rs.log --logappend",
+    "db:mongo:dev": "node scripts/mongo-rs-start.mjs",
     "db:mongo:init": "node scripts/mongo-rs-init.mjs"
   },
   "dependencies": {

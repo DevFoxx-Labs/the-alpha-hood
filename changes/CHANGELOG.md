@@ -75,6 +75,8 @@ nothing is served publicly: the files live in `docs/`, not `public/`.
 - `lib/db/index.ts` caches store sets per module instance: a long-running dev server no longer keeps store objects
   built by older code (found during the smoke check: `/api/admin/setup` returned 500 on a server started before this
   change).
+- `pnpm db:mongo:dev` now runs `scripts/mongo-rs-start.mjs`. The old one-liner failed on Windows cmd because of
+  the space in "Program Files". `MONGOD_PATH` overrides the binary.
 
 **Verified**
 - `pnpm verify`: typecheck, lint, 358/358 tests (memory + local MongoDB), build.
