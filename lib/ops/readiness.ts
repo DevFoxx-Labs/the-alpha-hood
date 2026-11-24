@@ -56,7 +56,12 @@ export function configChecks(env: Env): Check[] {
     add(`legal_${k.toLowerCase()}`, "blocker", !!env[k] && !/TO BE PROVIDED|example/i.test(env[k]!), `${k} set (notices need real contact details — DPDP)`);
   }
   add("checkout_enabled", "warning", env.CHECKOUT_ENABLED === "true", "CHECKOUT_ENABLED is \"true\" (store sells)");
-  add("payment_gateway", "warning", false, "Real payment gateway adapter — not built yet; only COD can take orders");
+  const rzp = env.PAYMENT_GATEWAY === "razorpay";
+  add("payment_gateway", "warning", rzp, rzp ? "PAYMENT_GATEWAY is razorpay (online payments on)" : "No payment gateway — only COD can take orders");
+  if (rzp) {
+    add("razorpay_keys", "blocker", /^rzp_live_[A-Za-z0-9]{8,32}$/.test(env.RAZORPAY_KEY_ID ?? "") && (env.RAZORPAY_KEY_SECRET ?? "").length >= 16, "Razorpay LIVE key id + key secret set (rzp_live_…)");
+    add("razorpay_webhook", "blocker", (env.RAZORPAY_WEBHOOK_SECRET ?? "").length >= 16, "RAZORPAY_WEBHOOK_SECRET set (≥ 16 characters)");
+  }
   add("indexing", "warning", env.ALLOW_INDEXING === "true", "ALLOW_INDEXING is \"true\" (search engines may index)");
   return checks;
 }

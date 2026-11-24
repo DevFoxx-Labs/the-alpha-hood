@@ -1,5 +1,70 @@
 # Change log
 
+## 2026-11-27 — Payments: Razorpay gateway (Payment Links) + payment reconciliation in the cron (High-risk tier: payments)
+
+**Threat model:**
+- *Assets:* money, order state, stock held during payment, refunds.
+- *Actors:* a shopper forging the return from Razorpay; anyone forging or replaying webhooks; a slow or failed
+  gateway; an attacker trying to redirect shoppers to a fake payment page; double refunds on retries.
+- *Abuse cases and the layer that stops each:*
+  - forged "paid" return → the return route ignores the query and asks Razorpay's API (`fetchStatus`);
+  - forged / tampered webhook → HMAC-SHA256 over the raw body with the webhook secret, constant-time compare;
+  - replayed webhook → event id de-duplication (`markEvent`) and an age limit (3 days);
+  - wrong amount or currency → INR only, and the amount must equal the attempt and the order total (existing
+    handler);
+  - open redirect / phishing → the client only gets `/api/payments/go/<order>`, which checks the session owns the
+    order and redirects to the stored gateway URL (https on rzp.io / razorpay.com only);
+  - double refund on a timeout retry → `X-Refund-Idempotency` + `receipt` from our reference, and existing refunds
+    are looked up first;
+  - a paid order left unconfirmed by a missed webhook → `reconcilePending` now runs in the cron sweep (it was never
+    scheduled before);
+  - personal data sent to the gateway → only the order number and amount (no phone / email);
+  - SSRF → fixed API host, `redirect: "error"`, 10 s timeout;
+  - test keys live → `ops:check` blocker.
+
+**Added**
+- `lib/payments/razorpay.ts`:
+  - payment link create;
+  - webhook verify (`payment_link.paid` → succeeded; expired / cancelled → failed; other events → `"ignored"`, 200);
+  - status fetch;
+  - idempotent refunds.
+- Routes:
+  - `app/api/payments/go/[order]` (owner-checked hop to the hosted page);
+  - `app/api/payments/return` (API-verified return).
+- `PaymentAttempt.payUrl`, plus `payRedirect` / `hostedPayUrl` / `syncAttempt` in the checkout service.
+- `components/checkout/api.ts` `goToPayment`: a full page load for the hosted-gateway hop.
+- Env:
+  - `PAYMENT_GATEWAY`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` (`.env.example`);
+  - `ops:check` requires live keys + a webhook secret when Razorpay is on.
+- `lib/payments/razorpay.test.ts`, against a fake Razorpay API with real HMAC signatures:
+  - config fails closed;
+  - link body (INR, reference, expiry ≥ 15 min, no customer data);
+  - webhook positive and negative cases (tampered, wrong secret, missing, stale, non-INR, forged reference, ignored
+    events);
+  - status;
+  - refund idempotency;
+  - API errors;
+  - end to end through the real routes: place UPI → same-origin hop → Razorpay URL → forged return changes
+    nothing → signed webhook confirms → replay is `duplicate` → a bad signature gets 401; and a late webhook covered by
+    the return route.
+
+**Changed**
+- `PaymentGateway.verifyWebhook(rawBody, headers, now)`: each gateway reads its own signature headers. The demo
+  gateway and tests were moved over (`lib/payments/test-helpers.ts`).
+- `/api/cron/sweep` runs `reconcilePending` first.
+- Privacy Notice (EN + HI) names Razorpay Software Private Limited as the payment processor. Version
+  **2026-11-27**; needs lawyer review.
+- `docs/backend/go-live.md`: Razorpay setup, secrets, a test-mode checklist (§11); the cron interval is now
+  5–15 min.
+
+**Verified**
+- `pnpm verify`: typecheck, lint, 380/380 tests (memory + local MongoDB), build.
+- `pnpm audit --prod`: clean.
+
+**Not verified**
+- Not run against Razorpay's real test environment (needs an account and test keys — owner TODO).
+- No browser check of the redirect hop.
+
 ## 2026-11-27 — Own backend, phase 6: switch-over (readiness gate, catalogue import, product photos, retention clean-up) (High-risk tier: uploads, production data)
 
 **Threat model:**

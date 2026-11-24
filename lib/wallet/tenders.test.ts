@@ -1,3 +1,4 @@
+import { demoVerify } from "@/lib/payments/test-helpers";
 import { describe, expect, it } from "vitest";
 import { parseAddress } from "@/lib/checkout/address";
 import { cancelOrder } from "@/lib/orders/lifecycle";
@@ -55,7 +56,7 @@ async function place(deps: CheckoutDeps, b: Awaited<ReturnType<typeof buyer>>, p
 
 function pay(deps: CheckoutDeps, gateway: ReturnType<typeof createDemoGateway>, redirectUrl: string, outcome: "succeeded" | "failed") {
   const signed = gateway.simulate(redirectUrl.split("/").pop()!, outcome, NOW.getTime())!;
-  return handlePaymentEvent(deps, gateway.verifyWebhook(signed.rawBody, signed.signature, signed.timestamp, NOW.getTime())!, NOW);
+  return handlePaymentEvent(deps, demoVerify(gateway, signed.rawBody, signed.signature, signed.timestamp, NOW.getTime())!, NOW);
 }
 
 async function giveCoins(wallet: ReturnType<typeof setup>["wallet"], customerId: string, coins: number) {

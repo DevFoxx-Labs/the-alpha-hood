@@ -26,10 +26,15 @@
   allow-list (M8): `www.googletagmanager.com`, `www.google-analytics.com`, `*.google.com` / `googleadservices.com`
   (Ads), `connect.facebook.net`, `www.facebook.com`.
 - 🟠 Semgrep (SAST) not in CI yet; ZAP baseline needs a staging URL.
-- 🔴 **No real payment gateway, SMS provider or database.** Checkout refuses to run on the live store until they're
-  configured (demo gateway/SMS only with `ALLOW_MOCK_PAYMENTS`); carts, orders, customers and sessions are in memory.
-  With a DB: UNIQUE indexes (order number, customer+idempotency key, payment id, event id), row locks / conditional
-  updates in transactions, and a cron for `reconcilePending` every few minutes.
+- 🔴 **No SMS / email provider yet.** OTP sign-in can't send codes on the live store (the demo SMS needs
+  `ALLOW_MOCK_PAYMENTS`), and order messages wait in `notify_outbox`.
+
+  Already done:
+  - Payments: Razorpay.
+  - Database: the own backend.
+  - Payment reconciliation: the cron sweep calls `reconcilePending`.
+
+  See docs/backend/go-live.md.
 - 🔴 Pentest of the High-risk flows (OTP, checkout/payments, wallet/gift cards, refunds, admin/MFA, uploads, webhooks)
   before launch. `/security-review` of M5–M9 done 2026-11-25: no high-confidence findings
   (`docs/security/2026-11-25-security-review-m5-m9.md`); repeat it once the DB, gateway and providers are wired in.
@@ -222,3 +227,14 @@
 - 🟡 The retention clean-up runs only when `/api/cron/sweep` is called. Schedule it every 15 min (owner TODO). Queued
   `notify_outbox` rows are kept until a delivery worker exists.
 - 🟡 There is no delivery worker reading `notify_outbox` yet (no SMS / email / WhatsApp provider).
+
+## Payments — Razorpay (2026-11-27)
+- 🟠 Built against Razorpay's documented API with a fake Razorpay in tests. It hasn't run against the real Razorpay
+  test environment yet. Owner TODO: run the test-mode checklist in go-live.md §11 before live keys.
+- 🟡 The redirect back from Razorpay isn't signature-checked. It doesn't need to be: that route only asks the API for
+  the status. The docs don't publish the exact string Razorpay signs for links, so the code doesn't guess.
+- 🟡 Payment link expiry is 16 minutes, just past the 15-minute stock hold. A shopper who pays at the very end can be
+  confirmed after the hold expired. Then reconciliation either confirms (if stock was still free) or marks the order
+  for review/refund (existing `needs_review` path). Watch for this in the first weeks.
+- 🟡 COD refunds still go to UPI by hand (payout API not built).
+

@@ -17,7 +17,8 @@ export async function POST(request: Request) {
   if (raw.length > 16_384) return jsonError(413, "payload_too_large", "Too large.");
 
   const deps = defaultDeps();
-  const event = deps.gateway.verifyWebhook(raw, request.headers.get("x-signature"), request.headers.get("x-timestamp"));
+  const event = deps.gateway.verifyWebhook(raw, request.headers);
+  if (event === "ignored") return Response.json({ received: true, result: "ignored" });
   if (!event) {
     securityEvent("payment_signature_invalid", { ip: clientIp(request), gateway: resolveGateway().name });
     return jsonError(401, "invalid_signature", "Invalid signature.");

@@ -160,3 +160,10 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] Have a lawyer review the retention schedule (go-live.md §7) and set periods for the consent ledger, audit log
       and privacy requests.
 
+## 2026-11-27 (payments — Razorpay)
+- [ ] Open / finish the Razorpay account (business KYC, settlement bank account). Create test keys first.
+- [ ] Run the test-mode checklist in docs/backend/go-live.md §11 on a preview, then tell me the result.
+- [ ] Create the live webhook (URL + 3 events + secret) and put `PAYMENT_GATEWAY`, `RAZORPAY_KEY_ID`,
+      `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` in the host's secret store. Turn on MFA on the Razorpay login.
+- [ ] Lawyer review of the Privacy Notice change (Razorpay named as the payment processor; version 2026-11-27).
+

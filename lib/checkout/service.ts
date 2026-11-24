@@ -9,7 +9,7 @@ import { CommerceError, type CommerceAdapter } from "@/lib/commerce/types";
 import { locks as defaultLocks, type KeyedLock } from "@/lib/concurrency/lock";
 import { resolveCustomers, type CustomerStore } from "@/lib/customers/store";
 import type { Paise } from "@/lib/format";
-import { resolveOrders, type Order, type OrderStore } from "@/lib/orders/store";
+import { resolveOrders, type Order, type OrderStore, type PaymentAttempt } from "@/lib/orders/store";
 import { resolveGateway, type PaymentEvent, type PaymentGateway } from "@/lib/payments/gateway";
 import type { PaymentMethod } from "@/lib/pricing/price-cart";
 import { lookupCoupon } from "@/lib/promotions/lookup";
@@ -45,7 +45,8 @@ export class CheckoutError extends Error {
       | "out_of_stock"
       | "total_changed"
       | "order_not_found"
-      | "not_retryable",
+      | "not_retryable"
+      | "payment_unavailable",
     message: string,
     public readonly status: number,
     public readonly details?: Record<string, unknown>,
@@ -171,8 +172,7 @@ function placeResult(order: Order): PlaceResult {
     throw new CheckoutError("out_of_stock", "Some items just sold out. Please review your bag.", 409);
   }
   const last = order.attempts.at(-1);
-  const redirectUrl =
-    order.status === "pending_payment" && last && last.status === "pending" ? `/checkout/pay/${last.paymentId}` : `/checkout/order/${order.number}`;
+  const redirectUrl = order.status === "pending_payment" && last && last.status === "pending" ? payRedirect(order.number, last) : `/checkout/order/${order.number}`;
   return { orderNumber: order.number, status: order.status, redirectUrl };
 }
 
@@ -350,11 +350,12 @@ export async function placeOrder(deps: CheckoutDeps, input: PlaceInput): Promise
       }
       throw e;
     }
+    const attempt = attemptFrom(payment, plan.payable, now);
     await deps.orders.update(order.number, (o) => {
-      o.attempts.push({ paymentId: payment.paymentId, amount: plan.payable, status: "pending", createdAt: now.toISOString() });
+      o.attempts.push(attempt);
     });
     securityEvent("order_placed", { order: order.number, method: input.payment });
-    return { orderNumber: order.number, status: "pending_payment", redirectUrl: payment.redirectUrl };
+    return { orderNumber: order.number, status: "pending_payment", redirectUrl: payRedirect(order.number, attempt) };
   });
 }
 
@@ -488,11 +489,59 @@ export async function retryPayment(deps: CheckoutDeps, customerId: string, order
     }
     const method = order.paymentMethod as Exclude<PaymentMethod, "cod">;
     const payment = await deps.gateway.createPayment({ orderNumber: order.number, amount: orderPayable(order), method });
+    const attempt = attemptFrom(payment, orderPayable(order), now);
     await deps.orders.transition(order.number, ["payment_failed", "expired"], "pending_payment", (o) => {
-      o.attempts.push({ paymentId: payment.paymentId, amount: orderPayable(o), status: "pending", createdAt: now.toISOString() });
+      o.attempts.push(attempt);
     });
-    return { orderNumber: order.number, redirectUrl: payment.redirectUrl };
+    return { orderNumber: order.number, redirectUrl: payRedirect(order.number, attempt) };
   });
+}
+
+/** Hosted gateway pages we may send a shopper to (exact hosts, https only). */
+const PAY_HOSTS = /^https:\/\/(rzp\.io|pages\.razorpay\.com|api\.razorpay\.com)\//;
+
+function attemptFrom(payment: { paymentId: string; redirectUrl: string }, amount: Paise, now: Date): PaymentAttempt {
+  const a: PaymentAttempt = { paymentId: payment.paymentId, amount, status: "pending", createdAt: now.toISOString() };
+  if (!payment.redirectUrl.startsWith("/")) {
+    if (!PAY_HOSTS.test(payment.redirectUrl)) throw new CheckoutError("payment_unavailable", "Payment is unavailable right now. Please try again.", 502);
+    a.payUrl = payment.redirectUrl;
+  }
+  return a;
+}
+
+/**
+ * Where the browser goes to pay. The client only ever receives a same-origin path: `/checkout/pay/<id>` for the demo
+ * gateway, or `/api/payments/go/<order>` which checks the session owns the order and then redirects to the stored,
+ * allow-listed gateway page (no open redirect, no gateway URL trusted from the client).
+ */
+export function payRedirect(orderNumber: string, attempt: PaymentAttempt): string {
+  return attempt.payUrl ? `/api/payments/go/${orderNumber}` : `/checkout/pay/${attempt.paymentId}`;
+}
+
+export function hostedPayUrl(order: Order): string | null {
+  const last = order.attempts.at(-1);
+  return order.status === "pending_payment" && last?.status === "pending" && last.payUrl && PAY_HOSTS.test(last.payUrl) ? last.payUrl : null;
+}
+
+/**
+ * Asks the gateway (never the browser) whether this attempt is final, and applies it like a webhook. Returns the
+ * handler's result, or null while the payment is still pending / unknown. Idempotent (same event id as webhooks
+ * would de-duplicate against, derived from the attempt).
+ */
+export async function syncAttempt(deps: CheckoutDeps, orderNumber: string, paymentId: string, now = new Date()): Promise<string | null> {
+  const status = await deps.gateway.fetchStatus(paymentId);
+  if (!status || status.status === "pending") return null;
+  return handlePaymentEvent(
+    deps,
+    {
+      id: `evt_sync_${paymentId}_${status.status}`,
+      type: status.status === "succeeded" ? "payment.succeeded" : "payment.failed",
+      paymentId,
+      orderNumber,
+      amount: status.amount,
+    },
+    now,
+  );
 }
 
 /**
@@ -516,19 +565,9 @@ export async function reconcilePending(deps: CheckoutDeps, now = new Date()) {
       }
       continue;
     }
-    const status = await deps.gateway.fetchStatus(attempt.paymentId);
-    if (status && status.status !== "pending") {
-      results[order.number] = await handlePaymentEvent(
-        deps,
-        {
-          id: `evt_${attempt.paymentId.slice(4)}`,
-          type: status.status === "succeeded" ? "payment.succeeded" : "payment.failed",
-          paymentId: attempt.paymentId,
-          orderNumber: order.number,
-          amount: status.amount,
-        },
-        now,
-      );
+    const synced = await syncAttempt(deps, order.number, attempt.paymentId, now);
+    if (synced) {
+      results[order.number] = synced;
       continue;
     }
     if (now.getTime() - Date.parse(attempt.createdAt) > RESERVATION_TTL_MS) {

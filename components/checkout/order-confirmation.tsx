@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { track } from "@/lib/analytics/client";
 import { formatINR } from "@/lib/format";
 import type { publicOrder } from "@/lib/orders/store";
-import { api, ApiError, safeRedirect } from "./api";
+import { api, ApiError, goToPayment } from "./api";
 
 type Order = ReturnType<typeof publicOrder>;
 const POLL_MS = 3_000;
@@ -73,7 +73,7 @@ export function OrderConfirmation() {
     setRetrying(true);
     try {
       const r = await api<{ redirectUrl: string }>("/api/checkout/retry", { method: "POST", body: { orderNumber: number } });
-      router.push(safeRedirect(r.redirectUrl));
+      goToPayment(r.redirectUrl, router.push);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Couldn't start the payment.");
       setRetrying(false);

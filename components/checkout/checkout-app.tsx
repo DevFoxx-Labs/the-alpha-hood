@@ -22,7 +22,7 @@ import { PREPAID_OFFER } from "@/lib/promotions/automatic";
 import type { DeliveryPromise } from "@/lib/shipping";
 import { cn } from "@/lib/utils";
 import { AddressStep } from "./address-step";
-import { api, ApiError, safeRedirect } from "./api";
+import { api, ApiError, goToPayment } from "./api";
 import { ContactStep } from "./contact-step";
 
 interface State {
@@ -193,7 +193,7 @@ export function CheckoutApp() {
         body: { addressId, speed, payment, expectedTotal: quote.payable, tenders: wallet, ...(payment === "upi" ? { upiApp } : {}) },
       });
       void refreshCart();
-      router.push(safeRedirect(r.redirectUrl));
+      goToPayment(r.redirectUrl, router.push);
     } catch (e) {
       idemKey.current = null; // a refused attempt didn't create an order — the next click is a new attempt
       if (e instanceof ApiError && (e.code === "total_changed" || e.code === "cart_changed" || e.code === "coupon_invalid")) {

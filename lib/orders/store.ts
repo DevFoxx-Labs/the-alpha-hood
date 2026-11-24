@@ -64,6 +64,8 @@ export interface PaymentAttempt {
   amount: Paise;
   status: "pending" | "succeeded" | "failed" | "expired";
   createdAt: string;
+  /** The gateway's hosted payment page (absolute https URL, allow-listed host); absent for the demo gateway. */
+  payUrl?: string;
 }
 
 export interface Order {

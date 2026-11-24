@@ -1,3 +1,4 @@
+import { demoVerify } from "@/lib/payments/test-helpers";
 import { describe, expect, it } from "vitest";
 import { createOtpStore, OtpError, sendOtp, verifyOtp, OTP_COOLDOWN_MS } from "@/lib/auth/otp";
 import { loadCartView } from "@/lib/cart/service";
@@ -71,7 +72,7 @@ async function place(deps: CheckoutDeps, b: Awaited<ReturnType<typeof buyer>>, p
 function pay(deps: CheckoutDeps, gateway: ReturnType<typeof createDemoGateway>, redirectUrl: string, outcome: "succeeded" | "failed") {
   const paymentId = redirectUrl.split("/").pop()!;
   const signed = gateway.simulate(paymentId, outcome, NOW.getTime())!;
-  const event = gateway.verifyWebhook(signed.rawBody, signed.signature, signed.timestamp, NOW.getTime())!;
+  const event = demoVerify(gateway, signed.rawBody, signed.signature, signed.timestamp, NOW.getTime())!;
   return { event, signed, run: () => handlePaymentEvent(deps, event, NOW) };
 }
 
@@ -222,10 +223,10 @@ describe("payment events (CHK-06)", () => {
     const b = await buyer(deps);
     const r = await place(deps, b, "card");
     const { signed } = pay(deps, gateway, r.redirectUrl, "succeeded");
-    expect(gateway.verifyWebhook(signed.rawBody.replace(/"amount":\d+/, '"amount":1'), signed.signature, signed.timestamp, NOW.getTime())).toBeNull();
-    expect(gateway.verifyWebhook(signed.rawBody, "0".repeat(64), signed.timestamp, NOW.getTime())).toBeNull();
-    expect(gateway.verifyWebhook(signed.rawBody, signed.signature, signed.timestamp, NOW.getTime() + 10 * 60_000)).toBeNull();
-    expect(gateway.verifyWebhook(signed.rawBody, null, null)).toBeNull();
+    expect(demoVerify(gateway, signed.rawBody.replace(/"amount":\d+/, '"amount":1'), signed.signature, signed.timestamp, NOW.getTime())).toBeNull();
+    expect(demoVerify(gateway, signed.rawBody, "0".repeat(64), signed.timestamp, NOW.getTime())).toBeNull();
+    expect(demoVerify(gateway, signed.rawBody, signed.signature, signed.timestamp, NOW.getTime() + 10 * 60_000)).toBeNull();
+    expect(demoVerify(gateway, signed.rawBody, null, null)).toBeNull();
   });
 
   it("an amount that doesn't match the order is never confirmed", async () => {

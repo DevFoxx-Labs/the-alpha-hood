@@ -38,3 +38,13 @@ export async function api<T>(url: string, init: { method?: string; body?: unknow
 export function safeRedirect(url: string): string {
   return url.startsWith("/") && !url.startsWith("//") && !url.includes("\\") ? url : "/checkout";
 }
+
+/**
+ * Goes to a payment step. Same-origin paths only (`safeRedirect`). The hosted-gateway hop (`/api/payments/go/…`) is a
+ * server redirect, so it needs a full page load; in-app pages use the router.
+ */
+export function goToPayment(url: string, push: (href: string) => void) {
+  const safe = safeRedirect(url);
+  if (safe.startsWith("/api/payments/go/")) window.location.assign(safe);
+  else push(safe);
+}

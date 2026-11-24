@@ -49,8 +49,8 @@ export async function POST(request: Request) {
     if (r.error) return r.error;
     const signed = r.gateway!.simulate(paymentId, input.outcome);
     if (!signed) return jsonError(409, "already_final", "This payment is already complete.");
-    const event = r.gateway!.verifyWebhook(signed.rawBody, signed.signature, signed.timestamp);
-    if (!event) return jsonError(401, "invalid_signature", "Invalid signature.");
+    const event = r.gateway!.verifyWebhook(signed.rawBody, new Headers({ "x-signature": signed.signature, "x-timestamp": signed.timestamp }));
+    if (!event || event === "ignored") return jsonError(401, "invalid_signature", "Invalid signature.");
     const result = await handlePaymentEvent(r.deps, event);
     return privateJson({ result, orderNumber: r.order!.number });
   } catch (error) {

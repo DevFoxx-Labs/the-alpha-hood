@@ -3,13 +3,18 @@ import { mockPaymentsAllowed } from "@/lib/checkout/flags";
 import type { Paise } from "@/lib/format";
 import { BackendUnavailableError, devSingleton, type Env } from "@/lib/mock-guard";
 import type { PaymentMethod } from "@/lib/pricing/price-cart";
+import { createRazorpayGateway, readRazorpayConfig } from "./razorpay";
 
 /**
- * Payment gateway (CHK-04/06) — Razorpay / Cashfree / PayU pending (PRD §9). Card, UPI, netbanking and wallet
- * details are entered on the gateway's hosted page: no card data ever reaches our servers (PCI).
+ * Payment gateway (CHK-04/06). Card, UPI, netbanking and wallet details are entered on the gateway's hosted page:
+ * no card data ever reaches our servers (PCI).
+ * - `razorpay` (lib/payments/razorpay.ts): PAYMENT_GATEWAY=razorpay + RAZORPAY_KEY_ID / _KEY_SECRET / _WEBHOOK_SECRET.
+ * - `demo`: development / protected previews only.
+ * - otherwise every call refuses (fail closed).
  *
- * Webhooks: HMAC-SHA256 over `${timestamp}.${rawBody}`, constant-time compare, ±5 min timestamp window
- * (replay), event ids de-duplicated by the handler. Fails closed when no gateway is configured.
+ * Webhooks: each gateway verifies its own signature over the RAW body (constant-time compare); event ids are
+ * de-duplicated by the handler, so a replayed event is a no-op. `"ignored"` = correctly signed but not an event we
+ * act on (answered 200 so the gateway doesn't retry it).
  */
 export interface PaymentEvent {
   id: string;
@@ -22,7 +27,7 @@ export interface PaymentEvent {
 export interface PaymentGateway {
   readonly name: string;
   createPayment(input: { orderNumber: string; amount: Paise; method: Exclude<PaymentMethod, "cod">; upiApp?: string }): Promise<{ paymentId: string; redirectUrl: string }>;
-  verifyWebhook(rawBody: string, signature: string | null, timestamp: string | null, now?: number): PaymentEvent | null;
+  verifyWebhook(rawBody: string, headers: Headers, now?: number): PaymentEvent | "ignored" | null;
   fetchStatus(paymentId: string): Promise<{ status: "pending" | "succeeded" | "failed"; amount: Paise } | null>;
   /**
    * Refund to the original payment method. Idempotent per `reference` (the gateway's idempotency key); never
@@ -33,6 +38,8 @@ export interface PaymentGateway {
 
 export const WEBHOOK_TOLERANCE_MS = 5 * 60_000;
 const PAYMENT_ID_RE = /^pay_[a-f0-9]{24}$/;
+/** Gateway payment ids we accept anywhere in the app: demo `pay_…` or Razorpay payment link `plink_…`. */
+export const GATEWAY_PAYMENT_ID_RE = /^(pay_[a-f0-9]{24}|plink_[A-Za-z0-9]{8,24})$/;
 const ORDER_RE = /^AH[0-9A-Z]{8}$/;
 
 function sign(secret: string, timestamp: string, body: string) {
@@ -83,8 +90,8 @@ export function createDemoGateway(secret = randomBytes(32).toString("hex")): Dem
       payments.set(paymentId, { orderNumber, amount, method, status: "pending", refunded: 0 });
       return { paymentId, redirectUrl: `/checkout/pay/${paymentId}` };
     },
-    verifyWebhook(rawBody, signature, timestamp, now) {
-      return verifySignedBody(secret, rawBody, signature, timestamp, now);
+    verifyWebhook(rawBody, headers, now) {
+      return verifySignedBody(secret, rawBody, headers.get("x-signature"), headers.get("x-timestamp"), now);
     },
     async fetchStatus(paymentId) {
       const p = payments.get(paymentId);
@@ -124,7 +131,10 @@ export function createDemoGateway(secret = randomBytes(32).toString("hex")): Dem
 }
 
 export function resolveGateway(env: Env = process.env): PaymentGateway {
-  if (mockPaymentsAllowed(env)) return devSingleton("demo_gateway", () => createDemoGateway());
+  if (env.PAYMENT_GATEWAY === "razorpay") {
+    const cfg = readRazorpayConfig(env);
+    if (cfg) return createRazorpayGateway(cfg);
+  } else if (mockPaymentsAllowed(env)) return devSingleton("demo_gateway", () => createDemoGateway());
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Payment gateway");
   };

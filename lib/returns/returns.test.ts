@@ -1,3 +1,4 @@
+import { demoVerify } from "@/lib/payments/test-helpers";
 import { createMemoryGiftCardStore } from "@/lib/giftcards/store";
 import { createMemoryLoyaltyStore } from "@/lib/loyalty/store";
 import { describe, expect, it } from "vitest";
@@ -64,7 +65,7 @@ async function deliveredOrder(
   const placed = await placeOrder(deps, { customerId: customer.id, cartId: cart.id, addressId: address.id, speed: "standard", payment, idempotencyKey: crypto.randomUUID(), expectedTotal: q.pricing.total, now: T0 });
   if (payment !== "cod") {
     const signed = gateway.simulate(placed.redirectUrl.split("/").pop()!, "succeeded", T0.getTime())!;
-    await handlePaymentEvent(deps, gateway.verifyWebhook(signed.rawBody, signed.signature, signed.timestamp, T0.getTime())!, T0);
+    await handlePaymentEvent(deps, demoVerify(gateway, signed.rawBody, signed.signature, signed.timestamp, T0.getTime())!, T0);
   }
   for (const to of ["packed", "shipped", "delivered"] as const) await advanceFulfilment(deps, placed.orderNumber, to, T0);
   return { customer, address, order: (await deps.orders.get(placed.orderNumber))! };
@@ -117,7 +118,7 @@ describe("ORD-04 cancellation", () => {
     const q = await quote(deps, { customerId: customer.id, cartId: cart.id, addressId: address.id, speed: "standard", payment: "upi", now: T0 });
     const placed = await placeOrder(deps, { customerId: customer.id, cartId: cart.id, addressId: address.id, speed: "standard", payment: "upi", idempotencyKey: crypto.randomUUID(), expectedTotal: q.pricing.total, now: T0 });
     const s = gateway.simulate(placed.redirectUrl.split("/").pop()!, "succeeded", T0.getTime())!;
-    await handlePaymentEvent(deps, gateway.verifyWebhook(s.rawBody, s.signature, s.timestamp, T0.getTime())!, T0);
+    await handlePaymentEvent(deps, demoVerify(gateway, s.rawBody, s.signature, s.timestamp, T0.getTime())!, T0);
 
     await expect(cancelOrder(deps, "cus_other", placed.orderNumber, T0)).rejects.toMatchObject({ status: 404 });
     const [a, b] = await Promise.allSettled([cancelOrder(deps, customer.id, placed.orderNumber, T0), cancelOrder(deps, customer.id, placed.orderNumber, T0)]);
@@ -303,7 +304,7 @@ describe("CHK-05 returns on a wallet-paid order", () => {
     const q = await quote(deps, { customerId: customer.id, cartId: cart.id, addressId: address.id, speed: "standard", payment: "upi", tenders, now: T0 });
     const placed = await placeOrder(deps, { customerId: customer.id, cartId: cart.id, addressId: address.id, speed: "standard", payment: "upi", idempotencyKey: crypto.randomUUID(), expectedTotal: q.payable, tenders, now: T0 });
     const signed = gateway.simulate(placed.redirectUrl.split("/").pop()!, "succeeded", T0.getTime())!;
-    await handlePaymentEvent(deps, gateway.verifyWebhook(signed.rawBody, signed.signature, signed.timestamp, T0.getTime())!, T0);
+    await handlePaymentEvent(deps, demoVerify(gateway, signed.rawBody, signed.signature, signed.timestamp, T0.getTime())!, T0);
     for (const to of ["packed", "shipped", "delivered"] as const) await advanceFulfilment(deps, placed.orderNumber, to, T0);
     const order = (await deps.orders.get(placed.orderNumber))!;
     expect(await deps.credit.balance(customer.id)).toBe(0);

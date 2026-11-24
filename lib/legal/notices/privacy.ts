@@ -7,8 +7,8 @@ import type { Notice } from "../types";
  */
 export const PRIVACY_NOTICE: Notice = {
   slug: "privacy",
-  version: "2026-11-25",
-  lastUpdated: "2026-11-25",
+  version: "2026-11-27",
+  lastUpdated: "2026-11-27",
   text: {
     en: {
       title: "Privacy Notice",
@@ -80,7 +80,7 @@ export const PRIVACY_NOTICE: Notice = {
               head: ["Who", "What for", "Provider"],
               rows: [
                 ["E-commerce platform and hosting", "Run the store, your account, cart and orders", "To be confirmed before launch"],
-                ["Payment gateway", "Take payments and refunds (UPI, cards, netbanking, wallets)", "To be confirmed before launch"],
+                ["Payment gateway", "Take payments and refunds (UPI, cards, netbanking, wallets). We send only the order number and amount; you enter payment details on the gateway's own page", "Razorpay Software Private Limited, India (when online payment is switched on)"],
                 ["Courier and logistics partners", "Deliver orders, pick up returns, show tracking", "To be confirmed before launch"],
                 ["SMS, email and WhatsApp providers", "OTPs and order updates; offers only if you opted in", "To be confirmed before launch"],
                 ["Error monitoring", "Find and fix technical faults (no payment data)", "To be confirmed before launch"],
@@ -316,7 +316,7 @@ export const PRIVACY_NOTICE: Notice = {
               head: ["कौन", "किसलिए", "प्रदाता"],
               rows: [
                 ["ई-कॉमर्स प्लेटफ़ॉर्म और होस्टिंग", "स्टोर, आपका खाता, कार्ट और ऑर्डर चलाना", "लॉन्च से पहले तय किया जाएगा"],
-                ["पेमेंट गेटवे", "भुगतान और रिफ़ंड (UPI, कार्ड, नेटबैंकिंग, वॉलेट)", "लॉन्च से पहले तय किया जाएगा"],
+                ["पेमेंट गेटवे", "भुगतान और रिफ़ंड (UPI, कार्ड, नेटबैंकिंग, वॉलेट)। हम केवल ऑर्डर नंबर और राशि भेजते हैं; भुगतान विवरण आप गेटवे के अपने पेज पर भरते हैं", "Razorpay Software Private Limited, भारत (ऑनलाइन भुगतान चालू होने पर)"],
                 ["कूरियर और लॉजिस्टिक्स साझेदार", "ऑर्डर पहुँचाना, रिटर्न उठाना, ट्रैकिंग दिखाना", "लॉन्च से पहले तय किया जाएगा"],
                 ["SMS, ईमेल और WhatsApp प्रदाता", "OTP और ऑर्डर अपडेट; ऑफ़र केवल तब जब आपने सहमति दी हो", "लॉन्च से पहले तय किया जाएगा"],
                 ["एरर मॉनिटरिंग", "तकनीकी खराबियाँ ढूँढना और ठीक करना (भुगतान डेटा नहीं)", "लॉन्च से पहले तय किया जाएगा"],
