@@ -51,6 +51,8 @@
   address + customer, GST assumes one warehouse state, consent sources are web/android/ios only.
 
 ## Product / design
+- 🟠 Trademark files (`docs/brand/trademark/`) are cut from a vector-traced logo concept. Before filing, confirm who
+  owns the concept artwork and get a designer's final master. No clearance search has been done yet.
 - 🟡 PLP-08 rail gallery (`components/listing/product-rail-gallery.tsx`): uses `GarmentArt` placeholders; the "Back"
   view is the mirrored placeholder until real front/back/side cut-out photos (transparent PNG/WebP) exist. Products are
   auto-picked (popularity, one colour per style) — per-collection hand-picking belongs to PLP-07 admin merchandising.

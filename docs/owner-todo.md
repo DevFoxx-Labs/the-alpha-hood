@@ -142,3 +142,10 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] When the production database is created, give the app a database user that can't UPDATE or DELETE
       `audit_log` (insert + select only).
 
+
+## 2026-11-24 (trademark files — `docs/brand/trademark/TRADEMARK.md`)
+- [ ] Engage a trademark attorney/agent; run a clearance search for `THE ALPHA HOOD` and the wolf device (classes 25, 35).
+- [ ] Confirm who created the logo concept and get a written copyright assignment (or have a designer finalise the
+      master) before filing.
+- [ ] Provide applicant details (legal entity, address, entity type for the fee tier) and date of first use / evidence.
+- [ ] Decide B&W vs colour claim for the device marks, then file (word mark first). Use ™ only — never ® until registered.

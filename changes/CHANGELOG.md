@@ -1,5 +1,26 @@
 # Change log
 
+## 2026-11-24 — Trademark filing files
+
+**Threat model:** static image and docs files only. There is no new route, personal data, tracker or processor, and
+nothing is served publicly: the files live in `docs/`, not `public/`.
+
+**Added**
+- `docs/brand/trademark/`:
+  - `word-mark.txt`;
+  - wordmark (B&W), logo mark and composite (B&W + colour) as filing JPGs (≤ 944 px, 300 dpi, white background,
+    fits the TM-A 8 × 8 cm box), plus 2400 px `-hires.png` copies;
+  - `TRADEMARK.md`: which file is which, B&W vs colour claim, filing order, classes to discuss, owner checklist,
+    and the ™ / ® rules.
+- `scripts/brand-trademark.mjs` rebuilds the files from the vector masters in `docs/brand/logo-kit/logo/`
+  using sharp, which comes with Next. The logo is not redrawn: B&W only stretches `#0A0A0A` to `#000`.
+
+**Verified**
+- Ran `node scripts/brand-trademark.mjs`. It printed the size and dpi of every JPG.
+- Checked each image visually.
+- `eslint scripts/brand-trademark.mjs` passes.
+- Not run: `pnpm verify`. No app code changed.
+
 ## 2026-11-26 — Own backend, phase 5: staff + MFA, audit log, rate limits, alerts, UGC, outbox, flows on the database (High-risk tier: auth, admin powers)
 
 **Threat model:**
