@@ -238,3 +238,23 @@
   for review/refund (existing `needs_review` path). Watch for this in the first weeks.
 - 🟡 COD refunds still go to UPI by hand (payout API not built).
 
+## SMS (2026-11-27)
+- 🔴 **No real SMS provider adapter yet.** The SMS pipeline is built and tested:
+  - DLT template allow-list;
+  - per-template variable allow-list;
+  - outbox delivery worker with exclusive claims, back-off, retries and per-channel results;
+  - OTP path;
+  - `ops:check` blocker.
+
+  The provider adapter itself is missing. I couldn't confirm MSG91's current v5 API from a first-party source: the
+  docs pages render with JavaScript, and the public GitHub SDKs use legacy endpoints. Shipping a guessed request
+  format would pass fake-API tests and fail with real SMS.
+
+  Fix, once the owner picks a provider and shares its exact API (MSG91's panel shows the request for each approved
+  template; Gupshup, Exotel, Twilio and AWS SNS publish static docs):
+  1. add a factory to `SMS_PROVIDERS` in `lib/notify/sms.ts`;
+  2. add a contract test against a fake API;
+  3. run one real test send.
+- 🟡 Email and WhatsApp channels record `no_provider`. Order updates by email/WhatsApp need those providers.
+- 🟡 Delivery receipts (DLR) from the provider aren't read yet. "sent" means the provider accepted the message.
+

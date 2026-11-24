@@ -168,6 +168,30 @@ for (const target of testTargets()) {
       expect(await s.outbox.listFor("cus_ob")).toEqual([]);
     });
 
+    it("outbox delivery: parallel workers claim each message once; retry back-off; stale claims re-offered; done is final", async () => {
+      const t = Date.parse("2026-11-27T09:00:00Z");
+      for (let i = 0; i < 6; i++) await s.outbox.push({ customerId: "cus_dl", template: "order_shipped", channels: ["sms"], refs: { orderNumber: `AH0000001${i}` }, createdAt: new Date(t + i).toISOString(), status: "queued" });
+      const [a, b, c] = await Promise.all([s.outbox.claim(6, t), s.outbox.claim(6, t), s.outbox.claim(6, t)]);
+      const all = [...a, ...b, ...c];
+      expect(all).toHaveLength(6);
+      expect(new Set(all.map((m) => m.id)).size).toBe(6);
+      expect(all[0]).toMatchObject({ status: "sending", attempts: 0, results: {} });
+      expect(await s.outbox.claim(6, t)).toEqual([]); // all held
+      const [m1, m2, ...rest] = all;
+      await s.outbox.finish(m1.id, { status: "done", results: { sms: "sent" } }, t);
+      await s.outbox.finish(m1.id, { status: "failed", results: { sms: "failed" } }, t); // not claimed any more → ignored
+      await s.outbox.finish(m2.id, { status: "queued", results: {}, nextAttemptAt: t + 60_000 }, t);
+      expect(await s.outbox.claim(6, t + 1000)).toEqual([]); // backing off
+      const again = await s.outbox.claim(6, t + 61_000);
+      expect(again.map((m) => m.id)).toEqual([m2.id]);
+      expect(again[0].attempts).toBe(1);
+      // Crashed worker: its claims come back after STALE_CLAIM_MS.
+      const reoffered = await s.outbox.claim(10, t + 61_000 + 11 * 60_000);
+      expect(new Set(reoffered.map((m) => m.id))).toEqual(new Set([m2.id, ...rest.map((m) => m.id)]));
+      expect((await s.outbox.listFor("cus_dl")).find((m) => m.refs.orderNumber === m1.refs.orderNumber)!.status).toBe("done");
+      await s.outbox.erase("cus_dl");
+    });
+
     it("flows: each reminder step and review request is claimed once, even by parallel sweeps", async () => {
       const startedAt = "2026-11-26T06:00:00.000Z";
       await s.flows.putCheckout({ customerId: "cus_fl", cartId: "cart_1", startedAt, sent: { h1: false, h24: false } });

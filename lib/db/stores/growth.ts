@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { AlertKind, AlertStore, ProductAlert } from "@/lib/alerts/service";
 import type { CheckoutSession, FlowStore } from "@/lib/flows/service";
-import { isMarketing, type OutboxMessage, type OutboxStore, type Template } from "@/lib/notify/outbox";
+import { type ClaimedMessage, isMarketing, type OutboxMessage, type OutboxStore, STALE_CLAIM_MS, type Template } from "@/lib/notify/outbox";
 import type { UgcPost, UgcStore } from "@/lib/ugc/service";
 import { isMongoDuplicate, type MongoConn } from "../mongo";
 import type { Primitives } from "../primitives";
@@ -120,7 +120,7 @@ export function createSqlOutbox(db: SqlDb): OutboxStore {
     async push(m) {
       await db
         .insertInto("notify_outbox")
-        .values({ id: `msg_${randomBytes(10).toString("hex")}`, customer_id: m.customerId, template: m.template, marketing: isMarketing(m.template), status: m.status, created_at: new Date(m.createdAt), doc: JSON.stringify(m) })
+        .values({ id: `msg_${randomBytes(10).toString("hex")}`, customer_id: m.customerId, template: m.template, marketing: isMarketing(m.template), status: m.status, created_at: new Date(m.createdAt), doc: JSON.stringify(m), attempts: 0, next_attempt_at: 0, claimed_at: 0, results: "{}" })
         .execute();
     },
     async marketingSince(customerId, since) {
@@ -134,7 +134,33 @@ export function createSqlOutbox(db: SqlDb): OutboxStore {
       return Number(r?.c ?? 0);
     },
     async listFor(customerId) {
-      return (await db.selectFrom("notify_outbox").select("doc").where("customer_id", "=", customerId).orderBy("created_at").orderBy("id").execute()).map((r) => fromJson<OutboxMessage>(r.doc, null as unknown as OutboxMessage));
+      return (await db.selectFrom("notify_outbox").select(["doc", "status"]).where("customer_id", "=", customerId).orderBy("created_at").orderBy("id").execute()).map((r) => ({
+        ...fromJson<OutboxMessage>(r.doc, null as unknown as OutboxMessage),
+        status: r.status as OutboxMessage["status"],
+      }));
+    },
+    async claim(limit, now) {
+      // A crashed worker's claim is offered again after STALE_CLAIM_MS.
+      await db.updateTable("notify_outbox").set({ status: "queued" }).where("status", "=", "sending").where("claimed_at", "<", now - STALE_CLAIM_MS).execute();
+      const due = await db.selectFrom("notify_outbox").select("id").where("status", "=", "queued").where("next_attempt_at", "<=", now).orderBy("created_at").limit(Math.max(1, Math.min(limit, 500))).execute();
+      const out: ClaimedMessage[] = [];
+      for (const { id } of due) {
+        // Conditional update: only one worker wins each message.
+        const r = await db.updateTable("notify_outbox").set({ status: "sending", claimed_at: now }).where("id", "=", id).where("status", "=", "queued").executeTakeFirst();
+        if (Number(r.numUpdatedRows) !== 1) continue;
+        const row = await db.selectFrom("notify_outbox").select(["doc", "attempts", "results"]).where("id", "=", id).executeTakeFirst();
+        if (!row) continue;
+        out.push({ ...fromJson<OutboxMessage>(row.doc, null as unknown as OutboxMessage), status: "sending", id, attempts: Number(row.attempts), results: fromJson(row.results, {}) });
+      }
+      return out;
+    },
+    async finish(id, outcome) {
+      await db
+        .updateTable("notify_outbox")
+        .set((eb) => ({ status: outcome.status, results: JSON.stringify(outcome.results), attempts: eb("attempts", "+", 1), next_attempt_at: outcome.nextAttemptAt ?? 0 }))
+        .where("id", "=", id)
+        .where("status", "=", "sending")
+        .execute();
     },
     async erase(customerId) {
       await db.deleteFrom("notify_outbox").where("customer_id", "=", customerId).execute();
@@ -252,23 +278,40 @@ export function createMongoUgcStore(conn: Promise<MongoConn>): UgcStore {
 }
 
 export function createMongoOutbox(conn: Promise<MongoConn>): OutboxStore {
-  type Doc = OutboxMessage & { _id: string; marketing: boolean; seq: number };
+  type Doc = OutboxMessage & { _id: string; marketing: boolean; seq: number; attempts: number; nextAttemptAt: number; claimedAt: number; results: ClaimedMessage["results"] };
   const col = async () => (await conn).db.collection<Doc>("notify_outbox");
   let seq = 0;
   return {
     async push(m) {
-      await (await col()).insertOne({ ...m, _id: `msg_${randomBytes(10).toString("hex")}`, marketing: isMarketing(m.template as Template), seq: Date.now() * 1000 + (seq++ % 1000) });
+      await (await col()).insertOne({ ...m, _id: `msg_${randomBytes(10).toString("hex")}`, marketing: isMarketing(m.template as Template), seq: Date.now() * 1000 + (seq++ % 1000), attempts: 0, nextAttemptAt: 0, claimedAt: 0, results: {} });
+    },
+    async claim(limit, now) {
+      const c = await col();
+      const out: ClaimedMessage[] = [];
+      for (let i = 0; i < Math.max(1, Math.min(limit, 500)); i++) {
+        const d = await c.findOneAndUpdate(
+          { $or: [{ status: "queued", nextAttemptAt: { $lte: now } }, { status: "sending", claimedAt: { $lt: now - STALE_CLAIM_MS } }] },
+          { $set: { status: "sending", claimedAt: now } },
+          { sort: { seq: 1 }, returnDocument: "after" },
+        );
+        if (!d) break;
+        const { _id, marketing: _m, seq: _s, nextAttemptAt: _n, claimedAt: _c, ...rest } = d;
+        void _m;
+        void _s;
+        void _n;
+        void _c;
+        out.push({ ...rest, id: _id });
+      }
+      return out;
+    },
+    async finish(id, outcome) {
+      await (await col()).updateOne({ _id: id, status: "sending" }, { $set: { status: outcome.status, results: outcome.results, nextAttemptAt: outcome.nextAttemptAt ?? 0 }, $inc: { attempts: 1 } });
     },
     async marketingSince(customerId, since) {
       return (await col()).countDocuments({ customerId, marketing: true, createdAt: { $gte: since } });
     },
     async listFor(customerId) {
-      return (await (await col()).find({ customerId }).sort({ createdAt: 1, seq: 1 }).toArray()).map(({ _id, marketing: _m, seq: _s, ...rest }) => {
-        void _id;
-        void _m;
-        void _s;
-        return rest;
-      });
+      return (await (await col()).find({ customerId }).sort({ createdAt: 1, seq: 1 }).toArray()).map(({ customerId: cid, template, channels, refs, createdAt, status }) => ({ customerId: cid, template, channels, refs, createdAt, status }));
     },
     async erase(customerId) {
       await (await col()).deleteMany({ customerId });

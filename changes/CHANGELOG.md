@@ -1,5 +1,51 @@
 # Change log
 
+## 2026-11-27 — SMS pipeline: DLT templates, outbox delivery worker, provider registry (High-risk tier: auth OTP, personal data)
+
+**Not done:** the real provider adapter. I couldn't confirm MSG91's current v5 API from a first-party source (the
+docs render with JavaScript; the public GitHub SDKs use legacy endpoints). I didn't ship a guessed request format,
+which would pass fake-API tests and fail with real SMS. Everything around the adapter is built, so adding a provider
+is one factory plus a test (docs/known-gaps.md → SMS).
+
+**Threat model:**
+- *Assets:* OTP codes, customers' phone numbers, the sender reputation and DLT compliance, provider credits.
+- *Actors:* anyone triggering messages; a crashed or duplicated worker; a provider outage.
+- *Abuse cases and the layer that stops each:*
+  - free-text / phishing SMS from our sender → templates only, DLT ids from config, variable allow-list per
+    template, values `[A-Za-z0-9 ._/-]{1,30}`;
+  - leaking personal data in SMS → no names or addresses, only order / return numbers, product handle, OTP;
+  - phone numbers stored in the queue → looked up at send time, so an erased account gets nothing;
+  - marketing sent by SMS → never;
+  - a message sent twice by parallel workers → atomic claim (conditional update / `findOneAndUpdate`);
+  - a channel re-sent on retry → per-channel results, and sent channels are skipped;
+  - provider outage → back-off 1 m / 5 m / 15 m / 1 h, at most 5 attempts, then failed;
+  - crashed worker → stale claims are re-offered after 10 min;
+  - an unknown or misconfigured provider silently falling back to the demo (which shows codes) → refused;
+  - going live without SMS → `ops:check` blocker.
+
+**Added**
+- `lib/notify/sms.ts`: the `SmsAdapter` contract (`sendOtp`, `supports`, `send`), `SMS_VARIABLES`,
+  `templateVars`, `readTemplateIds` (`SMS_TEMPLATES`), the `SMS_PROVIDERS` registry (empty), and a demo SMS that
+  records instead of sending.
+- `lib/notify/delivery.ts`: the delivery worker, run by `/api/cron/sweep`, which reports counts only.
+- Outbox delivery state for all engines:
+  - `claim` / `finish`;
+  - SQL migration `2026_11_27_007_outbox_delivery` (additive columns with defaults + a due index);
+  - Mongo migration (backfills existing rows + index).
+- `ops:check` blocker `sms_provider`.
+- `.env.example`: `SMS_PROVIDER`, `SMS_TEMPLATES`.
+- `lib/notify/delivery.test.ts` (7 tests) and an outbox claim / back-off / stale-claim contract on every database.
+
+**Changed**
+- `OutboxMessage.status` is `queued` / `sending` / `done` / `failed`.
+- The client-bundle guard test gets a 120 s timeout. It walks every source file and exceeded 5 s on a busy machine;
+  no leak was found.
+
+**Verified**
+- `pnpm verify`: typecheck, lint, 389/389 tests (memory + local MongoDB), build.
+- `pnpm audit --prod`: clean.
+- `pnpm db:migrate` on local `alpha_hood_dev`: 7 migrations.
+
 ## 2026-11-27 — Payments: Razorpay gateway (Payment Links) + payment reconciliation in the cron (High-risk tier: payments)
 
 **Threat model:**

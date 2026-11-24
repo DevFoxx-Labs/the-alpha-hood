@@ -303,6 +303,10 @@ export interface NotifyOutboxTable {
   status: string;
   created_at: Date;
   doc: unknown;
+  attempts: number;
+  next_attempt_at: number | string;
+  claimed_at: number | string;
+  results: unknown;
 }
 export interface FlowCheckoutsTable {
   customer_id: string;

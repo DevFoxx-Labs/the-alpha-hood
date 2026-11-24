@@ -90,8 +90,10 @@ describe("go-live readiness checks (pure)", () => {
     GRIEVANCE_OFFICER_EMAIL: "grievance@thealphahood.in",
     SUPPORT_EMAIL: "help@thealphahood.in",
   };
-  it("a complete production environment has no config blockers", () => {
-    expect(blockers(configChecks(good))).toEqual([]);
+  it("a complete production environment has no config blockers except the SMS provider (not built yet)", () => {
+    // Until an SMS provider adapter exists, OTP sign-in can't send codes on the live store: the gate must say so.
+    expect(blockers(configChecks(good)).map((c) => c.id)).toEqual(["sms_provider"]);
+    expect(blockers(configChecks({ ...good, SMS_PROVIDER: "made-up", SMS_TEMPLATES: '{"otp":"tmpl_123"}' })).map((c) => c.id)).toEqual(["sms_provider"]);
   });
   it("each missing piece is a blocker", () => {
     const ids = (env: Record<string, string | undefined>) => blockers(configChecks(env)).map((c) => c.id);

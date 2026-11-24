@@ -167,3 +167,20 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
       `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` in the host's secret store. Turn on MFA on the Razorpay login.
 - [ ] Lawyer review of the Privacy Notice change (Razorpay named as the payment processor; version 2026-11-27).
 
+## 2026-11-27 (SMS)
+- [ ] Pick the SMS provider (e.g. MSG91, Gupshup, Exotel, Twilio, AWS SNS) and open the account.
+- [ ] DLT registration on a TRAI DLT portal (Jio / Vodafone-Idea / Airtel / BSNL):
+  - register the principal entity (PE ID) and a sender ID (header);
+  - register these templates, category *Service Implicit*:
+    - OTP: "{#var#} is your The Alpha Hood sign-in code. Valid for 10 minutes. Do not share it.";
+    - order confirmed, shipped, out for delivery, delivered, cancelled;
+    - refund initiated;
+    - return pickup scheduled, completed, rejected;
+    - back in stock.
+
+  Exact wording is up to you and the DLT portal; the app only fills the variables: order number, return number,
+  product handle, OTP.
+- [ ] Create the same templates in the provider panel. Send me the provider's API request for one template (from
+      its docs or panel; never the key itself) so I can add the adapter.
+- [ ] Put the provider key in the host secret store, and set `SMS_PROVIDER` and `SMS_TEMPLATES`.
+

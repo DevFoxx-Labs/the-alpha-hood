@@ -41,17 +41,42 @@ export const isMarketing = (t: Template) => MARKETING.includes(t);
 
 export const FREQUENCY_CAP = { perDay: 1, perWeek: 3 } as const;
 
+export type OutboxStatus = "queued" | "sending" | "done" | "failed";
+/** Per channel: sent, skipped (no template / no number / no consent provider), or no_provider yet. */
+export type ChannelResult = "sent" | "skipped" | "no_provider" | "failed";
+
 export interface OutboxMessage {
   customerId: string;
   template: Template;
   channels: Channel[];
   refs: Record<string, string>;
   createdAt: string;
-  status: "queued";
+  status: OutboxStatus;
 }
+
+/** A message handed to the delivery worker (exclusively — nobody else holds it while it's `sending`). */
+export interface ClaimedMessage extends OutboxMessage {
+  id: string;
+  attempts: number;
+  results: Partial<Record<Channel, ChannelResult>>;
+}
+
+export interface DeliveryOutcome {
+  status: "done" | "failed" | "queued";
+  results: Partial<Record<Channel, ChannelResult>>;
+  /** For `queued` (retry): not before this time (ms). */
+  nextAttemptAt?: number;
+}
+
+/** A claim older than this is treated as a crashed worker and the message is offered again. */
+export const STALE_CLAIM_MS = 10 * 60_000;
 
 export interface OutboxStore {
   push(m: OutboxMessage): Promise<void>;
+  /** Atomically takes up to `limit` due queued messages (and re-offers stale claims). */
+  claim(limit: number, now: number): Promise<ClaimedMessage[]>;
+  /** Records the result of a claimed message (only if it's still claimed). */
+  finish(id: string, outcome: DeliveryOutcome, now: number): Promise<void>;
   /** Marketing messages queued for this customer since `since` (ISO). */
   marketingSince(customerId: string, since: string): Promise<number>;
   listFor(customerId: string): Promise<OutboxMessage[]>;
@@ -59,18 +84,47 @@ export interface OutboxStore {
   erase(customerId: string): Promise<void>;
 }
 
+type Stored = ClaimedMessage & { nextAttemptAt: number; claimedAt: number };
+
 export function createMemoryOutbox(): OutboxStore & { clear(): void } {
-  const box: OutboxMessage[] = [];
+  const box: Stored[] = [];
+  let n = 0;
   return {
     async push(m) {
-      box.push(structuredClone(m));
+      box.push({ ...structuredClone(m), id: `msg_${++n}`, attempts: 0, results: {}, nextAttemptAt: 0, claimedAt: 0 });
       if (box.length > 5_000) box.splice(0, box.length - 5_000);
+    },
+    async claim(limit, now) {
+      const out: ClaimedMessage[] = [];
+      for (const m of box) {
+        if (out.length >= limit) break;
+        const stale = m.status === "sending" && m.claimedAt < now - STALE_CLAIM_MS;
+        if ((m.status === "queued" && m.nextAttemptAt <= now) || stale) {
+          m.status = "sending";
+          m.claimedAt = now;
+          const { nextAttemptAt: _n, claimedAt: _c, ...rest } = structuredClone(m);
+          void _n;
+          void _c;
+          out.push(rest);
+        }
+      }
+      return out;
+    },
+    async finish(id, outcome) {
+      const m = box.find((x) => x.id === id);
+      if (!m || m.status !== "sending") return;
+      m.status = outcome.status;
+      m.results = { ...outcome.results };
+      m.attempts += 1;
+      m.nextAttemptAt = outcome.nextAttemptAt ?? 0;
     },
     async marketingSince(customerId, since) {
       return box.filter((m) => m.customerId === customerId && isMarketing(m.template) && m.createdAt >= since).length;
     },
     async listFor(customerId) {
-      return box.filter((m) => m.customerId === customerId).map((m) => structuredClone(m));
+      return box
+        .filter((m) => m.customerId === customerId)
+        .map(({ customerId: c, template, channels, refs, createdAt, status }) => structuredClone({ customerId: c, template, channels, refs, createdAt, status }));
     },
     async erase(customerId) {
       for (let i = box.length - 1; i >= 0; i--) if (box[i].customerId === customerId) box.splice(i, 1);

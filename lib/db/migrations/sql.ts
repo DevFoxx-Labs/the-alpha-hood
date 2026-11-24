@@ -31,6 +31,14 @@ async function createIndex(db: AnyDb, d: Driver, name: string, table: string, co
   await db.schema.createIndex(name).on(table).columns(cols).$call((b) => (unique ? b.unique() : b)).execute();
 }
 
+async function hasColumn(db: AnyDb, d: Driver, table: string, column: string): Promise<boolean> {
+  const r =
+    d === "postgres"
+      ? await sql<{ n: number }>`SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_name = ${table} AND column_name = ${column}`.execute(db)
+      : await sql<{ n: number }>`SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ${table} AND column_name = ${column}`.execute(db);
+  return Number(r.rows[0]?.n ?? 0) > 0;
+}
+
 export function sqlMigrations(d: Driver): Record<string, Migration> {
   const c = t(d);
   return {
@@ -585,6 +593,29 @@ export function sqlMigrations(d: Driver): Record<string, Migration> {
         await db.schema.dropTable("product_media").ifExists().execute();
         for (const [t, i] of [["otp_challenges", "otp_challenges_expires_idx"], ["otp_sends", "otp_sends_sent_idx"], ["app_locks", "app_locks_expires_idx"], ["inventory_reservations", "inventory_res_expires_idx"], ["carts", "carts_updated_idx"], ["return_photos", "return_photos_orphan_idx"], ["staff_tickets", "staff_tickets_expires_idx"], ["staff_invites", "staff_invites_expires_idx"]]) {
           await (d === "postgres" ? db.schema.dropIndex(i).ifExists() : db.schema.dropIndex(i).on(t)).execute().catch(() => {});
+        }
+      },
+    },
+
+    "2026_11_27_007_outbox_delivery": {
+      async up(db: AnyDb) {
+        // Additive: delivery state for the notification worker (defaults keep existing rows valid).
+        const cols: [string, string, ReturnType<typeof sql>][] = [
+          ["attempts", "integer", sql`0`],
+          ["next_attempt_at", "bigint", sql`0`],
+          ["claimed_at", "bigint", sql`0`],
+        ];
+        for (const [name, type, def] of cols) {
+          if (!(await hasColumn(db, d, "notify_outbox", name))) {
+            await db.schema.alterTable("notify_outbox").addColumn(name, type as "integer", (col) => col.notNull().defaultTo(def)).execute();
+          }
+        }
+        if (!(await hasColumn(db, d, "notify_outbox", "results"))) await db.schema.alterTable("notify_outbox").addColumn("results", c.json).execute();
+        await createIndex(db, d, "notify_outbox_due_idx", "notify_outbox", ["status", "next_attempt_at"]);
+      },
+      async down(db: AnyDb) {
+        for (const name of ["results", "claimed_at", "next_attempt_at", "attempts"]) {
+          if (await hasColumn(db, d, "notify_outbox", name)) await db.schema.alterTable("notify_outbox").dropColumn(name).execute();
         }
       },
     },

@@ -11,7 +11,7 @@ import { type StoresUnderTest, testTargets } from "./testing";
  * database store is wrong — the business layer depends on exactly this behaviour.
  */
 const ADDRESS = { name: "Contract Buyer", phone: "9876543210", pincode: "411045", line1: "Flat 1, Test Tower, Baner Road", line2: "Baner", landmark: "", city: "Pune", state: "Maharashtra", type: "home" } as const;
-const sms = { name: "test", sendOtp: async (_p: string, code: string) => ({ demoCode: code }) };
+const sms = { name: "test", sendOtp: async (_p: string, code: string) => ({ demoCode: code }), supports: () => false, send: async () => ({ providerId: "x" }) };
 const reqWith = (token: string) => new Request("http://localhost/x", { headers: { cookie: `ah_session=${token}` } });
 
 describe("database config fails closed", () => {
@@ -275,5 +275,5 @@ describe("client bundle never imports the database layer", () => {
     const leaks = clientFiles.map((f) => reachesDb(f, new Set())).filter(Boolean);
     expect(leaks).toEqual([]);
     expect(clientFiles.length).toBeGreaterThan(20);
-  });
+  }, 120_000); // walks every source file; slow on a busy machine
 });

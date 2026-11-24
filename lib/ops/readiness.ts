@@ -1,4 +1,5 @@
 import { readDbConfig, isLocalTarget, type DbConfig } from "@/lib/db/config";
+import { readTemplateIds, SMS_PROVIDERS } from "@/lib/notify/sms";
 
 /**
  * Go-live readiness (phase 6). One list of checks that says whether this environment may serve the live store,
@@ -55,6 +56,8 @@ export function configChecks(env: Env): Check[] {
   for (const k of ["LEGAL_ENTITY_NAME", "LEGAL_REGISTERED_ADDRESS", "GRIEVANCE_OFFICER_NAME", "GRIEVANCE_OFFICER_EMAIL", "SUPPORT_EMAIL"]) {
     add(`legal_${k.toLowerCase()}`, "blocker", !!env[k] && !/TO BE PROVIDED|example/i.test(env[k]!), `${k} set (notices need real contact details — DPDP)`);
   }
+  const smsReady = !!env.SMS_PROVIDER && env.SMS_PROVIDER in SMS_PROVIDERS && !!SMS_PROVIDERS[env.SMS_PROVIDER](env) && !!readTemplateIds(env).otp;
+  add("sms_provider", "blocker", smsReady, smsReady ? `SMS provider ${env.SMS_PROVIDER} configured with an OTP template` : "SMS provider configured (SMS_PROVIDER + DLT OTP template in SMS_TEMPLATES) — OTP sign-in can't send codes without it");
   add("checkout_enabled", "warning", env.CHECKOUT_ENABLED === "true", "CHECKOUT_ENABLED is \"true\" (store sells)");
   const rzp = env.PAYMENT_GATEWAY === "razorpay";
   add("payment_gateway", "warning", rzp, rzp ? "PAYMENT_GATEWAY is razorpay (online payments on)" : "No payment gateway — only COD can take orders");

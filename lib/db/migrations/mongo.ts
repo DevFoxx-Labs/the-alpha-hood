@@ -197,4 +197,15 @@ export const MONGO_MIGRATIONS: MongoMigration[] = [
       if (await db.listCollections({ name: "product_media" }, { nameOnly: true }).hasNext()) await db.collection("product_media").drop();
     },
   },
+  {
+    name: "2026_11_27_007_outbox_delivery",
+    async up(db) {
+      // Existing queued messages become deliverable; the worker claims by (status, nextAttemptAt).
+      await db.collection("notify_outbox").updateMany({ attempts: { $exists: false } }, { $set: { attempts: 0, nextAttemptAt: 0, claimedAt: 0, results: {} } });
+      await db.collection("notify_outbox").createIndexes([{ key: { status: 1, nextAttemptAt: 1 }, name: "notify_outbox_due_idx" }]);
+    },
+    async down() {
+      // additive only — nothing to undo
+    },
+  },
 ];
