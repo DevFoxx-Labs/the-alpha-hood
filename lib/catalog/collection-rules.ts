@@ -17,7 +17,9 @@ export type CollectionRule =
   | { category: string[] }
   | { subcategory: string[] }
   | { attribute: keyof ProductAttributes; values: string[] }
-  | { sizeInStock: string };
+  | { sizeInStock: string }
+  /** Hand-picked products (admin "Add products" in a collection). */
+  | { productIds: string[] };
 
 const ATTRIBUTE_KEYS = new Set(["fit", "fabric", "sleeve", "pattern", "occasion"]);
 const MAX_DEPTH = 6;
@@ -41,5 +43,6 @@ export function matchesRule(p: Product, rule: CollectionRule, now: number, depth
     return !!v && (r.values as string[]).includes(v);
   }
   if (typeof r.sizeInStock === "string") return p.sizes.some((s) => s.label === r.sizeInStock && s.stock > 0);
+  if (Array.isArray(r.productIds)) return (r.productIds as string[]).includes(p.id);
   return false;
 }

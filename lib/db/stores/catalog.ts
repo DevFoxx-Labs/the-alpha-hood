@@ -73,6 +73,22 @@ export function createSqlCatalogStore(db: SqlDb): CatalogStore {
         else await trx.insertInto("catalog_documents").values({ name: DOCS_KEY, doc: JSON.stringify(d), updated_at: new Date() }).execute();
       });
     },
+    async replaceDocs(d, expected) {
+      try {
+        return await sqlTx(db, async (trx) => {
+          // Row lock: two saves of the same revision are serialised; the second sees the new revision and loses.
+          const has = await trx.selectFrom("catalog_documents").select("doc").where("name", "=", DOCS_KEY).forUpdate().executeTakeFirst();
+          const current = has ? (fromJson<CatalogDocs | null>(has.doc, null)?.revision ?? 0) : 0;
+          if (current !== expected) return false;
+          if (has) await trx.updateTable("catalog_documents").set({ doc: JSON.stringify(d), updated_at: new Date() }).where("name", "=", DOCS_KEY).execute();
+          else await trx.insertInto("catalog_documents").values({ name: DOCS_KEY, doc: JSON.stringify(d), updated_at: new Date() }).execute();
+          return true;
+        });
+      } catch (e) {
+        if (isUniqueViolation(e)) return false; // two first-ever saves raced on the insert
+        throw e;
+      }
+    },
     async onHand() {
       const rows = await db.selectFrom("inventory_skus").selectAll().execute();
       return new Map(rows.map((r) => [skuKey(r.product_id, r.size), Number(r.on_hand)]));
@@ -180,6 +196,20 @@ export function createMongoCatalogStore(conn: Promise<MongoConn>): CatalogStore 
     },
     async putDocs(d) {
       await (await docs()).updateOne({ _id: DOCS_KEY }, { $set: { doc: structuredClone(d), updated_at: new Date() } }, { upsert: true, ignoreUndefined: true });
+    },
+    async replaceDocs(d, expected) {
+      // One-document compare-and-set: the filter only matches the expected revision (absent counts as 0).
+      const filter =
+        expected === 0
+          ? { _id: DOCS_KEY, $or: [{ "doc.revision": 0 }, { "doc.revision": { $exists: false } }] }
+          : { _id: DOCS_KEY, "doc.revision": expected };
+      try {
+        const res = await (await docs()).updateOne(filter, { $set: { doc: structuredClone(d), updated_at: new Date() } }, { upsert: expected === 0, ignoreUndefined: true });
+        return res.matchedCount === 1 || res.upsertedCount === 1;
+      } catch (e) {
+        if (isMongoDuplicate(e)) return false; // a document with another revision exists (the upsert hit its _id)
+        throw e;
+      }
     },
     async onHand() {
       const rows = await (await conn).db.collection<{ _id: string; on_hand: number }>("inventory_skus").find().toArray();

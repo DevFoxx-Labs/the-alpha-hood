@@ -110,6 +110,10 @@
 - 🟡 Store credit can't be spent at checkout yet (CHK-05, P1).
 
 ## Admin & ops (M7)
+- 🔴 **Admin can't manage the store without a developer** — full list in `docs/admin/gap-analysis.md`. Homepage,
+  menus, footer, announcement bar, categories/collections, coupons, combos, automatic/prepaid offers, looks, size
+  charts, shipping/COD/GST/returns settings and feature flags are code constants or CLI-only. In production the mock
+  CMS is refused and no real CMS adapter exists, so the homepage/menu/footer have no data source.
 - 🟠 Staff, sessions, audit log and TOTP secrets are on the own backend (phase 5): TOTP secrets sealed with
   AES-256-GCM (`SECRET_BOX_KEY`), the audit log insert-only. Still needed: the key in the production secret store
   (owner TODO), and a database-level guard (a DB user without UPDATE/DELETE on `audit_log`).
@@ -205,8 +209,10 @@
   new package).
 - 🟡 Uploaded product photos that no product uses are never deleted. They are public but unlinked; add a purge
   once storage grows.
-- 🟠 Category tree, homepage rail and collection rules have no admin screen yet. Change them with
-  `pnpm catalog:import` (validated `categories` block — see docs/backend/go-live.md).
+- 🟡 Categories, homepage rail and collections are edited in `/admin/categories` and `/admin/collections` (2026-11-25).
+  Still missing there: category banner / description / SEO fields, hiding a category without removing it, per-
+  collection pin/bury order (PLP-07), and a schedule (start/end). Not browser-checked at 1440 / 390 / 360 px.
+  Collection "used by" checks read combos and the mock CMS content in code; they move to the DB with the CMS.
 - 🟡 Each server caches the catalogue snapshot for 10 s. With several servers, an edit can take up to 10 s to show on
   the others. The whole active catalogue is held in memory per server; that's fine for thousands of products, so
   revisit if it grows to tens of thousands.

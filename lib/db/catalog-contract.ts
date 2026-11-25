@@ -150,6 +150,18 @@ for (const target of testTargets()) {
       for (const [over, msg] of bad) await expect(createProduct(deps, productBody({ title: "Validation Probe", sku: "AH-VAL-1", ...over })), JSON.stringify(over)).rejects.toThrow(msg);
       expect((await s.catalog.listRecords()).some((r) => r.sku === "AH-VAL-1")).toBe(false);
     });
+
+    it("category documents: replaceDocs is compare-and-set on the revision (one of two racing saves wins)", async () => {
+      const docs = (await s.catalog.getDocs())!;
+      const base = docs.revision ?? 0;
+      const next = { ...docs, revision: base + 1 };
+      const race = await Promise.all([s.catalog.replaceDocs(next, base), s.catalog.replaceDocs({ ...next, featured: [] }, base)]);
+      expect(race.filter(Boolean)).toHaveLength(1);
+      expect((await s.catalog.getDocs())!.revision).toBe(base + 1);
+      expect(await s.catalog.replaceDocs(next, base)).toBe(false); // stale
+      expect(await s.catalog.replaceDocs({ ...docs, revision: base + 2 }, base + 1)).toBe(true);
+      expect((await s.catalog.getDocs())!.tree).toEqual(docs.tree);
+    });
   });
 }
 

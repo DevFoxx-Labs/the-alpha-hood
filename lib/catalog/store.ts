@@ -24,6 +24,8 @@ export interface CatalogDocs {
   tree: CategoryNode[];
   featured: Category[];
   collections: (Collection & { rule: CollectionRule })[];
+  /** Bumped by every admin save (optimistic lock, `replaceDocs`); absent = 0 (seeded / imported). */
+  revision?: number;
 }
 
 export class CatalogConflictError extends Error {
@@ -43,6 +45,11 @@ export interface CatalogStore {
   replace(record: ProductRecord, expectedVersion: number): Promise<boolean>;
   getDocs(): Promise<CatalogDocs | null>;
   putDocs(docs: CatalogDocs): Promise<void>;
+  /**
+   * Writes the documents only if the stored revision (absent = 0, no document = 0) is `expectedRevision`.
+   * Returns false when someone else saved first. The caller sets `docs.revision` to the new value.
+   */
+  replaceDocs(docs: CatalogDocs, expectedRevision: number): Promise<boolean>;
   /** `${productId}::${size}` → on hand, for SKUs the inventory has seen. */
   onHand(): Promise<Map<string, number>>;
 }
@@ -130,6 +137,11 @@ export function createMemoryCatalogStore(): CatalogStore {
     },
     async putDocs(d) {
       docs = structuredClone(d);
+    },
+    async replaceDocs(d, expected) {
+      if ((docs?.revision ?? 0) !== expected) return false;
+      docs = structuredClone(d);
+      return true;
     },
     async onHand() {
       return new Map();

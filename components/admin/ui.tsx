@@ -4,7 +4,7 @@ import { ArrowLeft01Icon, ArrowRight01Icon, InboxIcon, Search01Icon } from "@hug
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertDialog as AD, Select as SelectPrimitive, Slot, Tooltip as TooltipPrimitive } from "radix-ui";
+import { AlertDialog as AD, Dialog as DialogPrimitive, Select as SelectPrimitive, Slot, Tooltip as TooltipPrimitive } from "radix-ui";
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -182,6 +182,57 @@ export function Confirm({
         </AD.Content>
       </AD.Portal>
     </AD.Root>
+  );
+}
+
+/**
+ * shadcn Dialog for edit forms (non-destructive). Controlled, so the caller resets the form on open; only the body
+ * scrolls; Enter submits. Destructive actions use `Confirm` (AlertDialog) instead.
+ */
+export function FormDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  submitLabel,
+  onSubmit,
+  children,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description?: string;
+  submitLabel: string;
+  onSubmit: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[150] bg-black/50" />
+        <DialogPrimitive.Content className="admin-root fixed left-1/2 top-1/2 z-[160] flex max-h-[85dvh] w-[min(100vw-32px,520px)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-border bg-card p-6 text-card-foreground shadow-lg">
+          <DialogPrimitive.Title className="text-lg font-semibold">{title}</DialogPrimitive.Title>
+          {description ? <DialogPrimitive.Description className="mt-1 text-sm text-muted-foreground">{description}</DialogPrimitive.Description> : <DialogPrimitive.Description className="sr-only">{title}</DialogPrimitive.Description>}
+          <form
+            className="mt-4 flex min-h-0 flex-1 flex-col"
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSubmit();
+            }}
+          >
+            <div className="-mx-1 min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-1">{children}</div>
+            <div className="mt-6 flex justify-end gap-2">
+              <DialogPrimitive.Close className={buttonVariants({ variant: "outline" })} type="button">
+                Cancel
+              </DialogPrimitive.Close>
+              <button type="submit" className={buttonVariants({ variant: "default" })}>
+                {submitLabel}
+              </button>
+            </div>
+          </form>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 

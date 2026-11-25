@@ -9,6 +9,9 @@ import { resolveStaffStore } from "@/lib/admin/staff";
 import { MOCK_PRODUCTS } from "@/lib/commerce/mock/data";
 import { rateLimiter } from "@/lib/http/rate-limit";
 import { GET as auditGET } from "./admin/audit/route";
+import { GET as categoriesGET, PUT as categoriesPUT } from "./admin/categories/route";
+import { POST as collectionPreviewPOST } from "./admin/collections/preview/route";
+import { GET as collectionsGET, PUT as collectionsPUT } from "./admin/collections/route";
 import { POST as creditPOST, GET as customerGET } from "./admin/customers/[id]/route";
 import { GET as dashGET } from "./admin/dashboard/route";
 import { POST as inventoryPOST } from "./admin/inventory/route";
@@ -297,5 +300,28 @@ describe("operations", () => {
     const csv = await csvGET(req("/api/admin/reports/orders?days=30", "GET", undefined, { cookie: owner }));
     expect(csv.headers.get("content-disposition")).toContain("attachment");
     expect(await csv.text()).not.toContain("9876543210");
+  });
+});
+
+describe("categories & collections: authorization (lib/catalog/taxonomy.ts)", () => {
+  it("no session → 401; no catalog.read → 403; read-only roles can't save; cross-origin refused; mock catalogue is read-only", async () => {
+    expect((await categoriesGET(req("/api/admin/categories", "GET"))).status).toBe(401);
+    expect((await categoriesPUT(req("/api/admin/categories", "PUT", { revision: 0, tree: [] }))).status).toBe(401);
+
+    const support = await invite(`support-tax-${ip}@example.test`, "support");
+    expect((await categoriesGET(req("/api/admin/categories", "GET", undefined, { cookie: support }))).status).toBe(403);
+    expect((await collectionsGET(req("/api/admin/collections", "GET", undefined, { cookie: support }))).status).toBe(403);
+
+    const marketing = await invite(`mkt-tax-${ip}@example.test`, "marketing");
+    expect((await categoriesPUT(req("/api/admin/categories", "PUT", { revision: 0, tree: [] }, { cookie: marketing }))).status).toBe(403);
+    expect((await collectionsPUT(req("/api/admin/collections", "PUT", { revision: 0, collections: [] }, { cookie: marketing }))).status).toBe(403);
+
+    const evil = await categoriesPUT(req("/api/admin/categories", "PUT", { revision: 0, tree: [] }, { cookie: owner, headers: { origin: "https://evil.example" } }));
+    expect(evil.status).toBe(403);
+
+    // COMMERCE_PROVIDER is not "own" here: the catalogue belongs to its platform and nothing can be written.
+    expect((await categoriesGET(req("/api/admin/categories", "GET", undefined, { cookie: owner }))).status).toBe(409);
+    expect((await categoriesPUT(req("/api/admin/categories", "PUT", { revision: 0, tree: [] }, { cookie: owner }))).status).toBe(409);
+    expect((await collectionPreviewPOST(req("/api/admin/collections/preview", "POST", { builder: {} }, { cookie: owner }))).status).toBe(409);
   });
 });

@@ -1,5 +1,66 @@
 # Change log
 
+## 2026-11-25 — Admin: categories, homepage category rail and collections (own backend)
+
+Owner decisions recorded in `docs/admin/gap-analysis.md` §7:
+- CMS and everything else stay on the own backend and the own panel;
+- products get colour × size variants managed in the panel;
+- courier goes behind a Shiprocket-style aggregator adapter.
+
+- **New screens:** `/admin/categories` and `/admin/collections`, listed in the Catalogue nav.
+- **Categories (`/admin/categories`):**
+  - add, rename, reorder and remove categories and sub-categories;
+  - each one has an image: a placeholder drawing, or a photo uploaded to the own media store;
+  - edit the homepage category rail: tiles, order, and a link to a category or a sub-category;
+  - changes collect locally and go live with one "Save changes".
+- **Collections (`/admin/collections`):**
+  - rule builder with these conditions: category, sub-category, attribute, badge, size in stock, new in N days,
+    % off, max price, popularity, hand-picked products;
+  - each condition can include or exclude, and the rule matches all or any of them;
+  - a live preview shows the count and a sample of matching products;
+  - imported rules too deep for the builder are kept as they are;
+  - removing a collection is refused while combos or storefront links use it.
+- **Service:** `lib/catalog/taxonomy.ts` holds the business rules. The routes are:
+  - `GET/PUT /api/admin/categories`;
+  - `GET/PUT /api/admin/collections`;
+  - `POST /api/admin/collections/preview`.
+- **Store:** `CatalogStore.replaceDocs` is a compare-and-set on a new `revision`. SQL uses a row lock; MongoDB
+  uses a filter on the revision. The memory store implements it too. A new `productIds` collection rule.
+- **Threat model:** stolen staff session, low-privilege staff, tampered bodies, orphaned products, lost updates.
+  - Server allow-lists every field; handles are slugs.
+  - Images: only an own media id (no URLs, so no SSRF or `javascript:` links).
+  - Category or sub-category still used by products → 422. Collection rules pointing at a removed category →
+    refused.
+  - Stale save → 409.
+  - `catalog.read` to view, `catalog.write` to save; same-origin + rate limit; audited
+    (`catalog.categories` / `catalog.collections`).
+- **Tests:**
+  - `lib/catalog/taxonomy.test.ts` (12): round-trip of every demo rule; add/reorder/rename; race → one winner;
+    in-use refusals; 13 tampered-field cases; 14 tampered-rule cases; the store shows the new tree.
+  - Contract: `replaceDocs` race on memory + MongoDB.
+  - `admin-api.test.ts`: 401 / 403 (support, marketing) / cross-origin 403 / read-only provider 409.
+- **Local setup:** `.env.local` now sets `COMMERCE_PROVIDER=own` (the product editor was hidden because the mock
+  catalogue is read-only). Ran `db:status`, `db:migrate` (up to date) and `db:seed` (0 new) on local
+  `alpha_hood_dev`.
+- **Verified:**
+  - `pnpm typecheck` and `pnpm lint` clean;
+  - `pnpm test` 29 files / 407 tests passed, plus the 12 new taxonomy tests;
+  - catalogue contract on local MongoDB 10/10;
+  - `pnpm build` compiled;
+  - dev server: `/admin/categories` and `/admin/collections` 200, API 401 without a session.
+  - Not checked in a browser at 1440 / 390 / 360 px (no signed-in browser session here).
+  - MySQL / PostgreSQL contract not run (no test servers).
+
+## 2026-11-25 — Analysis: admin panel gaps (no code change)
+
+- `docs/admin/gap-analysis.md`: what a store owner needs in `/admin`, what exists, what is missing, by module
+  (products, categories/collections, CMS/homepage, promotions, orders/shipping, settings, customers, reports,
+  inventory, admin UX), with P0/P1/P2, new permissions, threat-model notes, build order and owner decisions.
+- Finding: the product editor is hidden locally because `.env.local` has no `COMMERCE_PROVIDER=own` (mock catalogue
+  is read-only).
+- Finding: storefront content, promotions, shipping/COD/GST settings live in code constants; the mock CMS is
+  refused in production with no real adapter (🔴, added to `docs/known-gaps.md`).
+
 ## 2026-11-27 — Fix: admin sidebar clicks looked like they did nothing
 
 - **Cause:**

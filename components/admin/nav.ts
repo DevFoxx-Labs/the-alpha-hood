@@ -14,7 +14,9 @@ import {
   UserLock01Icon,
   WarehouseIcon,
   GiftIcon,
+  HierarchySquare02Icon,
   Image01Icon,
+  Layers01Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import { can, type Permission, type Role, ROLES } from "@/lib/admin/permissions";
@@ -38,6 +40,8 @@ const ALL: NavItem[] = [
   { type: "section", label: "Catalogue" },
   { label: "Inventory", icon: WarehouseIcon, route: "/admin/inventory", permission: "inventory.read" },
   { label: "Products", icon: PackageIcon, route: "/admin/catalog", permission: "catalog.read" },
+  { label: "Categories", icon: HierarchySquare02Icon, route: "/admin/categories", permission: "catalog.read" },
+  { label: "Collections", icon: Layers01Icon, route: "/admin/collections", permission: "catalog.read" },
   { label: "Promotions", icon: Discount01Icon, route: "/admin/promotions", permission: "promotions.read" },
   { label: "Gift cards", icon: GiftIcon, route: "/admin/giftcards", permission: "giftcards.issue" },
   { type: "section", label: "People" },
