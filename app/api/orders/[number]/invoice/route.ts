@@ -33,7 +33,7 @@ export async function GET(request: Request, { params }: RouteContext<"/api/order
         placeOfSupply: o.address.state,
         lines: o.lines.map((l) => {
           const split = splitTax(l.gst, intra);
-          return { title: l.title, size: l.size, quantity: l.quantity, gstRate: l.gstRate, taxable: l.net - l.gst, ...split, total: l.net };
+          return { title: l.title, size: l.size, hsn: l.hsn ?? null, quantity: l.quantity, gstRate: l.gstRate, taxable: l.net - l.gst, ...split, total: l.net };
         }),
         charges: { shipping: o.pricing.shipping, express: o.pricing.expressFee, cod: o.pricing.codFee },
         totals: { gst: o.pricing.gst, total: o.pricing.total },

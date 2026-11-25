@@ -16,7 +16,7 @@ interface Invoice {
   seller: { name: string; address: string; gstin: string; state: string };
   buyer: { name: string; address: string; city: string; state: string; pincode: string };
   placeOfSupply: string;
-  lines: { title: string; size: string; quantity: number; gstRate: number; taxable: number; cgst: number; sgst: number; igst: number; total: number }[];
+  lines: { title: string; size: string; hsn: string | null; quantity: number; gstRate: number; taxable: number; cgst: number; sgst: number; igst: number; total: number }[];
   charges: { shipping: number; express: number; cod: number };
   totals: { gst: { cgst: number; sgst: number; igst: number; total: number }; total: number };
   /** How the invoice total was paid (wallet tenders don't change the taxable value). */
@@ -83,6 +83,7 @@ export function InvoiceView({ number }: { number: string }) {
             <thead>
               <tr>
                 <th className={th}>Item</th>
+                <th className={th}>HSN</th>
                 <th className={th}>Qty</th>
                 <th className={th}>Taxable</th>
                 <th className={th}>GST %</th>
@@ -98,6 +99,7 @@ export function InvoiceView({ number }: { number: string }) {
                   <td className={td}>
                     {l.title} · {l.size}
                   </td>
+                  <td className={td}>{l.hsn ?? "—"}</td>
                   <td className={td}>{l.quantity}</td>
                   <td className={td}>{formatINR(l.taxable)}</td>
                   <td className={td}>{l.gstRate}%</td>

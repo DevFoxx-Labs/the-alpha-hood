@@ -23,11 +23,14 @@ export async function generateMetadata({ params }: PageProps<"/products/[handle]
   const data = await getProductPage(handle);
   if (!data) return {};
   const { product } = data;
+  // Admin SEO fields win; otherwise derive from the product.
+  const title = product.seo?.title ?? product.title;
+  const description = product.seo?.description ?? `${product.title} — ${formatINR(product.price)}. ${product.description}`.slice(0, 160);
   return {
-    title: product.title,
-    description: `${product.title} — ${formatINR(product.price)}. ${product.description}`.slice(0, 160),
+    title,
+    description,
     alternates: { canonical: `/products/${product.handle}` },
-    openGraph: { title: product.title, type: "website", url: `/products/${product.handle}` },
+    openGraph: { title, type: "website", url: `/products/${product.handle}` },
   };
 }
 

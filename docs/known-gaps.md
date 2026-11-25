@@ -191,6 +191,22 @@
 - 🟡 Size advice uses order history only; the height/weight quiz (PDP-04) is not built.
 - 🟡 Not browser-checked at 1440/390/360; homepage M9 blocks render only with demo data (`pnpm dev`).
 
+## Product (style) editor (2026-11-25)
+- 🟠 **No per-size price.** Price / MRP are per colour, not per size (e.g. 3XL can't cost more). Adding it needs
+  cart, pricing, PDP ("from ₹…") and feed changes.
+- 🟠 **Web addresses of published colours are locked** because there is no 301 redirect manager (CMS-03). Add the
+  redirect manager, then allow changes with an automatic redirect.
+- 🟡 **Size SKU / barcode uniqueness is checked in the service, not by a database index.** The codes live inside the
+  product document. Two saves at the same instant could both pass. Fix: a `product_codes` table / collection with
+  UNIQUE(code), written in the same `writeMany` transaction.
+- 🟡 **Order lines placed before 2026-11-25 have no HSN** (invoice shows "—"). HSN defaults per GST class are
+  placeholders; the CA must confirm every HSN and rate.
+- 🟡 **Missing from the products list:** bulk actions (publish / archive / category), CSV import / export from the UI
+  (CLI only), and a draft preview link.
+- 🟡 **Shipping data isn't used yet:** packed weight and package size are stored, but nothing reads them until the
+  courier adapter exists.
+- 🟡 **Not browser-checked** at 1440 / 390 / 360 px.
+
 ## Own backend (2026-11-26 — `docs/backend/README.md`)
 - 🔴 Phases 1–5 are on the database:
   - identity: consent, customers, sessions, OTP;

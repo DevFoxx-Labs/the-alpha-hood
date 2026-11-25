@@ -649,17 +649,29 @@ export function InventoryScreen() {
   );
 }
 
-type CatalogRow = { id: string; handle: string; title: string; sku: string; category: string; price: number; mrp: number; status: "draft" | "active" | "archived"; stock: number; image: { art: string; colour: string } };
+type CatalogRow = { id: string; handle: string; title: string; sku: string; category: string; price: number; mrp: number; status: "draft" | "active" | "archived"; stock: number; image: { art: string; colour: string; url?: string } };
+type StyleRow = {
+  styleId: string;
+  title: string;
+  category: string;
+  colours: { id: string; name: string; hex: string; status: "draft" | "active" | "archived" }[];
+  price: { min: number; max: number };
+  stock: number;
+  status: "draft" | "active" | "archived";
+  image: { art: string; colour: string; url?: string };
+};
 const PRODUCT_TONE = { draft: "warning", active: "success", archived: "neutral" } as const;
 
 export function CatalogScreen() {
   const { params, set } = useUrlFilters("/admin/catalog");
   const q = params.get("q") ?? "";
   const status = params.get("status") ?? "all";
-  const qs = new URLSearchParams({ ...(q ? { q } : {}), ...(status !== "all" ? { status } : {}) }).toString();
-  const { data, error, busy, reload } = useAdminData<{ editable: boolean; rows: CatalogRow[] }>(`/api/admin/catalog${qs ? `?${qs}` : ""}`);
+  const qs = new URLSearchParams({ view: "styles", ...(q ? { q } : {}), ...(status !== "all" ? { status } : {}) }).toString();
+  // On the own backend the list is one row per product (style); elsewhere the platform's products (read-only).
+  const { data, error, busy, reload } = useAdminData<{ editable: boolean; rows: (StyleRow | CatalogRow)[]; total: number }>(`/api/admin/catalog?${qs}`);
   const { me } = useAdmin();
   const canEdit = !!data?.editable && me.permissions.includes("catalog.write");
+  const styles = data?.editable ? (data.rows as StyleRow[]) : null;
   return (
     <div className="space-y-5">
       <PageHeader
@@ -667,7 +679,7 @@ export function CatalogScreen() {
         description={
           data && !data.editable
             ? "Read-only: this store's catalogue is managed in its commerce platform."
-            : "Create, edit, publish and archive products. Stock changes go through Inventory."
+            : "Each product has its colours and sizes. Stock changes go through Inventory."
         }
         action={
           canEdit ? (
@@ -678,40 +690,73 @@ export function CatalogScreen() {
         }
       />
       <div className="flex flex-wrap gap-3">
-        <SearchBox value={q} onChange={(v) => set({ q: v || null })} placeholder="Product or SKU" />
+        <SearchBox value={q} onChange={(v) => set({ q: v || null })} placeholder="Name, SKU or barcode" />
         {data?.editable ? (
           <ASelect
             label="Status"
             value={status}
             onValueChange={(v) => set({ status: v === "all" ? null : v })}
-            options={[{ value: "all", label: "All statuses" }, { value: "active", label: "Active" }, { value: "draft", label: "Drafts" }, { value: "archived", label: "Archived" }]}
+            options={[{ value: "all", label: "All statuses" }, { value: "active", label: "Has live colours" }, { value: "draft", label: "Has drafts" }, { value: "archived", label: "Has archived" }]}
           />
         ) : null}
       </div>
       {error ? (
         <ErrorState message={error} onRetry={reload} />
+      ) : styles ? (
+        <DataTable
+          rows={styles}
+          busy={busy}
+          rowKey={(r) => r.styleId}
+          empty={{ title: "No products found", description: canEdit ? "Try adjusting your search, or create a product." : "Try adjusting your search." }}
+          columns={[
+            {
+              key: "t",
+              header: "Product",
+              cell: (r) => (
+                <span className="flex items-center gap-3">
+                  <GarmentArt image={{ art: r.image.art as never, colour: r.image.colour, url: r.image.url, alt: "" }} sizes="36px" className="h-12 w-9 shrink-0 overflow-hidden rounded" />
+                  <Link href={`/admin/catalog/style/${r.styleId}`} className="font-medium text-foreground hover:underline">
+                    {r.title}
+                  </Link>
+                </span>
+              ),
+            },
+            {
+              key: "co",
+              header: "Colours",
+              cell: (r) => (
+                <span className="flex items-center gap-1" aria-label={r.colours.map((c) => `${c.name} (${c.status})`).join(", ")}>
+                  {r.colours.slice(0, 8).map((c) => (
+                    <span key={c.id} title={`${c.name} · ${c.status}`} className={cn("h-4 w-4 rounded-full border border-border", c.status !== "active" && "opacity-40")} style={{ backgroundColor: c.hex }} />
+                  ))}
+                  {r.colours.length > 8 ? <span className="text-xs text-muted-foreground">+{r.colours.length - 8}</span> : null}
+                </span>
+              ),
+            },
+            { key: "c", header: "Category", cell: (r) => r.category },
+            { key: "p", header: "Price", cell: (r) => (r.price.min === r.price.max ? formatINR(r.price.min) : `${formatINR(r.price.min)} – ${formatINR(r.price.max)}`) },
+            { key: "k", header: "Stock", cell: (r) => <span className={r.stock === 0 ? "font-semibold text-red-600 dark:text-red-400" : ""}>{r.stock}</span> },
+            { key: "st", header: "Status", cell: (r) => <StatusBadge status={r.status} tone={PRODUCT_TONE[r.status]} label={r.status === "active" ? "live" : r.status} /> },
+          ]}
+          footer={data && data.total > styles.length ? <p className="px-4 py-3 text-xs text-muted-foreground">Showing {styles.length} of {data.total}. Search to narrow down.</p> : null}
+        />
       ) : (
         <DataTable
-          rows={data?.rows ?? null}
+          rows={(data?.rows as CatalogRow[] | undefined) ?? null}
           busy={busy}
           rowKey={(r) => r.id}
-          empty={{ title: "No products found", description: canEdit ? "Try adjusting your search, or create a product." : "Try adjusting your search." }}
+          empty={{ title: "No products found", description: "Try adjusting your search." }}
           columns={[
             { key: "t", header: "Product", cell: (r) => (
               <span className="flex items-center gap-3">
                 <GarmentArt image={{ art: r.image.art as never, colour: r.image.colour, alt: "" }} className="h-12 w-9 rounded" />
-                {data?.editable ? (
-                  <Link href={`/admin/catalog/${r.id}`} className="font-medium text-foreground hover:underline">{r.title}</Link>
-                ) : (
-                  <Link href={`/products/${r.handle}`} target="_blank" className="font-medium text-foreground hover:underline">{r.title}</Link>
-                )}
+                <Link href={`/products/${r.handle}`} target="_blank" className="font-medium text-foreground hover:underline">{r.title}</Link>
               </span>
             ) },
             { key: "s", header: "SKU", cell: (r) => r.sku },
             { key: "c", header: "Category", cell: (r) => r.category },
             { key: "p", header: "Price / MRP", cell: (r) => `${formatINR(r.price)} / ${formatINR(r.mrp)}` },
             { key: "k", header: "Stock", cell: (r) => r.stock },
-            { key: "st", header: "Status", cell: (r) => <StatusBadge status={r.status} tone={PRODUCT_TONE[r.status]} label={r.status} /> },
           ]}
         />
       )}

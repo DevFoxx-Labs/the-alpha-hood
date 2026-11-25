@@ -184,3 +184,9 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
       its docs or panel; never the key itself) so I can add the adapter.
 - [ ] Put the provider key in the host secret store, and set `SMS_PROVIDER` and `SMS_TEMPLATES`.
 
+## 2026-11-25 (after the admin catalogue work)
+- [ ] Local production build (`pnpm build`) with the own backend needs `SECRET_BOX_KEY` in `.env.local` (32 random
+      bytes, base64). Dev uses a built-in development key, so put that key's value in `SECRET_BOX_PREVIOUS_KEYS` at
+      the same time, or staff TOTP secrets saved in dev can't be opened. Never reuse the production key locally.
+- [ ] Confirm with the CA: HSN code and GST class for every product type (the editor's defaults are placeholders).
+- [ ] Decide whether any size should cost more (e.g. 3XL). Per-size pricing isn't built yet.

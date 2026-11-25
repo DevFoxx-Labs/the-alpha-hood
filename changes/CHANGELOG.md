@@ -1,5 +1,77 @@
 # Change log
 
+## 2026-11-25 — Admin: product (style) editor with colour × size variants
+
+- **One product = a style with colours.** Each colour has:
+  - its own web address, photos, swatch, price / MRP, badge, status and SEO title / description;
+  - its sizes, each with its own SKU, barcode (EAN / GTIN, check digit verified) and opening stock.
+  Shared by the style and written to every colour: name, category, description, filters, specs, size chart, model
+  note, legal declarations, GST class, HSN, packed weight and package size.
+- **Screens:**
+  - `/admin/catalog` now lists one row per product: colour swatches, price range, stock and live / draft status;
+    search covers name, SKU, size SKU and barcode.
+  - `/admin/catalog/style/[styleId]` is the editor. It has colour tabs, "Add colour" (copies the sizes and prices
+    of the current colour), "Fill empty size SKUs", photos per colour, "Save and publish drafts" and a margin hint
+    from the cost price.
+  - `/admin/catalog/new?from=<styleId>` duplicates a product as a draft (new codes and web addresses).
+  - Old `/admin/catalog/[id]` links open the colour's product. `components/admin/product-editor.tsx` was removed.
+- **New fields:**
+  - `gstClass` and `hsn` on products: the cart's GST rate uses the product's class. Each priced line, order line
+    and tax invoice now carries the HSN; the invoice has a new HSN column.
+  - `seo` is used by the product page metadata.
+  - Admin-only: `costPrice`, `weightGrams`, `dimensionsCm`, size `sku` / `barcode`. `toProduct` removes them
+    (`ADMIN_ONLY_FIELDS`), so they never reach the storefront, page props or feeds.
+- **Store:** `CatalogStore.writeMany` writes all colours of a style in one transaction, with every version checked.
+  - SQL: `sqlTx`.
+  - MongoDB: `mongoTx`.
+  - Memory: implemented too.
+  - A stale version or a taken handle rolls back the inserts as well.
+- **Service / routes:**
+  - Business rules live in `lib/catalog/style.ts`.
+  - `GET` / `PUT /api/admin/styles/[styleId]` and `POST /api/admin/styles`; `GET /api/admin/catalog?view=styles`.
+- **Threat model:**
+  - Colour ids must belong to the style being edited (no editing other products through it).
+  - A colour can't be dropped (archive it instead).
+  - A published colour's web address is locked (no redirects yet).
+  - Size SKUs and barcodes are unique across the catalogue.
+  - Every field is allow-listed (shared parser with single products and the import).
+  - Stale or racing saves → 409 with nothing written.
+  - Cost price is returned only to `catalog.write` roles, also on the old `GET /api/admin/catalog/[id]`.
+  - `catalog.write` is needed to save; saves are audited (`catalog.style.create` / `catalog.style.save`).
+- **Tests:**
+  - `lib/catalog/style.test.ts` (13): create; no admin-only fields on the storefront; cost redaction;
+    20 tampered-input cases; catalogue-wide SKU / barcode uniqueness; shared fields reach every colour; archive;
+    live stock kept; ownership / drop / handle-lock refusals; race → one winner, the loser writes nothing; list
+    search; GST class / HSN pricing; GS1 check digits.
+  - Contract: `writeMany` rollback on memory + MongoDB.
+  - Routes: 401 / 403 / cross-origin / read-only (`admin-api.test.ts`).
+- **Verified:**
+  - `pnpm typecheck` and `pnpm lint` clean;
+  - `pnpm test`: 30 files / 423 tests passed;
+  - catalogue contract + admin API on local MongoDB: 117 passed;
+  - `pnpm build` compiled. Page-data collection passes with `COMMERCE_PROVIDER=mock`. With the own backend
+    configured it stops (fail closed) for the missing `SECRET_BOX_KEY` in production mode (see the owner TODO);
+  - dev server: the new pages return 200 and the APIs 401 without a session.
+  - Not checked in a signed-in browser at 1440 / 390 / 360 px.
+  - MySQL / PostgreSQL not run (no test servers).
+
+## 2026-11-25 — Brand: ™ and ® versions of the logos
+
+- **New:** `scripts/brand-marks.mjs` writes `docs/brand/logo-kit/logo-symbols/{tm,registered}/`:
+  - 11 wordmark-bearing masters (horizontal ×4, stacked ×3, wordmark ×2, one-line ×2);
+  - 2 positions at the "D" of HOOD: `-top` (top-right) and `-bottom` (bottom-right, on the baseline);
+  - 44 SVGs + PNGs at 600 / 2000 px.
+- **How it's made:** each master is copied unchanged, plus one path for the symbol. The viewBox gets wider only
+  when the symbol wouldn't fit the original right margin; the stacked lockup grows on both sides so it stays
+  centred. The symbol is Anton's ™/® glyph, outlined (no font needed), 30% of the D's height, in the
+  wordmark's colour.
+- **Not changed:** the original masters, `public/brand/`, the site header and the trademark filing images
+  (those must stay symbol-free).
+- **Not made:** PDF versions (the kit's PDFs came from a tool that isn't in the repo).
+- **Legal:** use ® only after registration (Trade Marks Act 1999, s.107). Noted in the logo kit README.
+- **Verified:** visual preview of all four variants on light and dark backgrounds. No app code changed, so
+  `pnpm verify` wasn't run.
+
 ## 2026-11-25 — Admin: categories, homepage category rail and collections (own backend)
 
 Owner decisions recorded in `docs/admin/gap-analysis.md` §7:

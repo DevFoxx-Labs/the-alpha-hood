@@ -20,6 +20,8 @@ export interface CartLineView extends CartLine {
   sizes: SizeOption[];
   category: string;
   subcategory?: string;
+  gstClass?: Product["gstClass"];
+  hsn?: string;
 }
 
 export interface CartView {
@@ -100,6 +102,8 @@ export async function loadCartView(
       sizes: product?.sizes ?? [],
       category: product?.category ?? "",
       subcategory: product?.subcategory,
+      gstClass: product?.gstClass,
+      hsn: product?.hsn,
     };
   });
   const purchasable = lines.filter((l) => l.status !== "unavailable");
@@ -122,6 +126,8 @@ export function priceLines(lines: CartLineView[], coupon: Coupon | null, ctx: Pr
       productId: l.productId,
       category: l.category,
       subcategory: l.subcategory,
+      gstClass: l.gstClass,
+      hsn: l.hsn,
       quantity: l.quantity,
       unitPrice: l.price,
       unitMrp: l.mrp,

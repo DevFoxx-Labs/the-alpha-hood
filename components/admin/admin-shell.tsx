@@ -62,6 +62,7 @@ const PAGE_TITLES: [RegExp, string][] = [
   [/^\/admin\/orders\/[^/]+$/, "Order"],
   [/^\/admin\/customers\/[^/]+$/, "Customer"],
   [/^\/admin\/catalog\/new$/, "New product"],
+  [/^\/admin\/catalog\/style\/[^/]+$/, "Edit product"],
   [/^\/admin\/catalog\/[^/]+$/, "Edit product"],
   [/^\/admin\/promotions$/, "Promotions"],
   [/^\/admin\/customers$/, "Customers"],

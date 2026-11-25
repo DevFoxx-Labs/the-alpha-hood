@@ -1,12 +1,13 @@
 import { randomBytes } from "node:crypto";
 import { ATTRIBUTE_VALUES, COLOUR_FAMILIES, SIZE_ORDER } from "@/lib/catalog/attributes";
 import type { GarmentKind, Product, ProductAttributes, SizeChartKind } from "@/lib/commerce/types";
+import { GST_CONFIG, type GstClass } from "@/lib/pricing/gst";
 import { ValidationError } from "@/lib/http/guard";
 import { asObject, cleanText, rejectUnknownFields } from "@/lib/validation";
 import { MEDIA_ID_RE, type MediaStore, mediaUrl } from "./media";
 import { GARMENT_KINDS, SIZE_CHARTS } from "./product-options";
 import { HANDLE_RE } from "./reader";
-import { CatalogConflictError, type CatalogDocs, type CatalogStore, PRODUCT_STATUSES, type ProductRecord, type ProductStatus } from "./store";
+import { CatalogConflictError, type CatalogDocs, type CatalogStore, PRODUCT_STATUSES, type ProductRecord, type ProductStatus, type RecordSize } from "./store";
 
 /**
  * ADM-01 product editing on the own backend. Every field is validated on the server against an allow-list:
@@ -22,6 +23,20 @@ const SKU_RE = /^[A-Z0-9][A-Z0-9-]{2,39}$/;
 const STYLE_RE = /^[a-z0-9_]{1,64}$/;
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const TAG_RE = /^[a-z0-9][a-z0-9 -]{0,29}$/;
+/** HSN: 4, 6 or 8 digits (CBIC). */
+export const HSN_RE = /^\d{4}(?:\d{2}){0,2}$/;
+/** GTIN-8 / UPC-12 / EAN-13 / GTIN-14 digits (check digit verified separately). */
+const BARCODE_RE = /^(?:\d{8}|\d{12,14})$/;
+export const GST_CLASSES = Object.keys(GST_CONFIG.classes) as GstClass[];
+
+/** GS1 check digit (mod 10, weights 3/1 from the right). Catches most mistyped barcodes. */
+export function validGtin(code: string): boolean {
+  if (!BARCODE_RE.test(code)) return false;
+  const digits = [...code].map(Number);
+  const check = digits.pop()!;
+  const sum = digits.reverse().reduce((n, d, i) => n + d * (i % 2 === 0 ? 3 : 1), 0);
+  return (10 - (sum % 10)) % 10 === check;
+}
 export const MAX_PRICE = 10_000_000; // ₹1,00,000 in paise
 
 export class CatalogAdminError extends Error {
@@ -47,7 +62,7 @@ export interface ProductInput {
   colour: { name: string; hex: string };
   colourFamily: string;
   styleId: string | null;
-  sizes: { label: string; stock: number }[];
+  sizes: RecordSize[];
   art: GarmentKind;
   attributes: ProductAttributes;
   tags: string[];
@@ -59,6 +74,12 @@ export interface ProductInput {
   status: ProductStatus;
   /** Uploaded photos in display order (first = card + LCP image); empty = placeholder drawings. */
   photos: { id: string; alt: string }[];
+  gstClass?: GstClass;
+  hsn?: string;
+  costPrice?: number;
+  weightGrams?: number;
+  dimensionsCm?: { length: number; width: number; height: number };
+  seo?: { title?: string; description?: string };
 }
 
 export function slugify(text: string): string {
@@ -80,7 +101,8 @@ const oneOf = <T extends string>(v: unknown, list: readonly T[], field: string):
 };
 const optText = (v: unknown, field: string, max: number) => (v === undefined || v === null || v === "" ? undefined : cleanText(v, field, { max }));
 
-const FIELDS = ["title", "handle", "sku", "category", "subcategory", "price", "mrp", "badge", "colour", "colourFamily", "styleId", "sizes", "art", "attributes", "tags", "description", "specs", "sizeChart", "model", "legal", "status", "photos", "version"];
+const FIELDS = ["title", "handle", "sku", "category", "subcategory", "price", "mrp", "badge", "colour", "colourFamily", "styleId", "sizes", "art", "attributes", "tags", "description", "specs", "sizeChart", "model", "legal", "status", "photos", "version", "gstClass", "hsn", "costPrice", "weightGrams", "dimensionsCm", "seo"];
+const absent = (v: unknown) => v === undefined || v === null || v === "";
 
 /** Strict parse of the product form (create and edit share it). `docs` supplies the category tree. */
 export function parseProductInput(body: unknown, docs: CatalogDocs | null): ProductInput {
@@ -121,13 +143,29 @@ export function parseProductInput(body: unknown, docs: CatalogDocs | null): Prod
 
   if (!Array.isArray(b.sizes) || b.sizes.length < 1 || b.sizes.length > 12) throw new ValidationError("Add 1–12 sizes.");
   const seen = new Set<string>();
+  const codes = new Set<string>();
   const sizes = b.sizes.map((raw) => {
     const s = asObject(raw);
-    rejectUnknownFields(s, ["label", "stock"]);
+    rejectUnknownFields(s, ["label", "stock", "sku", "barcode"]);
     const label = oneOf(s.label, SIZE_ORDER, "size");
     if (seen.has(label)) throw new ValidationError(`Size ${label} is listed twice.`);
     seen.add(label);
-    return { label, stock: int(s.stock, `Stock for ${label}`, 0, 10_000) };
+    const size: RecordSize = { label, stock: int(s.stock, `Stock for ${label}`, 0, 10_000) };
+    if (!absent(s.sku)) {
+      const code = typeof s.sku === "string" ? s.sku.trim().toUpperCase() : "";
+      if (!SKU_RE.test(code)) throw new ValidationError(`SKU for size ${label}: 3–40 capital letters, digits and dashes.`);
+      if (codes.has(`s:${code}`)) throw new ValidationError(`SKU ${code} is used twice.`);
+      codes.add(`s:${code}`);
+      size.sku = code;
+    }
+    if (!absent(s.barcode)) {
+      const code = typeof s.barcode === "string" ? s.barcode.trim() : "";
+      if (!validGtin(code)) throw new ValidationError(`Barcode for size ${label}: 8, 12, 13 or 14 digits with a valid check digit.`);
+      if (codes.has(`b:${code}`)) throw new ValidationError(`Barcode ${code} is used twice.`);
+      codes.add(`b:${code}`);
+      size.barcode = code;
+    }
+    return size;
   });
 
   const art = oneOf(b.art, GARMENT_KINDS, "placeholder drawing");
@@ -186,7 +224,59 @@ export function parseProductInput(body: unknown, docs: CatalogDocs | null): Prod
     return { id: ph.id, alt: cleanText(ph.alt, "Photo description", { min: 3, max: 140 }) };
   });
 
-  return { title, handle, sku, category: cat.handle, subcategory, price, mrp, badge, colour, colourFamily, styleId, sizes, art, attributes, tags, description, specs, sizeChart, model, legal, status, photos };
+  const gstClass = absent(b.gstClass) ? undefined : oneOf(b.gstClass, GST_CLASSES, "GST class");
+  let hsn: string | undefined;
+  if (!absent(b.hsn)) {
+    if (typeof b.hsn !== "string" || !HSN_RE.test(b.hsn.trim())) throw new ValidationError("HSN code: 4, 6 or 8 digits.");
+    hsn = b.hsn.trim();
+  }
+  const costPrice = absent(b.costPrice) ? undefined : int(b.costPrice, "Cost price (paise)", 0, MAX_PRICE);
+  const weightGrams = absent(b.weightGrams) ? undefined : int(b.weightGrams, "Weight (grams)", 1, 50_000);
+  let dimensionsCm: ProductInput["dimensionsCm"];
+  if (!absent(b.dimensionsCm)) {
+    const d = asObject(b.dimensionsCm);
+    rejectUnknownFields(d, ["length", "width", "height"]);
+    dimensionsCm = { length: int(d.length, "Length (cm)", 1, 200), width: int(d.width, "Width (cm)", 1, 200), height: int(d.height, "Height (cm)", 1, 200) };
+  }
+  let seo: ProductInput["seo"];
+  if (!absent(b.seo)) {
+    const o = asObject(b.seo);
+    rejectUnknownFields(o, ["title", "description"]);
+    const t = optText(o.title, "SEO title", 70);
+    const d = optText(o.description, "SEO description", 160);
+    if (t || d) seo = { ...(t ? { title: t } : {}), ...(d ? { description: d } : {}) };
+  }
+
+  return {
+    title, handle, sku, category: cat.handle, subcategory, price, mrp, badge, colour, colourFamily, styleId, sizes, art, attributes, tags, description, specs, sizeChart, model, legal, status, photos,
+    ...(gstClass ? { gstClass } : {}),
+    ...(hsn ? { hsn } : {}),
+    ...(costPrice !== undefined ? { costPrice } : {}),
+    ...(weightGrams ? { weightGrams } : {}),
+    ...(dimensionsCm ? { dimensionsCm } : {}),
+    ...(seo ? { seo } : {}),
+  };
+}
+
+/**
+ * Size SKUs and barcodes must be unique across the whole catalogue (and must not reuse another colour's main SKU).
+ * `records` = the catalogue as it will be after the write. Checked in the service: the codes live inside the product
+ * document, so the database can't index them (docs/known-gaps.md).
+ */
+export function assertUniqueCodes(records: Pick<ProductRecord, "id" | "sku" | "sizes" | "title">[]) {
+  const owner = new Map<string, string>();
+  const claim = (key: string, id: string, label: string, title: string) => {
+    const prev = owner.get(key);
+    if (prev !== undefined && prev !== id) throw new CatalogAdminError("conflict", `${label} is already used by another product (${title}).`, 409);
+    owner.set(key, id);
+  };
+  for (const r of records) claim(`s:${r.sku}`, r.id, `SKU ${r.sku}`, r.title);
+  for (const r of records) {
+    for (const s of r.sizes) {
+      if (s.sku && s.sku !== r.sku) claim(`s:${s.sku}`, r.id, `SKU ${s.sku}`, r.title);
+      if (s.barcode) claim(`b:${s.barcode}`, r.id, `Barcode ${s.barcode}`, r.title);
+    }
+  }
 }
 
 export interface CatalogAdminDeps {
@@ -205,7 +295,7 @@ const imagesFor = (title: string, art: GarmentKind, hex: string): Product["image
     alt: `${title}, ${view === "model" ? "on model" : view === "detail" ? "fabric close-up" : view}`,
   }));
 
-function apply(input: ProductInput, base: { id: string; styleId: string; createdAt: string; popularity: number; version: number; sizes: { label: string; stock: number }[] }, now: Date): ProductRecord {
+export function apply(input: ProductInput, base: { id: string; styleId: string; createdAt: string; popularity: number; version: number; sizes: { label: string; stock: number }[] }, now: Date): ProductRecord {
   // Existing sizes keep their recorded stock (live stock is the inventory's); only new sizes take the given number.
   const prior = new Map(base.sizes.map((s) => [s.label, s.stock]));
   return {
@@ -218,7 +308,7 @@ function apply(input: ProductInput, base: { id: string; styleId: string; created
     mrp: input.mrp,
     badge: input.badge,
     colour: { ...input.colour, handle: input.handle },
-    sizes: input.sizes.map((s) => ({ label: s.label, stock: prior.has(s.label) ? prior.get(s.label)! : s.stock })),
+    sizes: input.sizes.map((s) => ({ ...s, stock: prior.has(s.label) ? prior.get(s.label)! : s.stock })),
     images: input.photos.length
       ? input.photos.map((ph, i) => ({ url: mediaUrl(ph.id), alt: ph.alt, art: input.art, colour: input.colour.hex, view: i === 0 ? ("front" as const) : undefined }))
       : imagesFor(input.title, input.art, input.colour.hex),
@@ -234,6 +324,12 @@ function apply(input: ProductInput, base: { id: string; styleId: string; created
     sizeChart: input.sizeChart,
     model: input.model,
     legal: input.legal,
+    ...(input.gstClass ? { gstClass: input.gstClass } : {}),
+    ...(input.hsn ? { hsn: input.hsn } : {}),
+    ...(input.seo ? { seo: input.seo } : {}),
+    ...(input.costPrice !== undefined ? { costPrice: input.costPrice } : {}),
+    ...(input.weightGrams ? { weightGrams: input.weightGrams } : {}),
+    ...(input.dimensionsCm ? { dimensionsCm: input.dimensionsCm } : {}),
     status: input.status,
     version: base.version,
     updatedAt: now.toISOString(),
@@ -263,6 +359,7 @@ export async function createProduct(deps: CatalogAdminDeps, body: unknown, now =
     styleId = input.styleId;
   }
   const record = apply(input, { id: `prd_${randomBytes(10).toString("hex")}`, styleId, createdAt: now.toISOString(), popularity: 0, version: 1, sizes: [] }, now);
+  assertUniqueCodes([...(await deps.store.listRecords()), record]);
   await deps.store.insert(record).catch(conflict);
   deps.invalidate();
   return record;
@@ -278,6 +375,7 @@ export async function updateProduct(deps: CatalogAdminDeps, id: string, body: un
   await checkPhotos(deps, input);
   // The style can't be moved on edit (it would silently change another product's colour swatches).
   const next = apply(input, { ...current, version: version + 1 }, now);
+  assertUniqueCodes([...(await deps.store.listRecords()).filter((r) => r.id !== id), next]);
   const ok = await deps.store.replace(next, version).catch(conflict);
   if (!ok) throw new CatalogAdminError("version_conflict", "Someone else changed this product. Reload to see their changes.", 409);
   deps.invalidate();

@@ -12,6 +12,8 @@ import { GET as auditGET } from "./admin/audit/route";
 import { GET as categoriesGET, PUT as categoriesPUT } from "./admin/categories/route";
 import { POST as collectionPreviewPOST } from "./admin/collections/preview/route";
 import { GET as collectionsGET, PUT as collectionsPUT } from "./admin/collections/route";
+import { GET as styleGET, PUT as stylePUT } from "./admin/styles/[styleId]/route";
+import { POST as stylesPOST } from "./admin/styles/route";
 import { POST as creditPOST, GET as customerGET } from "./admin/customers/[id]/route";
 import { GET as dashGET } from "./admin/dashboard/route";
 import { POST as inventoryPOST } from "./admin/inventory/route";
@@ -323,5 +325,24 @@ describe("categories & collections: authorization (lib/catalog/taxonomy.ts)", ()
     expect((await categoriesGET(req("/api/admin/categories", "GET", undefined, { cookie: owner }))).status).toBe(409);
     expect((await categoriesPUT(req("/api/admin/categories", "PUT", { revision: 0, tree: [] }, { cookie: owner }))).status).toBe(409);
     expect((await collectionPreviewPOST(req("/api/admin/collections/preview", "POST", { builder: {} }, { cookie: owner }))).status).toBe(409);
+  });
+});
+
+describe("style editor routes: authorization", () => {
+  it("401 without a session, 403 without catalog permissions, cross-origin refused, read-only provider 409", async () => {
+    const sp = p({ styleId: "style_abc" });
+    expect((await styleGET(req("/api/admin/styles/style_abc", "GET"), sp)).status).toBe(401);
+    expect((await stylesPOST(req("/api/admin/styles", "POST", {}))).status).toBe(401);
+    expect((await stylePUT(req("/api/admin/styles/style_abc", "PUT", {}), sp)).status).toBe(401);
+
+    const support = await invite(`support-style-${ip}@example.test`, "support");
+    expect((await styleGET(req("/api/admin/styles/style_abc", "GET", undefined, { cookie: support }), sp)).status).toBe(403);
+    const marketing = await invite(`mkt-style-${ip}@example.test`, "marketing");
+    expect((await stylesPOST(req("/api/admin/styles", "POST", {}, { cookie: marketing }))).status).toBe(403);
+    expect((await stylePUT(req("/api/admin/styles/style_abc", "PUT", {}, { cookie: marketing }), sp)).status).toBe(403);
+
+    expect((await stylesPOST(req("/api/admin/styles", "POST", {}, { cookie: owner, headers: { origin: "https://evil.example" } }))).status).toBe(403);
+    expect((await stylesPOST(req("/api/admin/styles", "POST", {}, { cookie: owner }))).status).toBe(409);
+    expect((await styleGET(req("/api/admin/styles/style_abc", "GET", undefined, { cookie: owner }), sp)).status).toBe(409);
   });
 });

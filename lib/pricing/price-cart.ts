@@ -4,7 +4,7 @@ import { automaticUnitDiscount, PREPAID_OFFER, type AutomaticDiscount, AUTOMATIC
 import { applyCombos, COMBOS, type Combo, type ComboApplication, type ComboResult } from "@/lib/promotions/combos";
 import { evaluateCoupon, type Coupon } from "@/lib/promotions/coupons";
 import { applyLooks, type Look, type LookApplication, LOOKS } from "@/lib/promotions/looks";
-import { gstClassFor, inclusiveTax, isIntraState, rateFor, splitTax } from "./gst";
+import { type GstClass, gstClassFor, hsnFor, inclusiveTax, isIntraState, rateFor, splitTax } from "./gst";
 
 /**
  * The ONE place money is computed (CART-02, CHK-05/07/10, PROMO-01…04). Bag, checkout quote, order
@@ -25,6 +25,9 @@ export interface PricingLineInput {
   productId: string;
   category: string;
   subcategory?: string;
+  /** The product's GST class (absent = derived from the category) and HSN (absent = the class default). */
+  gstClass?: GstClass;
+  hsn?: string;
   quantity: number;
   /** Catalogue selling price per unit (paise). */
   unitPrice: Paise;
@@ -59,6 +62,7 @@ export interface PricedLine {
   net: Paise;
   gstRate: number;
   gst: Paise;
+  hsn: string;
 }
 
 export interface PriceBreakdown {
@@ -168,7 +172,8 @@ export function priceCart(input: PricingInput): PriceBreakdown {
   const gst = { cgst: 0, sgst: 0, igst: 0, total: 0 };
   const lines: PricedLine[] = afterCoupon.map((l) => {
     const net = l.value - (prepaidAlloc.get(l.lineId) ?? 0);
-    const rate = rateFor(gstClassFor(l.category), Math.floor(net / l.quantity));
+    const cls = l.gstClass ?? gstClassFor(l.category);
+    const rate = rateFor(cls, Math.floor(net / l.quantity));
     const tax = inclusiveTax(net, rate);
     const split = splitTax(tax, intra);
     gst.cgst += split.cgst;
@@ -188,6 +193,7 @@ export function priceCart(input: PricingInput): PriceBreakdown {
       net,
       gstRate: rate,
       gst: tax,
+      hsn: hsnFor(cls, l.hsn),
     };
   });
 

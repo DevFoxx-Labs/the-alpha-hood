@@ -1,4 +1,5 @@
-import type { Category, CategoryNode, Collection, Product } from "@/lib/commerce/types";
+import type { Category, CategoryNode, Collection, Product, SizeOption } from "@/lib/commerce/types";
+import type { Paise } from "@/lib/format";
 import type { CatalogSnapshot } from "./reader";
 import type { CollectionRule } from "./collection-rules";
 
@@ -14,11 +15,32 @@ import type { CollectionRule } from "./collection-rules";
 export type ProductStatus = "draft" | "active" | "archived";
 export const PRODUCT_STATUSES: readonly ProductStatus[] = ["draft", "active", "archived"];
 
-export type ProductRecord = Omit<Product, "colours" | "rating"> & {
+/** A size variant as stored: its own SKU and barcode (GTIN / EAN) next to the opening stock. */
+export interface RecordSize extends SizeOption {
+  sku?: string;
+  barcode?: string;
+}
+
+/**
+ * One colour of a style, as stored. Fields after `sizes` up to `status` are ADMIN-ONLY: cost price, shipping weight
+ * and package size, per-size SKU / barcode. `toProduct` drops them, so they never reach the storefront, page props or
+ * feeds (cost price is commercially sensitive).
+ */
+export type ProductRecord = Omit<Product, "colours" | "rating" | "sizes"> & {
+  sizes: RecordSize[];
+  /** What the item costs us (paise), for margin reports. Never shown to shoppers. */
+  costPrice?: Paise;
+  /** Packed weight in grams (courier rate / label). */
+  weightGrams?: number;
+  /** Packed size in cm (courier volumetric weight). */
+  dimensionsCm?: { length: number; width: number; height: number };
   status: ProductStatus;
   version: number;
   updatedAt: string;
 };
+
+/** Record fields that must never leave the admin (see ProductRecord). */
+export const ADMIN_ONLY_FIELDS = ["costPrice", "weightGrams", "dimensionsCm", "status", "version", "updatedAt"] as const;
 
 export interface CatalogDocs {
   tree: CategoryNode[];
@@ -52,6 +74,12 @@ export interface CatalogStore {
   replaceDocs(docs: CatalogDocs, expectedRevision: number): Promise<boolean>;
   /** `${productId}::${size}` → on hand, for SKUs the inventory has seen. */
   onHand(): Promise<Map<string, number>>;
+  /**
+   * All-or-nothing write of several colours of one style (one transaction): inserts new records and replaces existing
+   * ones only if every stored version still matches. Returns false (nothing written) when any version is stale.
+   * Throws CatalogConflictError when an id, handle or SKU is taken.
+   */
+  writeMany(inserts: ProductRecord[], replaces: { record: ProductRecord; expectedVersion: number }[]): Promise<boolean>;
 }
 
 export const skuKey = (productId: string, size: string) => `${productId}::${size}`;
@@ -64,12 +92,10 @@ export function recordFromProduct(p: Product, now: Date, status: ProductStatus =
 }
 
 export function toProduct(r: ProductRecord, colours: Product["colours"], rating: Product["rating"], onHand: Map<string, number>): Product {
-  const { status: _s, version: _v, updatedAt: _u, ...rest } = structuredClone(r);
-  void _s;
-  void _v;
-  void _u;
+  const rest: Partial<ProductRecord> = structuredClone(r);
+  for (const k of ADMIN_ONLY_FIELDS) delete rest[k];
   return {
-    ...rest,
+    ...(rest as Omit<Product, "colours" | "rating" | "sizes">),
     rating,
     colour: colours.find((c) => c.handle === r.handle) ?? r.colour,
     colours,
@@ -145,6 +171,22 @@ export function createMemoryCatalogStore(): CatalogStore {
     },
     async onHand() {
       return new Map();
+    },
+    async writeMany(inserts, replaces) {
+      if (replaces.some(({ record, expectedVersion }) => records.get(record.id)?.version !== expectedVersion)) return false;
+      if (inserts.some((r) => records.has(r.id))) throw new CatalogConflictError("id");
+      // Check every clash against the result of the whole write before changing anything (all or nothing).
+      const next = new Map(records);
+      for (const r of [...inserts, ...replaces.map((x) => x.record)]) next.set(r.id, r);
+      const seen = new Map<string, string>();
+      for (const r of next.values()) {
+        for (const [k, field] of [[`h:${r.handle}`, "handle"], [`s:${r.sku}`, "sku"]] as const) {
+          if (seen.has(k) && seen.get(k) !== r.id) throw new CatalogConflictError(field);
+          seen.set(k, r.id);
+        }
+      }
+      for (const r of [...inserts, ...replaces.map((x) => x.record)]) records.set(r.id, structuredClone(r));
+      return true;
     },
   };
 }

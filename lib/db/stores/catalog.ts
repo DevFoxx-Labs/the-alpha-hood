@@ -12,6 +12,8 @@ import { fromJson, isUniqueViolation, type SqlDb, sqlTx } from "../sql";
  * counter moves in the same transaction.
  */
 const DOCS_KEY = "catalog";
+/** Thrown inside a transaction to roll the whole multi-colour write back when one version is stale. */
+class StaleWrite extends Error {}
 // MongoDB note: catalogue writes use `ignoreUndefined` so optional fields stay absent (the driver would store
 // `undefined` as `null`, and the storefront would see `badge: null` instead of no badge).
 
@@ -92,6 +94,28 @@ export function createSqlCatalogStore(db: SqlDb): CatalogStore {
     async onHand() {
       const rows = await db.selectFrom("inventory_skus").selectAll().execute();
       return new Map(rows.map((r) => [skuKey(r.product_id, r.size), Number(r.on_hand)]));
+    },
+    async writeMany(inserts, replaces) {
+      try {
+        await sqlTx(db, async (trx) => {
+          for (const { record, expectedVersion } of replaces) {
+            const res = await trx.updateTable("products").set(row(record)).where("id", "=", record.id).where("version", "=", expectedVersion).executeTakeFirst();
+            if (Number(res.numUpdatedRows) !== 1) throw new StaleWrite();
+          }
+          for (const r of inserts) await trx.insertInto("products").values(row(r)).execute();
+        });
+        return true;
+      } catch (e) {
+        if (e instanceof StaleWrite) return false;
+        if (isUniqueViolation(e)) {
+          for (const r of [...inserts, ...replaces.map((x) => x.record)]) {
+            const c = await conflictField(r);
+            if (c.field !== "id") throw c;
+          }
+          throw new CatalogConflictError("id");
+        }
+        throw e;
+      }
     },
   };
 }
@@ -214,6 +238,30 @@ export function createMongoCatalogStore(conn: Promise<MongoConn>): CatalogStore 
     async onHand() {
       const rows = await (await conn).db.collection<{ _id: string; on_hand: number }>("inventory_skus").find().toArray();
       return new Map(rows.map((r) => [r._id, r.on_hand]));
+    },
+    async writeMany(inserts, replaces) {
+      const c = await conn;
+      try {
+        await mongoTx(c, async (session) => {
+          const products = c.db.collection<ProductDoc>("products");
+          for (const { record, expectedVersion } of replaces) {
+            const res = await products.replaceOne({ _id: record.id, version: expectedVersion }, structuredClone(record), { session, ignoreUndefined: true });
+            if (res.matchedCount !== 1) throw new StaleWrite();
+          }
+          for (const r of inserts) await products.insertOne({ ...structuredClone(r), _id: r.id }, { session, ignoreUndefined: true });
+        });
+        return true;
+      } catch (e) {
+        if (e instanceof StaleWrite) return false;
+        if (isMongoDuplicate(e)) {
+          for (const r of [...inserts, ...replaces.map((x) => x.record)]) {
+            const err = await conflictField(r);
+            if (err.field !== "id") throw err;
+          }
+          throw new CatalogConflictError("id");
+        }
+        throw e;
+      }
     },
   };
 }

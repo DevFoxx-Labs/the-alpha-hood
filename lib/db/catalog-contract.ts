@@ -151,6 +151,29 @@ for (const target of testTargets()) {
       expect((await s.catalog.listRecords()).some((r) => r.sku === "AH-VAL-1")).toBe(false);
     });
 
+    it("writeMany: all colours or none — a stale version or a taken handle rolls back the inserts too", async () => {
+      const [a, b] = (await s.catalog.listRecords()).filter((r) => r.status === "active").slice(0, 2);
+      const fresh = (sku: string, handle: string) => ({ ...structuredClone(a), id: `prd_wm_${sku.toLowerCase()}`, sku, handle, styleId: "style_wm", version: 1 });
+      // Stale: b's version is wrong → nothing written, not even the insert or a's update.
+      const ok = await s.catalog.writeMany([fresh("AH-WM-1", "wm-one")], [
+        { record: { ...a, price: 100, version: a.version + 1 }, expectedVersion: a.version },
+        { record: { ...b, version: b.version + 5 }, expectedVersion: b.version + 4 },
+      ]);
+      expect(ok).toBe(false);
+      expect(await s.catalog.getRecord("prd_wm_ah-wm-1")).toBeNull();
+      expect((await s.catalog.getRecord(a.id))!.price).toBe(a.price);
+      // Taken handle on the insert → conflict, and a's update rolled back.
+      await expect(
+        s.catalog.writeMany([fresh("AH-WM-2", b.handle)], [{ record: { ...a, price: 100, version: a.version + 1 }, expectedVersion: a.version }]),
+      ).rejects.toMatchObject({ field: "handle" });
+      expect((await s.catalog.getRecord(a.id))!.price).toBe(a.price);
+      expect(await s.catalog.getRecord("prd_wm_ah-wm-2")).toBeNull();
+      // Valid: both land.
+      expect(await s.catalog.writeMany([fresh("AH-WM-3", "wm-three")], [{ record: { ...a, version: a.version + 1 }, expectedVersion: a.version }])).toBe(true);
+      expect((await s.catalog.getRecord("prd_wm_ah-wm-3"))!.styleId).toBe("style_wm");
+      expect((await s.catalog.getRecord(a.id))!.version).toBe(a.version + 1);
+    });
+
     it("category documents: replaceDocs is compare-and-set on the revision (one of two racing saves wins)", async () => {
       const docs = (await s.catalog.getDocs())!;
       const base = docs.revision ?? 0;

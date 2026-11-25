@@ -263,6 +263,7 @@ export async function placeOrder(deps: CheckoutDeps, input: PlaceInput): Promise
           unitPrice: pl.unitPrice,
           gstRate: pl.gstRate,
           gst: pl.gst,
+          hsn: pl.hsn,
         };
       }),
       pricing,

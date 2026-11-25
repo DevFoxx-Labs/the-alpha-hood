@@ -1,5 +1,6 @@
 import { audit, requireStaff } from "@/lib/admin/auth";
 import { adminError, adminWrite, privateJson } from "@/lib/admin/http";
+import { can } from "@/lib/admin/permissions";
 import { CatalogAdminError, updateProduct } from "@/lib/catalog/admin";
 import { catalogAdminDeps } from "@/lib/catalog/admin-deps";
 import { PRODUCT_ID_RE } from "@/lib/catalog/reader";
@@ -20,6 +21,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/admin/catalo
     if (!PRODUCT_ID_RE.test(id)) return jsonError(404, "not_found", "Product not found.");
     const product = await deps.store.getRecord(id);
     if (!product) return jsonError(404, "not_found", "Product not found.");
+    // Cost price is for staff who edit the catalogue (least privilege: marketing reads products but not margins).
+    if (!can(auth.staff.role, "catalog.write")) delete product.costPrice;
     return privateJson({ product });
   } catch (error) {
     return adminError(error);

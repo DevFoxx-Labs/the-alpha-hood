@@ -22,6 +22,11 @@ export const GST_CONFIG: {
   },
 };
 
+/** HSN printed on the invoice: the product's own code, else its class default. */
+export function hsnFor(cls: GstClass, own?: string): string {
+  return own ?? GST_CONFIG.classes[cls].hsn;
+}
+
 export function gstClassFor(category: string): GstClass {
   if (category === "sneakers") return "footwear";
   if (category === "sunglasses") return "eyewear";

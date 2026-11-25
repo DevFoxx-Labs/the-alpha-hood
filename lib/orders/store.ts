@@ -57,6 +57,8 @@ export interface OrderLine {
   unitPrice: Paise;
   gstRate: number;
   gst: Paise;
+  /** HSN on the tax invoice (absent on orders placed before 2026-11-25). */
+  hsn?: string;
 }
 
 export interface PaymentAttempt {

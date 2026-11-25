@@ -3,6 +3,7 @@ import { adminError, adminWrite, privateJson } from "@/lib/admin/http";
 import { adminRow, CatalogAdminError, createProduct } from "@/lib/catalog/admin";
 import { catalogAdminDeps } from "@/lib/catalog/admin-deps";
 import { PRODUCT_STATUSES, type ProductStatus } from "@/lib/catalog/store";
+import { styleRows } from "@/lib/catalog/style";
 import { commerce } from "@/lib/commerce";
 
 /**
@@ -26,6 +27,11 @@ export async function GET(request: Request) {
       const options = { tree: (docs?.tree ?? []).map((c) => ({ handle: c.handle, title: c.title, subcategories: c.subcategories.map((s) => ({ handle: s.handle, title: s.title })) })), styles };
       // The editor only needs the form choices.
       if (p.get("view") === "options") return privateJson({ editable: true, options });
+      // Products list: one row per style (product) with its colours.
+      if (p.get("view") === "styles") {
+        const rows = styleRows(records, onHand, q, status);
+        return privateJson({ editable: true, rows: rows.slice(0, 500), total: rows.length });
+      }
       const rows = records.filter((r) => match(r.title, r.sku) && (!status || r.status === status)).map((r) => adminRow(r, onHand));
       return privateJson({ editable: true, rows: rows.slice(0, 500), total: rows.length, options });
     }

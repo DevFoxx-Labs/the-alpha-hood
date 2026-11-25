@@ -1,5 +1,6 @@
 import type { CatalogQuery, CatalogResult, CatalogScope, SearchSuggestions } from "@/lib/catalog/types";
 import type { Paise } from "@/lib/format";
+import type { GstClass } from "@/lib/pricing/gst";
 
 /**
  * Platform-neutral commerce types (PRD §4, §8). The storefront only talks to `CommerceAdapter`,
@@ -86,6 +87,12 @@ export interface Product {
   model?: { height: string; size: string };
   /** Legal Metrology declarations (PDP-07). Never invented: placeholders until the supplier provides them. */
   legal: { manufacturer: string; packer?: string; importer?: string; countryOfOrigin: string; netQuantity: string };
+  /** GST class for the rate table (absent = derived from the category). */
+  gstClass?: GstClass;
+  /** HSN code printed on the tax invoice (4, 6 or 8 digits; absent = the class default). */
+  hsn?: string;
+  /** Search-engine title / description for this colour's page (absent = derived from the product). */
+  seo?: { title?: string; description?: string };
 }
 
 export type SizeChartKind = "tops" | "bottoms" | "shoes" | "none";
