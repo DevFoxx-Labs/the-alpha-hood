@@ -28,6 +28,7 @@ export const PERMISSIONS = [
   "audit.read",
   "ugc.moderate",
   "giftcards.issue",
+  "subscribers.read", // newsletter list (masked) + full-contact CSV export (audited)
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -43,7 +44,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   catalog_editor: ["dashboard", "catalog.read", "catalog.write", "inventory.read", "promotions.read"],
   support: ["dashboard", "orders.read", "orders.write", "returns.read", "refunds.issue", "customers.read", "privacy.read", "privacy.write"],
   warehouse: ["dashboard", "orders.read", "orders.ship", "returns.read", "returns.qc", "inventory.read", "inventory.write"],
-  marketing: ["dashboard", "catalog.read", "promotions.read", "reports.read", "ugc.moderate"],
+  marketing: ["dashboard", "catalog.read", "promotions.read", "reports.read", "ugc.moderate", "subscribers.read"],
   finance: ["dashboard", "orders.read", "returns.read", "refunds.issue", "customers.read", "reports.read", "giftcards.issue"],
 };
 
@@ -65,6 +66,6 @@ export const ROLE_META: Record<Role, { label: string; color: string; subtitle: s
   catalog_editor: { label: "Catalog editor", color: "bg-purple-500/10 text-purple-600 dark:text-purple-400", subtitle: "Products and stock levels." },
   support: { label: "Customer support", color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", subtitle: "Orders, returns, refunds and privacy requests." },
   warehouse: { label: "Warehouse", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400", subtitle: "Pick, pack, ship and quality checks." },
-  marketing: { label: "Marketing", color: "bg-pink-500/10 text-pink-600 dark:text-pink-400", subtitle: "Catalogue, promotions and reports." },
+  marketing: { label: "Marketing", color: "bg-pink-500/10 text-pink-600 dark:text-pink-400", subtitle: "Catalogue, promotions, subscribers and reports." },
   finance: { label: "Finance", color: "bg-slate-500/10 text-slate-600 dark:text-slate-400", subtitle: "Payouts, refunds and reports." },
 };

@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const store = resolveStaffStore();
     return privateJson({
       staff: (await store.list()).map(publicStaff),
-      invites: (await store.listInvites(Date.now())).map((i) => ({ email: i.email, role: i.role, expiresAt: new Date(i.expiresAt).toISOString() })),
+      invites: (await store.listInvites(Date.now())).map((i) => ({ email: i.email, role: i.role, kind: i.resetFor ? "reset" : "invite", expiresAt: new Date(i.expiresAt).toISOString() })),
     });
   } catch (error) {
     return adminError(error);

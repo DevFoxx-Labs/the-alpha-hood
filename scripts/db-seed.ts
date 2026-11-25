@@ -27,7 +27,7 @@ if (!cfg) {
 console.log(`Target: ${describeTarget(cfg)}`);
 try {
   const r = await seedDemoCatalog(createDbStores(cfg), () => assertDestructiveAllowed(cfg));
-  console.log(`Demo catalogue seeded: ${r.products} new products (existing ones kept), reviews checked: ${r.reviews}.`);
+  console.log(`Demo catalogue seeded: ${r.products} new products (existing ones kept), ${r.images} demo photo sets refreshed, reviews checked: ${r.reviews}.`);
 } catch (e) {
   console.error(e instanceof Error ? e.message : String(e));
   process.exitCode = 1;

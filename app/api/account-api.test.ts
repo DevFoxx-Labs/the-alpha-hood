@@ -117,6 +117,16 @@ describe("marketing preferences ↔ consent ledger (DPDP)", () => {
     expect(statuses).toEqual(["granted", "withdrawn"]);
     expect((await prefsPOST(req("/api/account/preferences", "POST", { marketing_whatsapp: "yes" }, { cookie: s }))).status).toBe(422);
   });
+
+  it("Offers by SMS: off by default, its own ledger purpose, switching it on never turns on WhatsApp offers", async () => {
+    const s = await signIn("9700000013");
+    expect(await (await prefsGET(req("/api/account/preferences", "GET", undefined, { cookie: s }))).json()).toMatchObject({ marketing_sms: false });
+    const on = await (await prefsPOST(req("/api/account/preferences", "POST", { marketing_sms: true }, { cookie: s }))).json();
+    expect(on).toMatchObject({ marketing_sms: true, marketing_whatsapp: false, marketing_email: false });
+    const off = await (await prefsPOST(req("/api/account/preferences", "POST", { marketing_sms: false }, { cookie: s }))).json();
+    expect(off.marketing_sms).toBe(false);
+    expect(off.history.filter((h: { purpose: string }) => h.purpose === "marketing_sms").map((h: { status: string }) => h.status)).toEqual(["granted", "withdrawn"]);
+  });
 });
 
 describe("orders, tracking, cancellation, invoice, returns", () => {

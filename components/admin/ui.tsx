@@ -119,7 +119,7 @@ export function ASelect({
               <SelectPrimitive.Item
                 key={o.value}
                 value={o.value}
-                className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[state=checked]:font-semibold"
+                className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[state=checked]:font-semibold"
               >
                 <SelectPrimitive.ItemText>{o.label}</SelectPrimitive.ItemText>
               </SelectPrimitive.Item>
@@ -382,7 +382,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 
 export interface Column<T> {
   key: string;
-  header: string;
+  header: React.ReactNode;
   cell: (row: T) => React.ReactNode;
   className?: string;
 }

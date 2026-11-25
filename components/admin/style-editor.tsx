@@ -40,6 +40,20 @@ interface SizeForm {
   saved: boolean;
 }
 
+/** An uploaded photo; `view` tags an on-hanger cutout for the collection rail turn (PLP-08). */
+type PhotoView = "front" | "back" | "side";
+interface Photo {
+  id: string;
+  alt: string;
+  view?: PhotoView;
+}
+const PHOTO_VIEW_OPTIONS = [
+  { value: NONE, label: "Gallery photo" },
+  { value: "front", label: "Hanger · front" },
+  { value: "back", label: "Hanger · back" },
+  { value: "side", label: "Hanger · side" },
+];
+
 interface VariantForm {
   key: string;
   id?: string;
@@ -57,7 +71,7 @@ interface VariantForm {
   cost: string;
   badge: string;
   sizes: SizeForm[];
-  photos: { id: string; alt: string }[];
+  photos: Photo[];
   seoTitle: string;
   seoDescription: string;
 }
@@ -119,7 +133,7 @@ interface StyleView {
     costPrice?: number;
     badge?: string;
     sizes: { label: string; sku?: string; barcode?: string; stock: number }[];
-    photos: { id: string; alt: string }[];
+    photos: Photo[];
     seo?: { title?: string; description?: string };
   }[];
 }
@@ -786,16 +800,22 @@ function VariantPanel({
   );
 }
 
+/** Sets or clears a photo's rail view (each view is used by one photo; picking it elsewhere moves it). */
+function withView(p: Photo, value: string): Photo {
+  const rest: Photo = { id: p.id, alt: p.alt };
+  return value === "front" || value === "back" || value === "side" ? { ...rest, view: value } : rest;
+}
+
 /**
  * Photos of one colour: upload (JPEG / PNG, ≤ 8 MB, 600–6000 px — checked again on the server), reorder, describe,
  * remove. The first photo leads on product cards and the product page. Every photo needs a description (alt text).
  */
-function PhotoManager({ photos, title, onChange }: { photos: { id: string; alt: string }[]; title: string; onChange: (p: { id: string; alt: string }[]) => void }) {
+function PhotoManager({ photos, title, onChange }: { photos: Photo[]; title: string; onChange: (p: Photo[]) => void }) {
   const [busy, setBusy] = useState(false);
   async function upload(files: FileList | null) {
     if (!files?.length) return;
     setBusy(true);
-    const added: { id: string; alt: string }[] = [];
+    const added: Photo[] = [];
     for (const file of Array.from(files).slice(0, 8 - photos.length)) {
       if (file.type !== "image/jpeg" && file.type !== "image/png") {
         notify("error", `${file.name}: use a JPEG or PNG photo.`);
@@ -824,12 +844,23 @@ function PhotoManager({ photos, title, onChange }: { photos: { id: string; alt: 
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">JPEG or PNG, at least 600 × 600 px, up to 8 MB, max 8 photos. Without photos the placeholder drawing is shown.</p>
+      <p className="text-xs text-muted-foreground">
+        Collection rail: tag three on-hanger cutouts as <b>Hanger · front</b>, <b>back</b> and <b>side</b> — transparent PNG, same size and
+        framing for all three, hook at the top centre. With a front and a side the garment hangs side-on and turns to face the shopper.
+      </p>
       {photos.length ? (
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {photos.map((p, i) => (
             <li key={p.id} className="space-y-1.5">
               <GarmentArt image={{ art: "tee", colour: "#e5e5e5", alt: p.alt, url: `/api/media/${p.id}` }} sizes="160px" className="aspect-[4/5] w-full rounded-md" />
               <AInput aria-label={`Description of photo ${i + 1}`} maxLength={140} value={p.alt} placeholder="Describe the photo" onChange={(e) => onChange(photos.map((x, j) => (j === i ? { ...x, alt: e.target.value } : x)))} />
+              <ASelect
+                label={`Use of photo ${i + 1}`}
+                className="w-full"
+                value={p.view ?? NONE}
+                onValueChange={(x) => onChange(photos.map((ph, j) => (j === i ? withView(ph, x) : ph.view === x ? withView(ph, NONE) : ph)))}
+                options={PHOTO_VIEW_OPTIONS}
+              />
               <div className="flex justify-between">
                 <AButton type="button" size="icon" variant="ghost" aria-label={`Move photo ${i + 1} earlier`} disabled={i === 0} onClick={() => move(i, -1)}>
                   <AIcon icon={ArrowLeft01Icon} />

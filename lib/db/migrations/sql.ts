@@ -619,5 +619,17 @@ export function sqlMigrations(d: Driver): Record<string, Migration> {
         }
       },
     },
+
+    "2026_11_28_008_staff_password_reset": {
+      async up(db: AnyDb) {
+        // Additive + nullable: existing invite rows stay join invites (reset_for = NULL).
+        if (!(await hasColumn(db, d, "staff_invites", "reset_for"))) {
+          await db.schema.alterTable("staff_invites").addColumn("reset_for", "varchar(40)").execute();
+        }
+      },
+      async down(db: AnyDb) {
+        if (await hasColumn(db, d, "staff_invites", "reset_for")) await db.schema.alterTable("staff_invites").dropColumn("reset_for").execute();
+      },
+    },
   };
 }

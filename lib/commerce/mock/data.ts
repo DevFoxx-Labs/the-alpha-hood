@@ -42,6 +42,11 @@ interface ColourSpec {
   family: string;
   /** Per-colour stock override. */
   sizes?: SizeSpec;
+  /**
+   * DEMO on-hanger cutouts in public/demo/products/<shots>-{front,back,side,angle}.webp (PLP-08 rail turn).
+   * Owner-supplied mock-ups, cut out and put on one 1000 × 1250 canvas (hook tip at the top centre, same scale).
+   */
+  shots?: string;
 }
 
 interface Group {
@@ -91,7 +96,7 @@ const GROUPS: Group[] = [
   { base: "Nylon Cargo Shorts", category: "shorts", art: "cargo", price: 999, mrp: 1399, age: 100, attributes: { fit: "relaxed", fabric: "nylon", pattern: "solid", occasion: "casual" }, colours: [col("Black", "#1b1b1b", "black"), col("Olive", "#59603f", "olive")], sizes: { labels: WAIST } },
   // Hoodies, sweaters, jackets
   { base: "Essential Zip Hoodie", collar: "Hooded", category: "hoodies", art: "hoodie", price: 1699, mrp: 2299, rating: { average: 4.4, count: 98 }, age: 28, attributes: { fit: "regular", fabric: "fleece", sleeve: "full", pattern: "solid", occasion: "winter" }, colours: [col("Charcoal", "#3a3a3c", "grey"), col("Slate", "#6d7a8a", "grey"), col("Oat", "#e9e4d8", "cream")], sizes: { labels: TOP } },
-  { base: "Heavyweight Oversized Hoodie", collar: "Hooded", model: { height: "6'0\"", size: "L" }, category: "hoodies", art: "hoodie", price: 1999, mrp: 2799, badge: "BESTSELLER", rating: { average: 4.7, count: 143 }, age: 22, attributes: { fit: "oversized", fabric: "fleece", sleeve: "full", pattern: "solid", occasion: "winter" }, colours: [col("Black", "#1b1b1b", "black"), col("Maroon", "#5a1f2a", "maroon")], sizes: { labels: TOP, low: { XL: 1 } }, tags: ["sweatshirt", "streetwear"] },
+  { base: "Heavyweight Oversized Hoodie", collar: "Hooded", model: { height: "6'0\"", size: "L" }, category: "hoodies", art: "hoodie", price: 1999, mrp: 2799, badge: "BESTSELLER", rating: { average: 4.7, count: 143 }, age: 22, attributes: { fit: "oversized", fabric: "fleece", sleeve: "full", pattern: "solid", occasion: "winter" }, colours: [{ ...col("Black", "#1b1b1b", "black"), shots: "oversized-hoodie-black" }, col("Maroon", "#5a1f2a", "maroon"), col("Grey Melange", "#a3a3a3", "grey")], sizes: { labels: TOP, low: { XL: 1 } }, tags: ["sweatshirt", "streetwear"] },
   { base: "Cable Knit Polo Sweater", collar: "Polo", category: "sweaters", art: "sweater", price: 1999, mrp: 2799, age: 12, attributes: { fit: "regular", fabric: "knit", sleeve: "full", pattern: "textured", occasion: "winter" }, colours: [col("Cream", "#e8e1cf", "cream"), col("Navy", "#2b3a55", "navy")], sizes: { labels: TOP } },
   { base: "Matte Puffer Jacket", category: "jackets", subcategory: "puffers", art: "puffer", price: 3499, mrp: 4999, rating: { average: 4.7, count: 56 }, age: 8, attributes: { fit: "regular", fabric: "nylon", sleeve: "full", pattern: "solid", occasion: "winter" }, colours: [col("Black", "#202020", "black"), col("Olive", "#4a5a3c", "olive")], sizes: { labels: TOP, low: { M: 1 } } },
   { base: "Varsity Knit Bomber", category: "jackets", subcategory: "bombers", art: "jacket", price: 2799, mrp: 3699, badge: "NEW", age: 5, attributes: { fit: "regular", fabric: "wool-blend", sleeve: "full", pattern: "solid", occasion: "winter" }, colours: [col("Maroon", "#5a1f2a", "maroon"), col("Navy", "#1d2a44", "navy")], sizes: { labels: TOP } },
@@ -153,12 +158,24 @@ export const MOCK_PRODUCTS: Product[] = GROUPS.flatMap((g, gi) => {
       colour: swatches[ci],
       colours: swatches,
       sizes: sizes(c.sizes ?? g.sizes),
-      images: (["front", "model", "back", "detail"] as const).map((view) => ({
-        art: g.art,
-        colour: c.hex,
-        view,
-        alt: `${title}, ${view === "model" ? "on model" : view === "detail" ? "fabric close-up" : view}`,
-      })),
+      images: c.shots
+        ? [
+            ...(["front", "back", "side"] as const).map((view) => ({
+              url: `/demo/products/${c.shots}-${view}.webp`,
+              art: g.art,
+              colour: c.hex,
+              view,
+              alt: `${title}, ${view} on a hanger`,
+            })),
+            // Gallery-only shot (no rail view): three-quarter back.
+            { url: `/demo/products/${c.shots}-angle.webp`, art: g.art, colour: c.hex, alt: `${title}, three-quarter back on a hanger` },
+          ]
+        : (["front", "model", "back", "detail"] as const).map((view) => ({
+            art: g.art,
+            colour: c.hex,
+            view,
+            alt: `${title}, ${view === "model" ? "on model" : view === "detail" ? "fabric close-up" : view}`,
+          })),
       attributes: g.attributes,
       colourFamily: c.family,
       createdAt: new Date(NOW - (g.age * 24 + ci) * 3_600_000).toISOString(),

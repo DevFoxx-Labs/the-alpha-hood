@@ -6,6 +6,7 @@ import { createMemoryReviewStore } from "@/lib/reviews/store";
 import { type CatalogAdminDeps, validGtin } from "./admin";
 import { createMemoryMediaStore } from "./media";
 import { createOwnCatalog } from "./own";
+import { hangerShots } from "./rail";
 import { seedDemoCatalog } from "./seed";
 import { createMemoryCatalogStore } from "./store";
 import { getStyle, saveStyle, styleRows } from "./style";
@@ -129,6 +130,33 @@ describe("style editor: create", () => {
     ];
     for (const [over, variants, msg] of bad) await expect(saveStyle(deps, null, styleBody(over, variants), now), msg.source).rejects.toThrow(msg);
     expect((await deps.store.listRecords()).some((r) => r.sku.startsWith("AH-OVR"))).toBe(false);
+  });
+
+  it("PLP-08 tags on-hanger photos front / back / side; the storefront rail can turn them", async () => {
+    const ids = ["d", "e"].map((c) => `med_${c.repeat(32)}`);
+    for (const id of ids) await deps.media!.save({ id, type: "image/png", width: 645, height: 1000, bytes: new Uint8Array(), createdAt: now.toISOString(), createdBy: "stf_test" });
+    const photos = [
+      { id: PHOTO, alt: "Heavy Overshirt in black, front on a hanger", view: "front" },
+      { id: ids[0], alt: "Heavy Overshirt in black, side on a hanger", view: "side" },
+      { id: ids[1], alt: "Heavy Overshirt in black, detail" },
+    ];
+    const { styleId } = await saveStyle(deps, null, styleBody({}, [colour("Black", "#111111", "BLK", { photos })]), now);
+    const black = (await own().reader.getProduct("heavy-overshirt-black"))!;
+    const shots = hangerShots(black);
+    expect(shots?.front.url).toBe(`/api/media/${PHOTO}`);
+    expect(shots?.side.url).toBe(`/api/media/${ids[0]}`);
+    expect(shots?.back).toBeUndefined();
+    // Round trip through the editor keeps the tags (and nothing is invented for the untagged photo).
+    expect((await getStyle(deps, styleId, true))!.variants[0].photos).toEqual(photos);
+  });
+
+  it("PLP-08 refuses a made-up photo view or the same view twice", async () => {
+    const twice = [{ id: PHOTO, alt: "Front on a hanger", view: "front" }];
+    await expect(saveStyle(deps, null, styleBody({}, [colour("Black", "#111111", "BLK", { photos: [{ ...twice[0], view: "top" }] })]), now)).rejects.toThrow(/photo view/);
+    const other = `med_${"f".repeat(32)}`;
+    await deps.media!.save({ id: other, type: "image/png", width: 800, height: 800, bytes: new Uint8Array(), createdAt: now.toISOString(), createdBy: "stf_test" });
+    await expect(saveStyle(deps, null, styleBody({}, [colour("Black", "#111111", "BLK", { photos: [...twice, { id: other, alt: "Also front", view: "front" }] })]), now)).rejects.toThrow(/Only one photo can be the front/);
+    await expect(saveStyle(deps, null, styleBody({}, [colour("Black", "#111111", "BLK", { photos: [{ ...twice[0], url: "https://evil.example/x.png" }] })]), now)).rejects.toThrow(/Unknown field/);
   });
 
   it("size SKUs and barcodes are unique across the catalogue", async () => {

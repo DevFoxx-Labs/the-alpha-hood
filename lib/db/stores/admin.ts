@@ -116,7 +116,7 @@ export function createSqlStaffStore(db: SqlDb, box: SecretBox): StaffStore {
       return Number(r.numUpdatedRows) === 1;
     },
     async putInvite(i) {
-      await db.insertInto("staff_invites").values({ token_hash: i.tokenHash, email: i.email, name: i.name, role: i.role, invited_by: i.invitedBy, expires_at: i.expiresAt, used: i.used }).execute();
+      await db.insertInto("staff_invites").values({ token_hash: i.tokenHash, email: i.email, name: i.name, role: i.role, invited_by: i.invitedBy, expires_at: i.expiresAt, used: i.used, reset_for: i.resetFor ?? null }).execute();
     },
     async listInvites(now) {
       const rows = await db.selectFrom("staff_invites").selectAll().where("used", "=", false).where("expires_at", ">", now).execute();
@@ -173,8 +173,8 @@ export function createSqlStaffStore(db: SqlDb, box: SecretBox): StaffStore {
   };
 }
 
-function inviteFromRow(r: { token_hash: string; email: string; name: string; role: string; invited_by: string; expires_at: number | string; used: boolean | number }): Invite {
-  return { tokenHash: r.token_hash, email: r.email, name: r.name, role: r.role as Role, invitedBy: r.invited_by, expiresAt: n(r.expires_at), used: toBool(r.used) };
+function inviteFromRow(r: { token_hash: string; email: string; name: string; role: string; invited_by: string; expires_at: number | string; used: boolean | number; reset_for?: string | null }): Invite {
+  return { tokenHash: r.token_hash, email: r.email, name: r.name, role: r.role as Role, invitedBy: r.invited_by, expiresAt: n(r.expires_at), used: toBool(r.used), resetFor: r.reset_for ?? null };
 }
 
 const newAuditId = () => `aud_${randomBytes(8).toString("hex")}`;
@@ -256,7 +256,7 @@ export function createMongoStaffStore(conn: Promise<MongoConn>, box: SecretBox):
   const sessions = async () => (await db()).collection<SessionDoc>("staff_sessions");
   const inv = (d: InviteDoc): Invite => {
     const { _id, ...rest } = d;
-    return { ...rest, tokenHash: _id };
+    return { ...rest, tokenHash: _id, resetFor: rest.resetFor ?? null };
   };
   return {
     async count() {

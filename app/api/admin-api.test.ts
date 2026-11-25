@@ -14,6 +14,9 @@ import { POST as collectionPreviewPOST } from "./admin/collections/preview/route
 import { GET as collectionsGET, PUT as collectionsPUT } from "./admin/collections/route";
 import { GET as styleGET, PUT as stylePUT } from "./admin/styles/[styleId]/route";
 import { POST as stylesPOST } from "./admin/styles/route";
+import { POST as bulkPOST } from "./admin/catalog/bulk/route";
+import { GET as exportGET } from "./admin/catalog/export/route";
+import { POST as importPOST } from "./admin/catalog/import/route";
 import { POST as creditPOST, GET as customerGET } from "./admin/customers/[id]/route";
 import { GET as dashGET } from "./admin/dashboard/route";
 import { POST as inventoryPOST } from "./admin/inventory/route";
@@ -28,6 +31,16 @@ import { GET as csvGET } from "./admin/reports/orders/route";
 import { POST as returnActionPOST } from "./admin/returns/[number]/action/route";
 import { POST as setupPOST } from "./admin/setup/route";
 import { PATCH as staffPATCH } from "./admin/staff/[id]/route";
+import { POST as resetLinkPOST } from "./admin/staff/[id]/reset-link/route";
+import { POST as forgotPOST } from "./admin/password/forgot/route";
+import { GET as subscribersGET } from "./admin/subscribers/route";
+import { GET as subscribersExportGET } from "./admin/subscribers/export/route";
+import { POST as newsletterPOST } from "./newsletter/route";
+import { POST as resetPOST } from "./admin/password/reset/route";
+import { requestResetCode } from "@/lib/admin/auth";
+import { type DemoEmail, resolveEmail } from "@/lib/notify/email";
+
+const demoMail = () => resolveEmail({ NODE_ENV: "test" }) as DemoEmail;
 import { GET as staffGET, POST as invitePOST } from "./admin/staff/route";
 import { POST as totpEnrol } from "./admin/totp/enrol/route";
 import { POST as totpVerify } from "./admin/totp/verify/route";
@@ -116,7 +129,7 @@ afterEach(() => {
 
 describe("guard: every admin route checks staff + permission", () => {
   it("each app/api/admin route uses requireStaff or adminWrite, except the sign-in steps", () => {
-    const PUBLIC = ["setup", "login", join("totp", "enrol"), join("totp", "verify"), "logout", join("invite", "accept")].map((x) => join("admin", x, "route.ts"));
+    const PUBLIC = ["setup", "login", join("totp", "enrol"), join("totp", "verify"), "logout", join("invite", "accept"), join("password", "forgot"), join("password", "reset")].map((x) => join("admin", x, "route.ts"));
     const files: string[] = [];
     const walk = (d: string) => {
       for (const n of readdirSync(d)) {
@@ -248,6 +261,134 @@ describe("RBAC on the server", () => {
     expect((await catalogPOST(req("/api/admin/catalog", "POST", body, { cookie: owner, headers: { origin: "https://evil.example" } }))).status).toBe(403);
   });
 
+  it("password-reset links: owner only, never for yourself, one use, MFA still required, audited", async () => {
+    const email = `forgot-${ip}@example.test`;
+    const staffCookie = await invite(email, "support");
+    const id = (await (await staffGET(req("/api/admin/staff", "GET", undefined, { cookie: owner }))).json()).staff.find((s: { email: string }) => s.email === email).id;
+    const me = (await (await staffGET(req("/api/admin/staff", "GET", undefined, { cookie: owner }))).json()).staff.find((s: { email: string }) => s.email === "owner@example.test").id;
+    const link = (cookie?: string, target = id, origin = ORIGIN) => resetLinkPOST(req(`/api/admin/staff/${target}/reset-link`, "POST", {}, { cookie, headers: { origin } }), p({ id: target }));
+
+    expect((await link()).status).toBe(401);
+    expect((await link(staffCookie)).status).toBe(403);
+    expect((await link(owner, me)).status).toBe(409);
+    expect((await link(owner, "stf_000000000000000000")).status).toBe(404);
+    expect((await link(owner, id, "https://evil.example")).status).toBe(403);
+
+    const res = await link(owner);
+    expect(res.status).toBe(201);
+    const { resetPath } = await res.json();
+    expect(resetPath).toMatch(/^\/admin\/reset\/[A-Za-z0-9_-]{40,60}$/);
+    const open = (await (await staffGET(req("/api/admin/staff", "GET", undefined, { cookie: owner }))).json()).invites;
+    expect(open.find((i: { email: string; kind: string }) => i.email === email)).toMatchObject({ kind: "reset" });
+
+    const token = resetPath.split("/").pop();
+    const NEW = "my brand new passphrase";
+    expect((await acceptPOST(req("/api/admin/invite/accept", "POST", { token, password: "short" }))).status).toBe(422);
+    expect((await acceptPOST(req("/api/admin/invite/accept", "POST", { token, password: NEW }))).status).toBe(201);
+    expect((await acceptPOST(req("/api/admin/invite/accept", "POST", { token, password: "someone elses passphrase" }))).status).toBe(410);
+    // Old session is gone; old password fails; the new password alone still only gives a TOTP ticket.
+    expect((await dashGET(req("/api/admin/dashboard", "GET", undefined, { cookie: staffCookie }))).status).toBe(401);
+    expect((await loginPOST(req("/api/admin/login", "POST", { email, password: "another strong passphrase" }))).status).toBe(401);
+    const login = await loginPOST(req("/api/admin/login", "POST", { email, password: NEW }));
+    expect(cookieOf(login, "ah_admin")).toBeUndefined();
+    expect((await login.json()).step).toBe("totp");
+    expect(await adminSignIn(email, NEW)).toBeTruthy();
+    const actions = (await resolveAudit().list({ target: id })).map((a) => a.action);
+    expect(actions).toEqual(expect.arrayContaining(["staff.password_reset_link", "staff.password_reset"]));
+  });
+
+  it("forgot password by email code: works for an owner, same answer for unknown emails, code scoped + single use, MFA kept", async () => {
+    const email = `owner-forgot-${ip}@example.test`;
+    const oldCookie = await invite(email, "owner");
+    const forgot = (body: unknown, headers: Record<string, string> = {}) => forgotPOST(req("/api/admin/password/forgot", "POST", body, { headers }));
+    const resetCall = (body: unknown) => resetPOST(req("/api/admin/password/reset", "POST", body));
+
+    // No enumeration: an unknown address gets the same 200 + challengeId shape (and no email goes out).
+    const sentBefore = demoMail().sent.length;
+    const unknown = await forgot({ email: `nobody-${ip}@example.test` });
+    expect(unknown.status).toBe(200);
+    expect(Object.keys(await unknown.json()).sort()).toEqual(["challengeId", "expiresInSeconds"]);
+    expect(demoMail().sent.length).toBe(sentBefore);
+    expect((await forgot({ email: "not-an-email" })).status).toBe(422);
+    expect((await forgot({ email, extra: 1 })).status).toBe(422);
+    expect((await forgot({ email }, { origin: "https://evil.example" })).status).toBe(403);
+
+    rateLimiter.reset(); // the probes above used up this IP's 5 requests
+    const res = await forgot({ email });
+    expect(res.status).toBe(200);
+    const { challengeId, demoCode } = await res.json();
+    expect(demoCode).toMatch(/^\d{6}$/);
+    expect(demoMail().sent.at(-1)).toMatchObject({ to: email });
+    expect(demoMail().sent.at(-1)!.text).toContain(demoCode);
+
+    // The admin code never signs anyone in on the customer OTP endpoint (purpose-scoped hash).
+    expect((await otpVerify(req("/api/otp/verify", "POST", { challengeId, code: demoCode }))).status).not.toBe(200);
+
+    const NEW = "owner chose a fresh passphrase";
+    expect((await resetCall({ email, challengeId, code: demoCode, password: "short" })).status).toBe(422); // weak: code not burned
+    expect((await resetCall({ email: `nobody-${ip}@example.test`, challengeId, code: demoCode, password: NEW })).status).toBe(400); // code is bound to its email
+    // That wrong-email try consumed the code, so ask again (same flow a real person would follow).
+    tick();
+    const again = await (await forgot({ email })).json();
+    expect((await resetCall({ email, challengeId: again.challengeId, code: again.demoCode === "000000" ? "111111" : "000000", password: NEW })).status).toBe(400);
+    const ok = await resetCall({ email, challengeId: again.challengeId, code: again.demoCode, password: NEW });
+    expect(ok.status).toBe(200);
+    expect(cookieOf(ok, "ah_admin")).toBeUndefined(); // no session from a reset
+    expect((await resetCall({ email, challengeId: again.challengeId, code: again.demoCode, password: "a third long passphrase" })).status).toBe(400); // single use
+
+    expect((await dashGET(req("/api/admin/dashboard", "GET", undefined, { cookie: oldCookie }))).status).toBe(401); // old sessions revoked
+    expect((await loginPOST(req("/api/admin/login", "POST", { email, password: "another strong passphrase" }))).status).toBe(401);
+    expect((await (await loginPOST(req("/api/admin/login", "POST", { email, password: NEW }))).json()).step).toBe("totp"); // MFA still required
+    expect(await adminSignIn(email, NEW)).toBeTruthy();
+    expect(demoMail().sent.at(-1)).toMatchObject({ to: email, subject: expect.stringContaining("password was changed") });
+    const id = (await resolveStaffStore().byEmail(email))!.id;
+    expect((await resolveAudit().list({ target: id })).map((a) => a.action)).toContain("staff.password_reset");
+  });
+
+  it("forgot password fails closed without an email provider in production", async () => {
+    const disabled = resolveEmail({ NODE_ENV: "production" });
+    expect(disabled.enabled).toBe(false);
+    await expect(requestResetCode("owner@example.test", { mailer: disabled })).rejects.toMatchObject({ status: 503, code: "email_unavailable" });
+  });
+
+  it("forgot password is rate-limited per IP", async () => {
+    const codes: number[] = [];
+    for (let i = 0; i < 6; i++) codes.push((await forgotPOST(req("/api/admin/password/forgot", "POST", { email: `rl-${i}@example.test` }))).status);
+    expect(codes.slice(0, 5).every((c) => c === 200)).toBe(true);
+    expect(codes[5]).toBe(429);
+  });
+
+  it("subscribers: footer sign-ups show up masked; only subscribers.read; CSV has full contacts, is formula-safe and audited", async () => {
+    const tag = `sub${ip}x${Date.now().toString(36)}`;
+    const join = (channel: string, contact: string) => newsletterPOST(req("/api/newsletter", "POST", { channel, contact, consent: true }));
+    expect((await join("email", `${tag}@example.test`)).status).toBe(201);
+    expect((await join("email", `=cmd${tag}@example.test`)).status).toBe(201);
+
+    expect(can("marketing", "subscribers.read")).toBe(true);
+    for (const role of ["warehouse", "support", "catalog_editor", "finance"] as const) expect(can(role, "subscribers.read")).toBe(false);
+    expect((await subscribersGET(req("/api/admin/subscribers", "GET"))).status).toBe(401);
+    const wh = await invite(`wh-sub-${ip}@example.test`, "warehouse");
+    expect((await subscribersGET(req("/api/admin/subscribers", "GET", undefined, { cookie: wh }))).status).toBe(403);
+    expect((await subscribersExportGET(req("/api/admin/subscribers/export", "GET", undefined, { cookie: wh }))).status).toBe(403);
+
+    const list = await (await subscribersGET(req(`/api/admin/subscribers?q=${tag}&channel=email&status=bogus&page=-3`, "GET", undefined, { cookie: owner }))).json();
+    expect(list.total).toBe(2);
+    expect(list.page).toBe(1);
+    for (const r of list.rows) {
+      expect(r.contact).not.toContain(tag); // masked on screen
+      expect(r.contact).toMatch(/^.{2}\*+@example\.test$/);
+    }
+
+    const csvRes = await subscribersExportGET(req(`/api/admin/subscribers/export?q=${tag}`, "GET", undefined, { cookie: owner }));
+    expect(csvRes.status).toBe(200);
+    expect(csvRes.headers.get("content-type")).toContain("text/csv");
+    const csv = await csvRes.text();
+    expect(csv).toContain(`"${tag}@example.test"`);
+    expect(csv).toContain(`"'=cmd${tag}@example.test"`); // formula neutralised
+    const audits = await resolveAudit().list({ target: "newsletter" });
+    expect(audits[0]).toMatchObject({ action: "subscribers.export_csv", details: { count: 2 } });
+  });
+
   it("cross-site admin writes are refused (CSRF)", async () => {
     const res = await actionPOST(req("/api/admin/orders/AH12345678/action", "POST", { action: "packed" }, { cookie: owner, headers: { origin: "https://evil.example" } }), p({ number: "AH12345678" }));
     expect(res.status).toBe(403);
@@ -344,5 +485,28 @@ describe("style editor routes: authorization", () => {
     expect((await stylesPOST(req("/api/admin/styles", "POST", {}, { cookie: owner, headers: { origin: "https://evil.example" } }))).status).toBe(403);
     expect((await stylesPOST(req("/api/admin/styles", "POST", {}, { cookie: owner }))).status).toBe(409);
     expect((await styleGET(req("/api/admin/styles/style_abc", "GET", undefined, { cookie: owner }), sp)).status).toBe(409);
+  });
+});
+
+describe("catalogue bulk / CSV routes: authorization", () => {
+  it("401 without a session, 403 without catalog.write (read-only roles may export, not import), cross-origin refused", async () => {
+    expect((await bulkPOST(req("/api/admin/catalog/bulk", "POST", {}))).status).toBe(401);
+    expect((await importPOST(req("/api/admin/catalog/import", "POST", {}))).status).toBe(401);
+    expect((await exportGET(req("/api/admin/catalog/export", "GET"))).status).toBe(401);
+
+    const support = await invite(`support-csv-${ip}@example.test`, "support");
+    expect((await exportGET(req("/api/admin/catalog/export", "GET", undefined, { cookie: support }))).status).toBe(403);
+    const marketing = await invite(`mkt-csv-${ip}@example.test`, "marketing");
+    expect((await bulkPOST(req("/api/admin/catalog/bulk", "POST", { action: "archive", styleIds: ["style_a"] }, { cookie: marketing }))).status).toBe(403);
+    expect((await importPOST(req("/api/admin/catalog/import", "POST", { csv: "x", apply: true }, { cookie: marketing }))).status).toBe(403);
+
+    const evil = { cookie: owner, headers: { origin: "https://evil.example" } };
+    expect((await bulkPOST(req("/api/admin/catalog/bulk", "POST", {}, evil))).status).toBe(403);
+    expect((await importPOST(req("/api/admin/catalog/import", "POST", {}, evil))).status).toBe(403);
+
+    // Mock / platform catalogue: read-only.
+    expect((await bulkPOST(req("/api/admin/catalog/bulk", "POST", { action: "archive", styleIds: ["style_a"] }, { cookie: owner }))).status).toBe(409);
+    expect((await importPOST(req("/api/admin/catalog/import", "POST", { csv: "x", apply: false }, { cookie: owner }))).status).toBe(409);
+    expect((await exportGET(req("/api/admin/catalog/export", "GET", undefined, { cookie: owner }))).status).toBe(409);
   });
 });

@@ -145,7 +145,8 @@ for (const target of testTargets()) {
       expect([...(await s.media.existing([item.id, "med_" + "0".repeat(32), "nope"]))]).toEqual([item.id]);
 
       const withPhoto = await createProduct(deps(), productBody({ sku: "AH-PH-1", title: "Photo Tee — Black", photos: [{ id: item.id, alt: "Photo Tee in black, front" }] }));
-      expect(withPhoto.images).toEqual([{ url: `/api/media/${item.id}`, alt: "Photo Tee in black, front", art: "shirt", colour: "#5b7fa6", view: "front" }]);
+      // Untagged photo: no view (PLP-08 rail views are set by staff only).
+      expect(withPhoto.images).toEqual([{ url: `/api/media/${item.id}`, alt: "Photo Tee in black, front", art: "shirt", colour: "#5b7fa6" }]);
       await expect(createProduct(deps(), productBody({ sku: "AH-PH-2", title: "Ghost Tee", photos: [{ id: "med_" + "f".repeat(32), alt: "made up" }] }))).rejects.toThrow(/photo wasn't found/);
       await expect(createProduct(deps(), productBody({ sku: "AH-PH-3", title: "Bad Tee", photos: [{ id: "https://evil.example/x.jpg", alt: "remote" }] }))).rejects.toThrow(/Unknown photo/);
     });

@@ -62,10 +62,12 @@ const PAGE_TITLES: [RegExp, string][] = [
   [/^\/admin\/orders\/[^/]+$/, "Order"],
   [/^\/admin\/customers\/[^/]+$/, "Customer"],
   [/^\/admin\/catalog\/new$/, "New product"],
+  [/^\/admin\/catalog\/import$/, "Import products"],
   [/^\/admin\/catalog\/style\/[^/]+$/, "Edit product"],
   [/^\/admin\/catalog\/[^/]+$/, "Edit product"],
   [/^\/admin\/promotions$/, "Promotions"],
   [/^\/admin\/customers$/, "Customers"],
+  [/^\/admin\/subscribers$/, "Subscribers"],
   [/^\/admin\/giftcards$/, "Gift cards"],
   [/^\/admin\/inventory$/, "Inventory"],
   [/^\/admin\/manifest$/, "Manifest"],
@@ -180,9 +182,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               {/* Sidebar is always dark → the on-dark brand files. Fixed sizes, no layout shift. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={isCollapsed ? "/brand/logo/mark_color-on-dark.svg" : "/brand/logo/primary-horizontal_color-on-dark.svg"}
+                src={isCollapsed ? "/brand/logo/mark_color-on-dark.svg" : "/brand/logo/primary-horizontal_color-on-dark_tm.svg"}
                 alt=""
-                width={isCollapsed ? 28 : 107}
+                width={isCollapsed ? 28 : 113}
                 height={isCollapsed ? 28 : 36}
                 className={isCollapsed ? "size-7" : "h-9 w-auto"}
               />
@@ -236,9 +238,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <Link href="/admin" aria-label="The Alpha Hood admin — dashboard" className="flex items-center">
                 {/* Topbar follows the admin theme: colour mark on light, on-dark mark in dark mode. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/brand/logo/primary-horizontal_color.svg" alt="" width={95} height={32} className="h-8 w-auto dark:hidden" />
+                <img src="/brand/logo/primary-horizontal_color_tm.svg" alt="" width={101} height={32} className="h-8 w-auto dark:hidden" />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/brand/logo/primary-horizontal_color-on-dark.svg" alt="" width={95} height={32} className="hidden h-8 w-auto dark:block" />
+                <img src="/brand/logo/primary-horizontal_color-on-dark_tm.svg" alt="" width={101} height={32} className="hidden h-8 w-auto dark:block" />
               </Link>
               <div className="flex items-center gap-1">
                 <button type="button" onClick={toggleTheme} aria-label="Toggle theme" className="rounded-md p-1.5 text-muted-foreground">
@@ -325,7 +327,7 @@ function UserMenu({ me, onSignOut }: { me: Me; onSignOut: () => void }) {
         <DropdownMenu.Content align="end" sideOffset={6} className="admin-root z-[200] w-52 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
           <div className="px-2 py-1.5 text-xs text-muted-foreground">{me.staff.email}</div>
           <DropdownMenu.Separator className="my-1 h-px bg-border" />
-          <DropdownMenu.Item onSelect={onSignOut} className="flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent">
+          <DropdownMenu.Item onSelect={onSignOut} className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent">
             <AIcon icon={Logout03Icon} />
             Sign out
           </DropdownMenu.Item>

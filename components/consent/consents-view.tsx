@@ -206,7 +206,7 @@ export function ConsentsView() {
 function currentMarketing(historyNewestFirst: HistoryRow[]): ConsentPurpose[] {
   const seen = new Map<ConsentPurpose, HistoryRow["status"]>();
   for (const r of historyNewestFirst) {
-    if ((r.purpose === "marketing_email" || r.purpose === "marketing_whatsapp") && !seen.has(r.purpose)) seen.set(r.purpose, r.status);
+    if ((r.purpose === "marketing_email" || r.purpose === "marketing_whatsapp" || r.purpose === "marketing_sms") && !seen.has(r.purpose)) seen.set(r.purpose, r.status);
   }
   return [...seen].filter(([, s]) => s === "granted").map(([p]) => p);
 }

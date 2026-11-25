@@ -147,6 +147,11 @@ export function createSqlInbox(db: SqlDb): GrievanceInbox {
   };
 }
 
+/** `\`, `%` and `_` escaped for LIKE (backslash is the default escape character on MySQL and PostgreSQL). */
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, (m) => `\\${m}`);
+/** Every regex metacharacter escaped, so search text is matched literally. */
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const freshSubscriber = (channel: NewsletterChannel, contact: string, now: Date): Subscriber => ({
   id: crypto.randomUUID(),
   channel,
@@ -189,6 +194,18 @@ export function createSqlNewsletterStore(db: SqlDb): NewsletterStore {
         if (Number(r.numUpdatedRows) === 1) return sub;
       }
       throw new Error("Newsletter sign-up is busy — try again");
+    },
+    async list({ channel, status, q, limit, offset }) {
+      let base = db.selectFrom("newsletter_subscribers");
+      if (channel) base = base.where("channel", "=", channel);
+      if (status) base = base.where("status", "=", status);
+      // LIKE with the wildcards in the search text escaped, so `%` / `_` are matched literally (bound parameter).
+      if (q) base = base.where("contact", "like", `%${escapeLike(q)}%`);
+      const [rows, count] = await Promise.all([
+        base.selectAll().orderBy("created_at", "desc").orderBy("id", "desc").limit(limit).offset(offset).execute(),
+        base.select((eb) => eb.fn.countAll<number>().as("n")).executeTakeFirst(),
+      ]);
+      return { rows: rows.map(toSub), total: Number(count?.n ?? 0) };
     },
     async unsubscribe(id) {
       const r = await db.updateTable("newsletter_subscribers").set({ status: "unsubscribed" }).where("id", "=", id).where("status", "<>", "unsubscribed").executeTakeFirst();
@@ -372,6 +389,16 @@ export function createMongoNewsletterStore(conn: Promise<MongoConn>): Newsletter
         if (r.modifiedCount === 1) return sub;
       }
       throw new Error("Newsletter sign-up is busy — try again");
+    },
+    async list({ channel, status, q, limit, offset }) {
+      const filter: Record<string, unknown> = {};
+      if (channel) filter.channel = channel;
+      if (status) filter.status = status;
+      // Search text is escaped, so it's matched literally (no regex injection / ReDoS).
+      if (q) filter.contact = { $regex: escapeRegex(q), $options: "i" };
+      const c = await col();
+      const [rows, total] = await Promise.all([c.find(filter).sort({ createdAt: -1, id: -1 }).skip(offset).limit(limit).toArray(), c.countDocuments(filter)]);
+      return { rows: rows.map(strip), total };
     },
     async unsubscribe(id) {
       const r = await (await col()).updateOne({ id, status: { $ne: "unsubscribed" } }, { $set: { status: "unsubscribed" } });

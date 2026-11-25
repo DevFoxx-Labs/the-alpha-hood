@@ -23,6 +23,7 @@ import { dateLabel } from "./labels";
 interface Prefs {
   marketing_email: boolean;
   marketing_whatsapp: boolean;
+  marketing_sms: boolean;
   whatsapp_updates: boolean;
   history: { purpose: string; status: string; method: string; source: string; notice_version: string; created_at: string }[];
 }
@@ -61,7 +62,7 @@ export function SettingsView() {
     }
   };
 
-  const toggle = async (purpose: "marketing_email" | "marketing_whatsapp" | "whatsapp_updates", on: boolean) => {
+  const toggle = async (purpose: "marketing_email" | "marketing_whatsapp" | "marketing_sms" | "whatsapp_updates", on: boolean) => {
     try {
       setPrefs(await api<Prefs>("/api/account/preferences", { method: "POST", body: { [purpose]: on } }));
     } catch (err) {
@@ -116,6 +117,7 @@ export function SettingsView() {
             {([
               ["whatsapp_updates", "Order updates on WhatsApp", "Order, delivery, return and back-in-stock updates on WhatsApp too. No offers."],
               ["marketing_whatsapp", "Offers on WhatsApp", "New drops, sales and offers on WhatsApp."],
+              ["marketing_sms", "Offers by SMS", `New drops, sales and offers by SMS to ${me.customer.phone}.`],
               ["marketing_email", "Offers by email", me.customer.email ? "New drops, sales and offers by email." : "Add an email above to turn this on."],
             ] as const).map(([key, title, text]) => (
               <li key={key} className="flex items-center justify-between gap-4 py-3">

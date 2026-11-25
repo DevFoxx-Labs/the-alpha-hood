@@ -5,8 +5,13 @@ import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { showSubscribedToast } from "./toast";
 
-type Channel = "email" | "whatsapp";
+type Channel = "email" | "whatsapp" | "sms";
+
+const CHANNEL_LABEL: Record<Channel, string> = { email: "Email", whatsapp: "WhatsApp", sms: "SMS" };
+/** Words used in the consent sentence: "…from The Alpha Hood by email / on WhatsApp / by SMS". */
+const CHANNEL_PHRASE: Record<Channel, string> = { email: "by email", whatsapp: "on WhatsApp", sms: "by SMS" };
 
 /**
  * GLB-05 newsletter (on black). Unticked consent checkbox, one specific purpose, linked Privacy Notice.
@@ -34,6 +39,7 @@ export function NewsletterForm() {
       });
       if (res.ok) {
         setState({ kind: "done" });
+        showSubscribedToast(channel);
         return;
       }
       const data = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
@@ -53,13 +59,27 @@ export function NewsletterForm() {
 
   if (state.kind === "done") {
     return (
-      <p role="status" className="border border-white/25 p-4 text-[13px] leading-[1.6] text-white">
-        You&apos;re on the list. You can unsubscribe any time from any message, or from{" "}
-        <Link href="/privacy/consents" className="underline underline-offset-2">
-          Your consents
-        </Link>
-        .
-      </p>
+      <div role="status" className="border border-white/25 p-4 text-[13px] leading-[1.6] text-white">
+        <p className="font-semibold">You&apos;re subscribed.</p>
+        <p className="mt-1 text-white/75">
+          You can unsubscribe any time from any message, or from{" "}
+          <Link href="/privacy/consents" className="underline underline-offset-2">
+            Your consents
+          </Link>
+          .
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setContact("");
+            setConsent(false);
+            setState({ kind: "idle" });
+          }}
+          className="mt-3 text-[11.5px] font-semibold uppercase tracking-[0.1em] underline underline-offset-4"
+        >
+          Add another email or number
+        </button>
+      </div>
     );
   }
 
@@ -67,7 +87,7 @@ export function NewsletterForm() {
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-3">
       <div role="radiogroup" aria-label="Contact method" className="flex gap-4 text-[11.5px] font-semibold uppercase tracking-[0.1em]">
-        {(["email", "whatsapp"] as const).map((c) => (
+        {(["email", "whatsapp", "sms"] as const).map((c) => (
           <button
             key={c}
             type="button"
@@ -79,13 +99,13 @@ export function NewsletterForm() {
             }}
             className={cn("pb-1", channel === c ? "border-b-2 border-white text-white" : "text-white/60 hover:text-white")}
           >
-            {c === "email" ? "Email" : "WhatsApp"}
+            {CHANNEL_LABEL[c]}
           </button>
         ))}
       </div>
       <div className="flex">
         <label htmlFor={`${id}-contact`} className="sr-only">
-          {isEmail ? "Email address" : "WhatsApp number"}
+          {isEmail ? "Email address" : channel === "sms" ? "Mobile number for SMS" : "WhatsApp number"}
         </label>
         <input
           id={`${id}-contact`}
@@ -96,7 +116,7 @@ export function NewsletterForm() {
           required
           value={contact}
           onChange={(e) => setContact(e.target.value)}
-          placeholder={isEmail ? "Your email" : "10-digit WhatsApp number"}
+          placeholder={isEmail ? "Your email" : "10-digit mobile number"}
           aria-invalid={state.kind === "error" || undefined}
           aria-describedby={state.kind === "error" ? `${id}-error` : undefined}
           className="h-12 min-w-0 flex-1 border border-white/35 bg-transparent px-4 text-[14px] text-white placeholder:text-white/50 outline-none focus-visible:border-white"
@@ -113,7 +133,7 @@ export function NewsletterForm() {
           className="mt-0.5 border-white/60 bg-transparent data-[state=checked]:border-white [&>span]:bg-white"
         />
         <label htmlFor={`${id}-consent`} className="text-[12px] leading-[1.55] text-white/75">
-          I agree to receive offers and new-drop updates from The Alpha Hood by {isEmail ? "email" : "WhatsApp"}. I can
+          I agree to receive offers and new-drop updates from The Alpha Hood {CHANNEL_PHRASE[channel]}. I can
           unsubscribe any time. See the{" "}
           <Link href="/legal/privacy" className="underline underline-offset-2">
             Privacy Notice

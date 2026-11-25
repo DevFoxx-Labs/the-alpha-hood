@@ -207,6 +207,10 @@ import { resolveAudit } from "@/lib/admin/audit";
 import { resolveStaffStore } from "@/lib/admin/staff";
 import { commerce } from "@/lib/commerce";
 import { rateLimiter } from "@/lib/http/rate-limit";
+import { POST as bulkPOST } from "@/app/api/admin/catalog/bulk/route";
+import { GET as exportGET } from "@/app/api/admin/catalog/export/route";
+import { POST as importPOST } from "@/app/api/admin/catalog/import/route";
+import { GET as styleGET, PUT as stylePUT } from "@/app/api/admin/styles/[styleId]/route";
 
 for (const target of testTargets().filter((t) => t.cfg)) {
   describe(`own-backend store end to end · ${target.name}`, () => {
@@ -221,7 +225,13 @@ for (const target of testTargets().filter((t) => t.cfg)) {
     const cookieOf = (res: Response, name: string) => res.headers.getSetCookie().find((c) => c.startsWith(`${name}=`))?.split(";")[0];
     const p = <T extends object>(v: T) => ({ params: Promise.resolve(v) });
 
+    let ownerSession: string | null = null;
+    /** Signs the owner in once per suite (TOTP is enrolled on the first sign-in only); later tests reuse the session. */
     async function ownerCookie() {
+      ownerSession ??= await signInOwner();
+      return ownerSession;
+    }
+    async function signInOwner() {
       const email = "owner-db@example.test";
       const password = "correct horse battery staple";
       if ((await resolveStaffStore().count()) === 0) expect((await setupPOST(req("/api/admin/setup", "POST", { email, name: "Owner", password }))).status).toBe(201);
@@ -287,6 +297,47 @@ for (const target of testTargets().filter((t) => t.cfg)) {
       const placed = await placePOST(req("/api/checkout/place", "POST", { addressId: address.id, payment: "cod", expectedTotal: q.payable }, cookie, { "idempotency-key": crypto.randomUUID() }));
       expect([200, 201]).toContain(placed.status);
       expect(await commerce.inventory.available(product.id, "M")).toBe(1);
+    }, 120_000);
+
+    it("style editor, CSV export -> import and bulk actions through the routes on this database", async () => {
+      const admin = await ownerCookie();
+      // CSV export of the seeded catalogue re-imports with nothing to change.
+      const exported = await exportGET(req("/api/admin/catalog/export", "GET", undefined, admin));
+      expect(exported.status).toBe(200);
+      expect(exported.headers.get("content-disposition")).toContain("attachment");
+      const text = await exported.text();
+      const plan = (await (await importPOST(req("/api/admin/catalog/import", "POST", { csv: text, apply: false }, admin))).json()).report;
+      expect(plan.errors).toEqual([]);
+      expect(plan.totals.create).toBe(0);
+      // Only the product the previous test made through the old single-product API changes: its title
+      // ("E2E Overshirt — Rust") doesn't follow "name — colour" (its colour is Sea Blue), and the style rules fix that.
+      expect(plan.groups.filter((g: { action: string }) => g.action === "update").map((g: { title: string }) => g.title)).toEqual(["E2E Overshirt"]);
+
+      // A new product from CSV, then edited in the style editor, then archived in bulk.
+      const header = "product_name,category,description,size_chart,manufacturer,country_of_origin,net_quantity,colour,colour_hex,colour_family,status,colour_sku,price_inr,mrp_inr,size,stock";
+      const row = (colour: string, sku: string, size: string) => `DB Field Jacket,jackets,A field jacket used by the database test.,tops,Test Manufacturer Pune,India,1 N (one piece),${colour},#556b2f,green,active,${sku},2999,3999,${size},4`;
+      const file = [header, row("Olive", "AH-DBF-OLV", "M"), row("Olive", "AH-DBF-OLV", "L"), row("Sand", "AH-DBF-SND", "M")].join("\n");
+      const applied = (await (await importPOST(req("/api/admin/catalog/import", "POST", { csv: file, apply: true }, admin))).json()).report;
+      expect(applied.errors).toEqual([]);
+      expect(applied).toMatchObject({ ok: true, applied: true, totals: { create: 1 } });
+      const styleId = applied.groups[0].styleId as string;
+      const style = (await (await styleGET(req(`/api/admin/styles/${styleId}`, "GET", undefined, admin), p({ styleId }))).json()).style;
+      expect(style.variants.map((v: { colour: { name: string } }) => v.colour.name)).toEqual(["Olive", "Sand"]);
+
+      const body = {
+        baseTitle: style.baseTitle,
+        ...style.shared,
+        description: "Edited in the style editor on the database.",
+        variants: style.variants.map((v: Record<string, unknown>) => ({ id: v.id, version: v.version, colour: v.colour, colourFamily: v.colourFamily, handle: v.handle, sku: v.sku, price: v.price, mrp: v.mrp, sizes: v.sizes, photos: v.photos, status: v.status })),
+      };
+      expect((await stylePUT(req(`/api/admin/styles/${styleId}`, "PUT", body, admin), p({ styleId }))).status).toBe(200);
+      expect((await stylePUT(req(`/api/admin/styles/${styleId}`, "PUT", body, admin), p({ styleId }))).status).toBe(409); // stale versions
+      expect((await commerce.getProduct("db-field-jacket-olive"))?.description).toBe("Edited in the style editor on the database.");
+
+      const bulk = await bulkPOST(req("/api/admin/catalog/bulk", "POST", { action: "archive", styleIds: [styleId] }, admin));
+      expect(await bulk.json()).toMatchObject({ products: 1, colours: 2 });
+      const actions = (await resolveAudit().list({ limit: 50 })).map((a) => a.action);
+      expect(actions).toEqual(expect.arrayContaining(["catalog.export_csv", "catalog.import_csv", "catalog.style.save", "catalog.bulk.archive"]));
     }, 120_000);
   });
 }

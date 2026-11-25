@@ -15,6 +15,7 @@
     "db:reset": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/db.ts reset",
     "db:seed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-transform-types --import ./scripts/alias-loader.mjs scripts/db-seed.ts",
     "ops:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-transform-types --import ./scripts/alias-loader.mjs scripts/ops-check.ts",
+    "admin:reset-link": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-transform-types --import ./scripts/alias-loader.mjs scripts/admin-reset-link.ts",
     "catalog:import": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-transform-types --import ./scripts/alias-loader.mjs scripts/catalog-import.ts",
     "db:test:migrate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/db.ts migrate --env-file=.env.test.local",
     "db:mongo:dev": "node scripts/mongo-rs-start.mjs",

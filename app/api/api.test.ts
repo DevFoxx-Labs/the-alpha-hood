@@ -118,7 +118,9 @@ describe("POST /api/newsletter (GLB-05)", () => {
     const bad = [
       { channel: "email", contact: "not-an-email" },
       { channel: "whatsapp", contact: "12345" },
-      { channel: "sms", contact: "9876543210" },
+      { channel: "sms", contact: "12345" },
+      { channel: "sms", contact: "someone@example.com" },
+      { channel: "push", contact: "9876543210" },
     ];
     for (const b of bad) expect((await newsletterPOST(post("/api/newsletter", { ...b, consent: true }))).status).toBe(422);
   });
@@ -137,6 +139,21 @@ describe("POST /api/newsletter (GLB-05)", () => {
     expect(await w.json()).toEqual({ withdrawn: 1 });
     const after = await resolveLedger().listByVisitor(vid);
     expect(after.map((r) => r.status)).toEqual(["granted", "withdrawn"]);
+  });
+
+  it("SMS offers are their own consent (marketing_sms), never bundled with WhatsApp; withdrawal covers both", async () => {
+    const sms = await newsletterPOST(post("/api/newsletter", { channel: "sms", contact: "98765 01234", consent: true }));
+    expect(sms.status).toBe(201);
+    const vid = cookieFrom(sms, "ah_vid")!;
+    expect(await resolveLedger().listByVisitor(vid)).toEqual([expect.objectContaining({ purpose: "marketing_sms", status: "granted", method: "checkbox" })]);
+    // Same browser also joins on WhatsApp: a second, separate purpose row.
+    const wa = await newsletterPOST(post("/api/newsletter", { channel: "whatsapp", contact: "98765 01234", consent: true }, { cookie: `ah_vid=${vid}` }));
+    expect(wa.status).toBe(201);
+    expect((await resolveLedger().listByVisitor(vid)).map((r) => r.purpose).sort()).toEqual(["marketing_sms", "marketing_whatsapp"]);
+    const w = await withdrawPOST(post("/api/newsletter/withdraw", {}, { cookie: `ah_vid=${vid}` }));
+    expect(await w.json()).toEqual({ withdrawn: 2 });
+    const after = await resolveLedger().listByVisitor(vid);
+    expect(after.filter((r) => r.status === "withdrawn").map((r) => r.purpose).sort()).toEqual(["marketing_sms", "marketing_whatsapp"]);
   });
 });
 

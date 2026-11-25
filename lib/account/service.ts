@@ -86,9 +86,9 @@ export function orderDetail(o: Order, returns: ReturnRequest[], deps: Pick<Retur
 
 // ── Marketing preferences ↔ consent ledger (DPDP rule §4: toggles stay in sync with the ledger) ──
 
-/** Settings toggles: two marketing purposes and the transactional WhatsApp opt-in (ORD-02). */
+/** Settings toggles: the marketing purposes (email, WhatsApp, SMS) and the transactional WhatsApp opt-in (ORD-02). */
 export type PreferencePurpose = CommunicationPurpose | "whatsapp_updates";
-export const MARKETING_PURPOSES: PreferencePurpose[] = ["marketing_email", "marketing_whatsapp", "whatsapp_updates"];
+export const MARKETING_PURPOSES: PreferencePurpose[] = ["marketing_email", "marketing_whatsapp", "marketing_sms", "whatsapp_updates"];
 
 function latest(rows: ConsentRecord[], purpose: string) {
   for (let i = rows.length - 1; i >= 0; i--) if (rows[i].purpose === purpose) return rows[i].status;
@@ -100,6 +100,7 @@ export async function getPreferences(customerId: string, ledger: ConsentLedger =
   return {
     marketing_email: latest(rows, "marketing_email") === "granted",
     marketing_whatsapp: latest(rows, "marketing_whatsapp") === "granted",
+    marketing_sms: latest(rows, "marketing_sms") === "granted",
     whatsapp_updates: latest(rows, "whatsapp_updates") === "granted",
     history: publicHistory(rows),
   };

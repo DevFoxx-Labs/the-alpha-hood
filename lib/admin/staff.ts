@@ -39,6 +39,11 @@ export interface Invite {
   invitedBy: string;
   expiresAt: number;
   used: boolean;
+  /**
+   * Password-reset link: the staff id whose password this link replaces (null/absent = a normal join invite).
+   * Same one-time, hashed, expiring token as an invite; the second factor (TOTP) is never touched by it.
+   */
+  resetFor?: string | null;
 }
 
 export interface AdminSession {

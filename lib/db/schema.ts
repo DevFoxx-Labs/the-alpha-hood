@@ -247,6 +247,8 @@ export interface StaffInvitesTable {
   invited_by: string;
   expires_at: number | string;
   used: boolean | number;
+  /** Staff id for a password-reset link (2026_11_28_008); null = join invite. */
+  reset_for: string | null;
 }
 export interface StaffTicketsTable {
   token_hash: string;

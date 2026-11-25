@@ -1,12 +1,14 @@
 import { timingSafeEqual } from "node:crypto";
 import type { NextResponse } from "next/server";
-import { sha256 } from "@/lib/auth/secrets";
+import { randomToken, sha256 } from "@/lib/auth/secrets";
 import { locks } from "@/lib/concurrency/lock";
 import { readCookie } from "@/lib/consent/cookie";
 import { clientIp, jsonError } from "@/lib/http/guard";
 import { rateLimiter } from "@/lib/http/rate-limit";
 import { BackendUnavailableError, type Env } from "@/lib/mock-guard";
 import { securityEvent } from "@/lib/security/log";
+import { OTP_TTL_MS, OtpError, type OtpStore, resolveOtpStore, sendOtp, verifyOtp } from "@/lib/auth/otp";
+import { type EmailAdapter, resolveEmail } from "@/lib/notify/email";
 import { normaliseEmail } from "@/lib/validation";
 import { resolveAudit } from "./audit";
 import { dummyHash, hashPassword, newTotpSecret, otpauthUri, passwordProblem, verifyPassword, verifyTotp } from "./crypto";
@@ -15,12 +17,14 @@ import {
   consumeTicket,
   createAdminSession,
   findByEmail,
+  type Invite,
   issueTicket,
   LOCK_MS,
   MAX_FAILED_LOGINS,
   newStaff,
   readTicket,
   resolveStaffStore,
+  revokeStaffSessions,
   SESSION_IDLE_MS,
   type Staff,
   StaffConflictError,
@@ -130,6 +134,7 @@ export async function acceptInvite(store: StaffStore, token: unknown, password: 
   if (!invite || invite.used || invite.expiresAt <= now) throw new AdminAuthError(410, "invite_invalid", "This invite link is invalid or has expired.");
   const problem = passwordProblem(password);
   if (problem) throw new AdminAuthError(422, "weak_password", problem);
+  if (invite.resetFor) return resetPassword(store, invite, password as string, now);
   if (await store.byEmail(invite.email)) throw new AdminAuthError(409, "exists", "This invite was already used.");
   const passwordHash = await hashPassword(password as string);
   const used = await store.consumeInvite(invite.tokenHash, now);
@@ -141,7 +146,156 @@ export async function acceptInvite(store: StaffStore, token: unknown, password: 
     if (e instanceof StaffConflictError) throw new AdminAuthError(409, "exists", "This invite was already used.");
     throw e;
   }
-  return { staff, invite: used };
+  return { staff, invite: used, reset: false };
+}
+
+/**
+ * Password-reset link (issued by an owner, or by the server-side recovery script). Single use (atomic consume);
+ * the link only works for the same account (id + email) and never for a disabled one. The new password clears
+ * the lockout and signs the person out everywhere. Two-step verification stays as it is — a reset link alone
+ * can never get anyone in.
+ */
+async function resetPassword(store: StaffStore, invite: Invite, password: string, now: number) {
+  const invalid = () => new AdminAuthError(410, "invite_invalid", "This link is invalid or has expired.");
+  const target = await store.get(invite.resetFor as string);
+  if (!target || target.disabled || target.email !== invite.email) throw invalid();
+  const passwordHash = await hashPassword(password);
+  const used = await store.consumeInvite(invite.tokenHash, now);
+  if (!used) throw invalid();
+  const staff = await applyNewPassword(store, target.id, used.email, passwordHash);
+  if (!staff) throw invalid();
+  return { staff, invite: used, reset: true };
+}
+
+/**
+ * The one place a staff password is replaced (owner link, email code, CLI). Only for the same active account
+ * (id + email re-checked inside the row update). Clears the lockout and signs the person out everywhere.
+ * Two-step verification is left as it is. Returns null when the account no longer qualifies.
+ */
+async function applyNewPassword(store: StaffStore, staffId: string, email: string, passwordHash: string): Promise<Staff | null> {
+  const staff = await store.update(staffId, (s) => {
+    if (s.disabled || s.email !== email) return false;
+    s.passwordHash = passwordHash;
+    s.failedLogins = 0;
+    s.lockedUntil = 0;
+  });
+  if (!staff || staff.passwordHash !== passwordHash) return null;
+  await revokeStaffSessions(store, staff.id);
+  return staff;
+}
+
+/* ---------- Self-service reset by email code ("Forgot password?") ---------- */
+
+/** OTP purpose: an admin reset code never verifies on customer sign-in, and a customer code never resets a password. */
+export const ADMIN_RESET_PURPOSE = "admin-reset";
+
+/** ≤16-char key for the shared OTP store (its key column is sized for phone numbers); derived, so no email is stored there. */
+export const adminOtpKey = (email: string) => `ae${sha256(`admin-reset:${email}`).slice(0, 14)}`;
+
+const CODE_INVALID = "That code is incorrect or has expired.";
+
+/**
+ * Step 1: email a 6-digit code (5 min, 5 tries, single use, 30 s cooldown, 5/h and 10/day per email; HMAC-stored).
+ * The answer is the same whether or not the email belongs to an active staff member, and also when this email
+ * is in cooldown / over its cap, so nobody can probe which addresses are staff. (The dev-only demo code is the
+ * exception: it's returned only for a real account, and the demo mailer is refused in production.)
+ */
+export async function requestResetCode(
+  emailInput: unknown,
+  { store = resolveStaffStore(), otp = resolveOtpStore(), mailer = resolveEmail(), now = Date.now() }: { store?: StaffStore; otp?: OtpStore; mailer?: EmailAdapter; now?: number } = {},
+): Promise<{ challengeId: string; expiresInSeconds: number; demoCode?: string }> {
+  const email = normaliseEmail(emailInput);
+  if (!email) throw new AdminAuthError(422, "invalid_input", "Enter a valid email.");
+  if (!mailer.enabled) throw new AdminAuthError(503, "email_unavailable", "Email reset isn't set up yet. Ask an owner for a reset link.");
+  const decoy = { challengeId: randomToken(18), expiresInSeconds: OTP_TTL_MS / 1000 };
+  const staff = await store.byEmail(email);
+  if (!staff || staff.disabled || !staff.passwordHash) return decoy;
+  try {
+    return await sendOtp(adminOtpKey(email), {
+      store: otp,
+      now,
+      purpose: ADMIN_RESET_PURPOSE,
+      deliver: (code) =>
+        mailer.send(
+          {
+            to: staff.email,
+            subject: "Your The Alpha Hood admin reset code",
+            text: [
+              `Your code to reset your The Alpha Hood admin password is ${code}.`,
+              "",
+              "It works once and expires in 5 minutes. Never share it — our team will never ask for it.",
+              "You will still need your authenticator code to sign in.",
+              "",
+              "Didn't ask for this? Ignore this email. Your password has not changed.",
+            ].join("\n"),
+          },
+          { demoCode: code },
+        ),
+    });
+  } catch (e) {
+    if (e instanceof OtpError) return decoy;
+    throw e;
+  }
+}
+
+/**
+ * Step 2: code + new password. The password is checked first, so a weak one doesn't burn the code. Every wrong
+ * code / wrong email / unknown account gives the same message. Success: new password, lockout cleared, every
+ * session revoked, MFA unchanged (the next sign-in still needs the authenticator code).
+ */
+export async function resetWithCode(
+  input: { email: unknown; challengeId: unknown; code: unknown; password: unknown },
+  { store = resolveStaffStore(), otp = resolveOtpStore(), now = Date.now() }: { store?: StaffStore; otp?: OtpStore; now?: number } = {},
+): Promise<Staff> {
+  const email = normaliseEmail(input.email);
+  const { challengeId, code } = input;
+  if (!email || typeof challengeId !== "string" || !/^[A-Za-z0-9_-]{20,40}$/.test(challengeId) || typeof code !== "string" || !/^\d{6}$/.test(code.trim())) {
+    throw new AdminAuthError(400, "code_invalid", CODE_INVALID);
+  }
+  const problem = passwordProblem(input.password);
+  if (problem) throw new AdminAuthError(422, "weak_password", problem);
+  let key: string;
+  try {
+    key = await verifyOtp(challengeId, code.trim(), { store: otp, now, purpose: ADMIN_RESET_PURPOSE });
+  } catch (e) {
+    if (e instanceof OtpError) throw new AdminAuthError(e.code === "locked" ? 429 : 400, e.code === "locked" ? "code_locked" : "code_invalid", e.message);
+    throw e;
+  }
+  if (key !== adminOtpKey(email)) throw new AdminAuthError(400, "code_invalid", CODE_INVALID);
+  const target = await store.byEmail(email);
+  if (!target || target.disabled) throw new AdminAuthError(400, "code_invalid", CODE_INVALID);
+  const staff = await applyNewPassword(store, target.id, email, await hashPassword(input.password as string));
+  if (!staff) throw new AdminAuthError(400, "code_invalid", CODE_INVALID);
+  return staff;
+}
+
+/** Best-effort "your password was changed" email after any reset, so a takeover can't go unnoticed. Never throws. */
+export async function notifyPasswordChanged(staff: Staff, via: "email_code" | "owner_link", mailer: EmailAdapter = resolveEmail()): Promise<void> {
+  if (!mailer.enabled) return;
+  try {
+    await mailer.send({
+      to: staff.email,
+      subject: "Your The Alpha Hood admin password was changed",
+      text: [
+        `Your The Alpha Hood admin password was just changed (${via === "email_code" ? "with a code sent to this email" : "with a reset link from an owner"}).`,
+        "You've been signed out on every device.",
+        "",
+        "If this wasn't you, tell an owner right away so they can disable the account.",
+      ].join("\n"),
+    });
+  } catch {
+    // A notice failing must not undo or block the reset; the audit log still has it.
+  }
+}
+
+export const RESET_TTL_MS = 60 * 60_000;
+
+/** One-time password-reset link for an existing, active staff member (1 hour). Returns the raw token. */
+export async function createPasswordReset(store: StaffStore, target: Staff, issuedBy: string, now = Date.now()): Promise<string> {
+  if (target.disabled) throw new AdminAuthError(409, "disabled", "This account is disabled. Re-enable it first.");
+  const token = randomToken(32);
+  await store.putInvite({ tokenHash: sha256(token), email: target.email, name: target.name, role: target.role, invitedBy: issuedBy, expiresAt: now + RESET_TTL_MS, used: false, resetFor: target.id });
+  return token;
 }
 
 export function setAdminCookie(response: NextResponse, token: string) {

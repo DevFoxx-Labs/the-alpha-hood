@@ -50,6 +50,27 @@ export class CatalogAdminError extends Error {
   }
 }
 
+/** Views a staff member can tag a photo with (rail turn: side → front; dialog adds back). */
+export const PHOTO_VIEWS = ["front", "back", "side"] as const;
+export type PhotoView = (typeof PHOTO_VIEWS)[number];
+
+export interface ProductPhotoInput {
+  id: string;
+  alt: string;
+  view?: PhotoView;
+}
+
+/** The uploaded photos of a stored record, back in editor shape (style editor, CSV export, import round-trip). */
+export function photosFromImages(images: Product["images"]): ProductPhotoInput[] {
+  const photos = images.filter((i) => i.url?.startsWith("/api/media/"));
+  // Records saved before tags existed carry an automatic "front" on photo 1 and no other tag: that's not a hanger shot.
+  const legacy = photos.length > 0 && photos[0].view === "front" && photos.slice(1).every((i) => !i.view);
+  return photos.map((i, n) => {
+    const view = !(legacy && n === 0) && (PHOTO_VIEWS as readonly string[]).includes(i.view ?? "") ? (i.view as PhotoView) : undefined;
+    return { id: i.url!.slice("/api/media/".length), alt: i.alt, ...(view ? { view } : {}) };
+  });
+}
+
 export interface ProductInput {
   title: string;
   handle: string;
@@ -72,8 +93,11 @@ export interface ProductInput {
   model?: { height: string; size: string };
   legal: Product["legal"];
   status: ProductStatus;
-  /** Uploaded photos in display order (first = card + LCP image); empty = placeholder drawings. */
-  photos: { id: string; alt: string }[];
+  /**
+   * Uploaded photos in display order (first = card + LCP image); empty = placeholder drawings. `view` tags an
+   * on-hanger cutout as front / back / side (each at most once) — the collection rail uses them (PLP-08).
+   */
+  photos: ProductPhotoInput[];
   gstClass?: GstClass;
   hsn?: string;
   costPrice?: number;
@@ -215,13 +239,19 @@ export function parseProductInput(body: unknown, docs: CatalogDocs | null): Prod
   const photosIn = b.photos === undefined || b.photos === null ? [] : b.photos;
   if (!Array.isArray(photosIn) || photosIn.length > 8) throw new ValidationError("Up to 8 photos.");
   const seenPhotos = new Set<string>();
-  const photos = photosIn.map((raw) => {
+  const seenViews = new Set<string>();
+  const photos = photosIn.map((raw): ProductPhotoInput => {
     const ph = asObject(raw);
-    rejectUnknownFields(ph, ["id", "alt"]);
+    rejectUnknownFields(ph, ["id", "alt", "view"]);
     if (typeof ph.id !== "string" || !MEDIA_ID_RE.test(ph.id)) throw new ValidationError("Unknown photo.");
     if (seenPhotos.has(ph.id)) throw new ValidationError("The same photo is listed twice.");
     seenPhotos.add(ph.id);
-    return { id: ph.id, alt: cleanText(ph.alt, "Photo description", { min: 3, max: 140 }) };
+    const alt = cleanText(ph.alt, "Photo description", { min: 3, max: 140 });
+    if (absent(ph.view)) return { id: ph.id, alt };
+    const view = oneOf(ph.view, PHOTO_VIEWS, "photo view");
+    if (seenViews.has(view)) throw new ValidationError(`Only one photo can be the ${view} view.`);
+    seenViews.add(view);
+    return { id: ph.id, alt, view };
   });
 
   const gstClass = absent(b.gstClass) ? undefined : oneOf(b.gstClass, GST_CLASSES, "GST class");
@@ -295,7 +325,10 @@ const imagesFor = (title: string, art: GarmentKind, hex: string): Product["image
     alt: `${title}, ${view === "model" ? "on model" : view === "detail" ? "fabric close-up" : view}`,
   }));
 
-export function apply(input: ProductInput, base: { id: string; styleId: string; createdAt: string; popularity: number; version: number; sizes: { label: string; stock: number }[] }, now: Date): ProductRecord {
+export function apply(input: ProductInput, base: { id: string; styleId: string; createdAt: string; popularity: number; version: number; sizes: { label: string; stock: number }[]; images?: Product["images"] }, now: Date): ProductRecord {
+  // Seeded DEMO photos (public/demo/products/, never accepted from a request) survive an edit that uploads none,
+  // so saving a demo product in the editor or re-importing its CSV doesn't swap its photos for drawings.
+  const demoImages = !input.photos.length && base.images?.some((i) => i.url?.startsWith("/demo/products/")) ? base.images : null;
   // Existing sizes keep their recorded stock (live stock is the inventory's); only new sizes take the given number.
   const prior = new Map(base.sizes.map((s) => [s.label, s.stock]));
   return {
@@ -309,8 +342,17 @@ export function apply(input: ProductInput, base: { id: string; styleId: string; 
     badge: input.badge,
     colour: { ...input.colour, handle: input.handle },
     sizes: input.sizes.map((s) => ({ ...s, stock: prior.has(s.label) ? prior.get(s.label)! : s.stock })),
-    images: input.photos.length
-      ? input.photos.map((ph, i) => ({ url: mediaUrl(ph.id), alt: ph.alt, art: input.art, colour: input.colour.hex, view: i === 0 ? ("front" as const) : undefined }))
+    images: demoImages
+      ? demoImages
+      : input.photos.length
+      ? input.photos.map((ph) => ({
+          url: mediaUrl(ph.id),
+          alt: ph.alt,
+          art: input.art,
+          colour: input.colour.hex,
+          // Only what staff tagged (cards and the PDP lead with photo 1 regardless of tags).
+          ...(ph.view ? { view: ph.view } : {}),
+        }))
       : imagesFor(input.title, input.art, input.colour.hex),
     attributes: input.attributes,
     colourFamily: input.colourFamily,

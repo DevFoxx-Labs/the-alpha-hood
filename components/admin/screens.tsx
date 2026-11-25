@@ -72,7 +72,7 @@ function useAdminData<T>(url: string | null) {
 
 async function act<T = unknown>(url: string, body: unknown, success: string, after?: () => unknown): Promise<T | null> {
   try {
-    const r = await adminApi<T>(url, { method: url.includes("/staff/stf_") ? "PATCH" : "POST", body });
+    const r = await adminApi<T>(url, { method: /\/staff\/stf_[a-f0-9]+$/.test(url) ? "PATCH" : "POST", body });
     notify("success", success);
     await after?.();
     return r;
@@ -649,121 +649,6 @@ export function InventoryScreen() {
   );
 }
 
-type CatalogRow = { id: string; handle: string; title: string; sku: string; category: string; price: number; mrp: number; status: "draft" | "active" | "archived"; stock: number; image: { art: string; colour: string; url?: string } };
-type StyleRow = {
-  styleId: string;
-  title: string;
-  category: string;
-  colours: { id: string; name: string; hex: string; status: "draft" | "active" | "archived" }[];
-  price: { min: number; max: number };
-  stock: number;
-  status: "draft" | "active" | "archived";
-  image: { art: string; colour: string; url?: string };
-};
-const PRODUCT_TONE = { draft: "warning", active: "success", archived: "neutral" } as const;
-
-export function CatalogScreen() {
-  const { params, set } = useUrlFilters("/admin/catalog");
-  const q = params.get("q") ?? "";
-  const status = params.get("status") ?? "all";
-  const qs = new URLSearchParams({ view: "styles", ...(q ? { q } : {}), ...(status !== "all" ? { status } : {}) }).toString();
-  // On the own backend the list is one row per product (style); elsewhere the platform's products (read-only).
-  const { data, error, busy, reload } = useAdminData<{ editable: boolean; rows: (StyleRow | CatalogRow)[]; total: number }>(`/api/admin/catalog?${qs}`);
-  const { me } = useAdmin();
-  const canEdit = !!data?.editable && me.permissions.includes("catalog.write");
-  const styles = data?.editable ? (data.rows as StyleRow[]) : null;
-  return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Products"
-        description={
-          data && !data.editable
-            ? "Read-only: this store's catalogue is managed in its commerce platform."
-            : "Each product has its colours and sizes. Stock changes go through Inventory."
-        }
-        action={
-          canEdit ? (
-            <AButton asChild>
-              <Link href="/admin/catalog/new">New product</Link>
-            </AButton>
-          ) : undefined
-        }
-      />
-      <div className="flex flex-wrap gap-3">
-        <SearchBox value={q} onChange={(v) => set({ q: v || null })} placeholder="Name, SKU or barcode" />
-        {data?.editable ? (
-          <ASelect
-            label="Status"
-            value={status}
-            onValueChange={(v) => set({ status: v === "all" ? null : v })}
-            options={[{ value: "all", label: "All statuses" }, { value: "active", label: "Has live colours" }, { value: "draft", label: "Has drafts" }, { value: "archived", label: "Has archived" }]}
-          />
-        ) : null}
-      </div>
-      {error ? (
-        <ErrorState message={error} onRetry={reload} />
-      ) : styles ? (
-        <DataTable
-          rows={styles}
-          busy={busy}
-          rowKey={(r) => r.styleId}
-          empty={{ title: "No products found", description: canEdit ? "Try adjusting your search, or create a product." : "Try adjusting your search." }}
-          columns={[
-            {
-              key: "t",
-              header: "Product",
-              cell: (r) => (
-                <span className="flex items-center gap-3">
-                  <GarmentArt image={{ art: r.image.art as never, colour: r.image.colour, url: r.image.url, alt: "" }} sizes="36px" className="h-12 w-9 shrink-0 overflow-hidden rounded" />
-                  <Link href={`/admin/catalog/style/${r.styleId}`} className="font-medium text-foreground hover:underline">
-                    {r.title}
-                  </Link>
-                </span>
-              ),
-            },
-            {
-              key: "co",
-              header: "Colours",
-              cell: (r) => (
-                <span className="flex items-center gap-1" aria-label={r.colours.map((c) => `${c.name} (${c.status})`).join(", ")}>
-                  {r.colours.slice(0, 8).map((c) => (
-                    <span key={c.id} title={`${c.name} · ${c.status}`} className={cn("h-4 w-4 rounded-full border border-border", c.status !== "active" && "opacity-40")} style={{ backgroundColor: c.hex }} />
-                  ))}
-                  {r.colours.length > 8 ? <span className="text-xs text-muted-foreground">+{r.colours.length - 8}</span> : null}
-                </span>
-              ),
-            },
-            { key: "c", header: "Category", cell: (r) => r.category },
-            { key: "p", header: "Price", cell: (r) => (r.price.min === r.price.max ? formatINR(r.price.min) : `${formatINR(r.price.min)} – ${formatINR(r.price.max)}`) },
-            { key: "k", header: "Stock", cell: (r) => <span className={r.stock === 0 ? "font-semibold text-red-600 dark:text-red-400" : ""}>{r.stock}</span> },
-            { key: "st", header: "Status", cell: (r) => <StatusBadge status={r.status} tone={PRODUCT_TONE[r.status]} label={r.status === "active" ? "live" : r.status} /> },
-          ]}
-          footer={data && data.total > styles.length ? <p className="px-4 py-3 text-xs text-muted-foreground">Showing {styles.length} of {data.total}. Search to narrow down.</p> : null}
-        />
-      ) : (
-        <DataTable
-          rows={(data?.rows as CatalogRow[] | undefined) ?? null}
-          busy={busy}
-          rowKey={(r) => r.id}
-          empty={{ title: "No products found", description: "Try adjusting your search." }}
-          columns={[
-            { key: "t", header: "Product", cell: (r) => (
-              <span className="flex items-center gap-3">
-                <GarmentArt image={{ art: r.image.art as never, colour: r.image.colour, alt: "" }} className="h-12 w-9 rounded" />
-                <Link href={`/products/${r.handle}`} target="_blank" className="font-medium text-foreground hover:underline">{r.title}</Link>
-              </span>
-            ) },
-            { key: "s", header: "SKU", cell: (r) => r.sku },
-            { key: "c", header: "Category", cell: (r) => r.category },
-            { key: "p", header: "Price / MRP", cell: (r) => `${formatINR(r.price)} / ${formatINR(r.mrp)}` },
-            { key: "k", header: "Stock", cell: (r) => r.stock },
-          ]}
-        />
-      )}
-    </div>
-  );
-}
-
 export function PromotionsScreen() {
   const { data, error } = useAdminData<{ coupons: { code: string; description: string; live: boolean; minCart: number; perCustomerLimit: number | null }[]; combos: { id: string; title: string; collection: string }[] }>("/api/admin/promotions");
   if (error) return <ErrorState message={error} />;
@@ -1132,13 +1017,22 @@ interface StaffRow {
 
 export function StaffScreen() {
   const { me } = useAdmin();
-  const { data, error, busy, reload } = useAdminData<{ staff: StaffRow[]; invites: { email: string; role: Role; expiresAt: string }[] }>("/api/admin/staff");
+  const { data, error, busy, reload } = useAdminData<{ staff: StaffRow[]; invites: { email: string; role: Role; kind: "invite" | "reset"; expiresAt: string }[] }>("/api/admin/staff");
   const [form, setForm] = useState({ email: "", name: "", role: "support" as Role });
   const [link, setLink] = useState<string | null>(null);
+  const [resetLink, setResetLink] = useState<{ name: string; url: string } | null>(null);
   const roleOptions = ROLES.map((r) => ({ value: r, label: ROLE_META[r].label }));
   return (
     <div className="space-y-5">
-      <PageHeader title="Staff" description="Everyone signs in with a password and an authenticator code. Invite links work once and expire in 24 hours." />
+      <PageHeader title="Staff" description="Everyone signs in with a password and an authenticator code. Invite links work once and expire in 24 hours; password-reset links in 1 hour." />
+
+      {resetLink ? (
+        <div role="status" className="rounded-xl border border-border bg-card p-4 text-xs">
+          <p className="font-medium">Password-reset link for {resetLink.name}. Send it privately; it&apos;s shown only once and works for 1 hour:</p>
+          <p className="mt-1 select-all break-all font-mono">{resetLink.url}</p>
+          <p className="mt-2 text-muted-foreground">Their authenticator stays the same. If they lost their phone too, also use &quot;Reset 2-step&quot;.</p>
+        </div>
+      ) : null}
       <Card title="Invite someone">
         <form
           className="grid gap-3 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end"
@@ -1193,6 +1087,18 @@ export function StaffScreen() {
                 ) : (
                   <span className="flex justify-end gap-1">
                     <ASelect label={`Role for ${r.name}`} className="h-8 w-36" value={r.role} onValueChange={(v) => act(`/api/admin/staff/${r.id}`, { role: v }, "Role changed — they've been signed out", reload)} options={roleOptions} />
+                    {r.disabled ? null : (
+                      <Confirm
+                        trigger={<AButton size="sm" variant="ghost">Reset link</AButton>}
+                        title={`Create a password-reset link for ${r.name}?`}
+                        description="You get a one-time link (1 hour) to send them privately. Their current password keeps working until they use it; then they're signed out everywhere."
+                        confirmLabel="Create link"
+                        onConfirm={async () => {
+                          const res = await act<{ resetPath: string }>(`/api/admin/staff/${r.id}/reset-link`, {}, "Reset link created", reload);
+                          if (res) setResetLink({ name: r.name, url: `${window.location.origin}${res.resetPath}` });
+                        }}
+                      />
+                    )}
                     <Confirm trigger={<AButton size="sm" variant="ghost">Reset 2-step</AButton>} title="Reset two-step verification?" description="They'll set it up again at their next sign-in, and are signed out now." confirmLabel="Reset" onConfirm={() => act(`/api/admin/staff/${r.id}`, { resetMfa: true }, "2-step reset", reload)} />
                     <Confirm trigger={<AButton size="sm" variant={r.disabled ? "secondary" : "ghost"}>{r.disabled ? "Enable" : "Disable"}</AButton>} title={r.disabled ? "Enable this account?" : "Disable this account?"} description={r.disabled ? "They can sign in again." : "They're signed out everywhere and can't sign in."} confirmLabel={r.disabled ? "Enable" : "Disable"} destructive={!r.disabled} onConfirm={() => act(`/api/admin/staff/${r.id}`, { disabled: !r.disabled }, "Saved", reload)} />
                   </span>
@@ -1202,11 +1108,11 @@ export function StaffScreen() {
         />
       )}
       {data?.invites.length ? (
-        <Card title="Open invites">
+        <Card title="Open invites and reset links">
           <ul className="space-y-1 text-sm">
             {data.invites.map((i) => (
-              <li key={i.email} className="flex justify-between">
-                <span>{i.email} · {ROLE_META[i.role].label}</span>
+              <li key={`${i.kind}-${i.email}-${i.expiresAt}`} className="flex justify-between gap-2">
+                <span>{i.email} · {i.kind === "reset" ? "Password reset" : ROLE_META[i.role].label}</span>
                 <span className="text-xs text-muted-foreground">expires {date(i.expiresAt, true)}</span>
               </li>
             ))}

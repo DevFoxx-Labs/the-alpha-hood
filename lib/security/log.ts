@@ -14,7 +14,9 @@ export type SecurityEvent =
   | "order_placed"
   | "cod_blocked"
   | "referral_refused"
-  | "rate_limit_store_error";
+  | "rate_limit_store_error"
+  | "admin_reset_code_requested"
+  | "admin_password_reset";
 
 export function maskPhone(phone: string): string {
   return phone.length > 4 ? `${"*".repeat(Math.max(0, phone.length - 4))}${phone.slice(-4)}` : "****";

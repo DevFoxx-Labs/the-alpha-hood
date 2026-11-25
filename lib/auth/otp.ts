@@ -102,11 +102,30 @@ export function resolveOtpStore(env: Env = process.env): OtpStore {
   return devSingleton("otp_store_v2", createOtpStore);
 }
 
-const codeHash = (challengeId: string, code: string) => hmac("OTP_PEPPER", `${challengeId}:${code}`);
+/**
+ * `purpose` scopes a code to one flow: a code issued for "admin-reset" never verifies on the customer sign-in
+ * (and the other way round), because the purpose is part of the hashed value. Customer codes have no purpose,
+ * so their stored hashes are unchanged.
+ */
+const codeHash = (challengeId: string, code: string, purpose?: string) => hmac("OTP_PEPPER", purpose ? `${purpose}:${challengeId}:${code}` : `${challengeId}:${code}`);
 
 export async function sendOtp(
   phone: string,
-  { store = resolveOtpStore(), sms = resolveSms(), now = Date.now() }: { store?: OtpStore; sms?: SmsAdapter; now?: number } = {},
+  {
+    store = resolveOtpStore(),
+    sms,
+    now = Date.now(),
+    purpose,
+    deliver,
+  }: {
+    store?: OtpStore;
+    sms?: SmsAdapter;
+    now?: number;
+    /** Scope of the code (see codeHash). Omit for customer phone sign-in. */
+    purpose?: string;
+    /** Channel other than SMS (e.g. email). `phone` is then only the ≤16-char rate-limit / challenge key. */
+    deliver?: (code: string) => Promise<{ demoCode?: string }>;
+  } = {},
 ): Promise<{ challengeId: string; expiresInSeconds: number; demoCode?: string }> {
   const history = (await store.sendsSince(phone, now - 86_400_000)).sort((x, y) => x - y);
   const last = history.at(-1);
@@ -121,10 +140,10 @@ export async function sendOtp(
   const code = String(randomInt(1_000_000)).padStart(6, "0");
   const id = randomToken(18);
   // Only one live challenge per phone.
-  await store.replaceChallenge({ id, phone, codeHash: codeHash(id, code), expiresAt: now + OTP_TTL_MS, attempts: 0, used: false });
+  await store.replaceChallenge({ id, phone, codeHash: codeHash(id, code, purpose), expiresAt: now + OTP_TTL_MS, attempts: 0, used: false });
   await store.recordSend(phone, now);
 
-  const sent = await sms.sendOtp(phone, code);
+  const sent = deliver ? await deliver(code) : await (sms ?? resolveSms()).sendOtp(phone, code);
   securityEvent("otp_sent", { phone: maskPhone(phone) });
   return { challengeId: id, expiresInSeconds: OTP_TTL_MS / 1000, ...(sent.demoCode ? { demoCode: sent.demoCode } : {}) };
 }
@@ -133,7 +152,7 @@ export async function sendOtp(
 export async function verifyOtp(
   challengeId: string,
   code: string,
-  { store = resolveOtpStore(), now = Date.now() }: { store?: OtpStore; now?: number } = {},
+  { store = resolveOtpStore(), now = Date.now(), purpose }: { store?: OtpStore; now?: number; purpose?: string } = {},
 ): Promise<string> {
   const c = await store.getChallenge(challengeId);
   if (!c || c.used) throw new OtpError("invalid", "That code is incorrect or has expired.");
@@ -144,7 +163,7 @@ export async function verifyOtp(
   // Atomic: counts the attempt only while under the limit (concurrent guesses can't exceed it).
   const attempts = await store.bumpAttempt(challengeId, OTP_MAX_ATTEMPTS);
   if (attempts === null) throw new OtpError("locked", "Too many wrong attempts. Request a new code.");
-  if (!/^\d{6}$/.test(code) || !safeEqualHex(codeHash(challengeId, code), c.codeHash)) {
+  if (!/^\d{6}$/.test(code) || !safeEqualHex(codeHash(challengeId, code, purpose), c.codeHash)) {
     securityEvent(attempts >= OTP_MAX_ATTEMPTS ? "otp_locked" : "otp_verify_failed", { phone: maskPhone(c.phone) });
     if (attempts >= OTP_MAX_ATTEMPTS) throw new OtpError("locked", "Too many wrong attempts. Request a new code.");
     throw new OtpError("invalid", "That code is incorrect or has expired.");

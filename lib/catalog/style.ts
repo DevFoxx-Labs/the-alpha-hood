@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { ValidationError } from "@/lib/http/guard";
 import { asObject, cleanText, rejectUnknownFields } from "@/lib/validation";
-import { apply, assertUniqueCodes, type CatalogAdminDeps, CatalogAdminError, parseProductInput, type ProductInput, slugify } from "./admin";
+import { apply, assertUniqueCodes, type CatalogAdminDeps, CatalogAdminError, parseProductInput, photosFromImages, type ProductInput, type ProductPhotoInput, slugify } from "./admin";
 import { CatalogConflictError, type ProductRecord, type ProductStatus, skuKey } from "./store";
 
 /**
@@ -44,7 +44,7 @@ export interface VariantView {
   costPrice?: number;
   badge?: "NEW" | "BESTSELLER";
   sizes: { label: string; sku?: string; barcode?: string; stock: number }[];
-  photos: { id: string; alt: string }[];
+  photos: ProductPhotoInput[];
   seo?: { title?: string; description?: string };
   image: ProductRecord["images"][number];
   updatedAt: string;
@@ -77,7 +77,7 @@ function variantView(r: ProductRecord, onHand: Map<string, number>, canSeeCost: 
     ...(r.badge ? { badge: r.badge } : {}),
     // Live stock from the inventory (read-only here; changed in Inventory, audited).
     sizes: r.sizes.map((s) => ({ label: s.label, ...(s.sku ? { sku: s.sku } : {}), ...(s.barcode ? { barcode: s.barcode } : {}), stock: Math.max(0, onHand.get(skuKey(r.id, s.label)) ?? s.stock) })),
-    photos: r.images.filter((i) => i.url?.startsWith("/api/media/")).map((i) => ({ id: i.url!.slice("/api/media/".length), alt: i.alt })),
+    photos: photosFromImages(r.images),
     ...(r.seo ? { seo: r.seo } : {}),
     image: r.images[0],
     updatedAt: r.updatedAt,
@@ -168,13 +168,35 @@ export interface SaveStyleResult {
   created: string[];
   updated: string[];
   records: ProductRecord[];
+  /** Colours whose saved content would change (all of them for a new style). */
+  changed: string[];
+}
+
+/** Content of a record without its bookkeeping (to tell "unchanged" from "changed"). */
+const content = (r: ProductRecord) => {
+  const { version: _v, updatedAt: _u, ...rest } = r;
+  void _v;
+  void _u;
+  return canonical(rest);
+};
+/** JSON with object keys sorted at every level (key order from different drivers doesn't matter). */
+function canonical(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`;
+  if (v && typeof v === "object") {
+    return `{${Object.entries(v as Record<string, unknown>)
+      .filter(([, x]) => x !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([k, x]) => `${JSON.stringify(k)}:${canonical(x)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(v);
 }
 
 /**
  * Creates a style (`styleId` null) or saves an existing one. Body: `{ baseTitle, ...shared fields, variants: [...] }`.
  * All colours are written in one transaction or none is.
  */
-export async function saveStyle(deps: CatalogAdminDeps, styleId: string | null, body: unknown, now = new Date()): Promise<SaveStyleResult> {
+export async function saveStyle(deps: CatalogAdminDeps, styleId: string | null, body: unknown, now = new Date(), opts: { dryRun?: boolean } = {}): Promise<SaveStyleResult> {
   const b = asObject(body);
   rejectUnknownFields(b, ["baseTitle", "variants", ...SHARED_FIELDS]);
   const baseTitle = cleanText(b.baseTitle, "Product name", { min: 3, max: 80 });
@@ -270,6 +292,14 @@ export async function saveStyle(deps: CatalogAdminDeps, styleId: string | null, 
   }
   const written = [...replaces.map((x) => x.record), ...inserts];
   assertUniqueCodes([...records.filter((r) => !currentById.has(r.id)), ...written]);
+  // Existing sizes keep their stored stock in `apply`, so an untouched colour compares equal.
+  const changed = written.filter((r) => {
+    const before = currentById.get(r.id);
+    return !before || content(before) !== content(r);
+  });
+  const result = { styleId: sid, created: inserts.map((r) => r.id), updated: replaces.map((x) => x.record.id), records: written, changed: changed.map((r) => r.id) };
+  // Dry run (CSV import plan): everything validated, nothing written.
+  if (opts.dryRun) return result;
 
   let ok: boolean;
   try {
@@ -280,5 +310,5 @@ export async function saveStyle(deps: CatalogAdminDeps, styleId: string | null, 
   }
   if (!ok) throw new CatalogAdminError("version_conflict", "Someone else changed this product. Reload to see their changes.", 409);
   deps.invalidate();
-  return { styleId: sid, created: inserts.map((r) => r.id), updated: replaces.map((x) => x.record.id), records: written };
+  return result;
 }

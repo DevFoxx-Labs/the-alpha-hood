@@ -1,6 +1,8 @@
 "use client";
 
+import { CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
 import { toast } from "sonner";
+import { Icon } from "@/components/ui/icon";
 import type { CartLine } from "@/lib/commerce/types";
 import { GarmentArt } from "./garment-art";
 
@@ -46,4 +48,24 @@ export function showMessageToast(message: string) {
       {message}
     </div>
   ));
+}
+
+/** Newsletter sign-up confirmation: black bar with a tick, "You're subscribed" + how to stop. */
+export function showSubscribedToast(channel: "email" | "whatsapp" | "sms") {
+  toast.custom(
+    () => (
+      <div role="status" className="on-dark mx-auto flex w-[min(100vw-24px,420px)] items-center gap-3 bg-black px-4 py-3 text-white shadow-[0_12px_32px_-12px_rgba(0,0,0,0.5)]">
+        <span aria-hidden className="grid size-8 shrink-0 place-items-center bg-white text-black">
+          <Icon icon={CheckmarkCircle02Icon} size={18} />
+        </span>
+        <p className="min-w-0 flex-1 text-[13px] leading-snug">
+          <span className="font-semibold">You&apos;re subscribed</span>
+          <span className="block text-[12px] text-white/70">
+            New drops and offers will reach you {channel === "email" ? "by email" : channel === "sms" ? "by SMS" : "on WhatsApp"}. Unsubscribe any time.
+          </span>
+        </p>
+      </div>
+    ),
+    { duration: 5000 },
+  );
 }

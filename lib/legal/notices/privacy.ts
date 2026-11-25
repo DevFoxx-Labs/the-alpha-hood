@@ -7,8 +7,8 @@ import type { Notice } from "../types";
  */
 export const PRIVACY_NOTICE: Notice = {
   slug: "privacy",
-  version: "2026-11-27",
-  lastUpdated: "2026-11-27",
+  version: "2026-11-28",
+  lastUpdated: "2026-11-28",
   text: {
     en: {
       title: "Privacy Notice",
@@ -55,7 +55,7 @@ export const PRIVACY_NOTICE: Notice = {
                 ["Order updates on WhatsApp (optional)", "Send order, delivery and alert messages on WhatsApp too", "Optional consent — off by default"],
                 ["Size advice", "Suggest a size from the sizes you kept and returned before (no new data is collected)", "Necessary to provide the feature you use, shown only to you"],
                 ["Messages to support, privacy requests and grievances", "Answer you and keep a record of how we handled it", "Your consent; and legal obligations"],
-                ["Email or WhatsApp number for offers (optional)", "Send you offers and new drops", "Optional consent — off by default"],
+                ["Email, WhatsApp number or mobile number (SMS) for offers (optional) — a separate choice for each", "Send you offers and new drops on the channel you chose", "Optional consent — off by default"],
                 ["IP address, browser/device type, a random visitor ID cookie", "Keep the site secure, stop abuse, and keep proof of your consent choices", "Necessary to provide a secure service and to prove consent"],
                 ["Analytics data (optional): pages and products viewed, search terms, bag, checkout and order events (items, sizes, value, order number), a cookie ID, device and browser type", "Measure and improve the store (Google Analytics)", "Optional consent (Analytics cookies) — off by default"],
                 ["Advertising data (optional): the same shopping events, ad-click and cookie IDs, IP address, browser type, and for purchases your mobile number in hashed (one-way encoded) form", "Measure which of our ads work and show you relevant ads on other sites (Google Ads, Meta)", "Optional consent (Advertising cookies) — off by default"],
@@ -125,7 +125,7 @@ export const PRIVACY_NOTICE: Notice = {
                 ["Alpha Club data and Hood Coins", "While you are a member; deleted when you leave or delete your account (coin entries linked to orders are kept with the order records)."],
                 ["#WearTheHood photos", "Until you remove them or delete your account; rejected photos are deleted within 30 days."],
                 ["Product alerts", "Until the alert is sent or you remove it; sent alerts are deleted after 90 days."],
-                ["Offer subscriptions (email/WhatsApp)", "Until you unsubscribe or withdraw consent; then deleted within 30 days."],
+                ["Offer subscriptions (email/WhatsApp/SMS)", "Until you unsubscribe or withdraw consent; then deleted within 30 days."],
                 ["Consent records (what you agreed to, when and to which version)", "As long as needed to prove consent — up to 7 years after you withdraw or close your account."],
                 ["Privacy requests and grievances", "3 years after the request is closed."],
                 ["Security and access logs", "At least 1 year, as the DPDP Rules require, then deleted."],
@@ -291,7 +291,7 @@ export const PRIVACY_NOTICE: Notice = {
                 ["WhatsApp पर ऑर्डर अपडेट (वैकल्पिक)", "ऑर्डर, डिलीवरी और अलर्ट संदेश WhatsApp पर भी भेजना", "वैकल्पिक सहमति — शुरुआत में बंद"],
                 ["साइज़ सलाह", "आपके पहले रखे और लौटाए गए साइज़ से साइज़ सुझाना (कोई नया डेटा नहीं लिया जाता)", "आपके द्वारा उपयोग की गई सुविधा के लिए आवश्यक, केवल आपको दिखता है"],
                 ["सहायता संदेश, गोपनीयता अनुरोध और शिकायतें", "आपको उत्तर देना और उसका रिकॉर्ड रखना", "आपकी सहमति; और कानूनी दायित्व"],
-                ["ऑफ़र के लिए ईमेल या WhatsApp नंबर (वैकल्पिक)", "ऑफ़र और नए ड्रॉप की जानकारी भेजना", "वैकल्पिक सहमति — शुरुआत में बंद"],
+                ["ऑफ़र के लिए ईमेल, WhatsApp नंबर या मोबाइल नंबर (SMS) (वैकल्पिक) — हर एक के लिए अलग विकल्प", "आपके चुने हुए माध्यम पर ऑफ़र और नए ड्रॉप की जानकारी भेजना", "वैकल्पिक सहमति — शुरुआत में बंद"],
                 ["IP पता, ब्राउज़र/डिवाइस का प्रकार, एक रैंडम विज़िटर ID कुकी", "साइट को सुरक्षित रखना, दुरुपयोग रोकना और आपकी सहमति का प्रमाण रखना", "सुरक्षित सेवा देने और सहमति प्रमाणित करने के लिए आवश्यक"],
                 ["एनालिटिक्स डेटा (वैकल्पिक): देखे गए पेज और उत्पाद, खोज शब्द, बैग, चेकआउट और ऑर्डर की घटनाएँ (सामान, साइज़, राशि, ऑर्डर नंबर), एक कुकी ID, डिवाइस और ब्राउज़र का प्रकार", "स्टोर को मापना और बेहतर बनाना (Google Analytics)", "वैकल्पिक सहमति (एनालिटिक्स कुकीज़) — शुरुआत में बंद"],
                 ["विज्ञापन डेटा (वैकल्पिक): वही खरीदारी घटनाएँ, विज्ञापन-क्लिक और कुकी ID, IP पता, ब्राउज़र का प्रकार, और खरीदारी पर आपका मोबाइल नंबर हैश (एकतरफ़ा कूटबद्ध) रूप में", "हमारे कौन-से विज्ञापन काम करते हैं यह मापना और अन्य साइटों पर प्रासंगिक विज्ञापन दिखाना (Google Ads, Meta)", "वैकल्पिक सहमति (विज्ञापन कुकीज़) — शुरुआत में बंद"],
@@ -361,7 +361,7 @@ export const PRIVACY_NOTICE: Notice = {
                 ["Alpha Club डेटा और Hood Coins", "जब तक आप सदस्य हैं; छोड़ने या खाता हटाने पर हटा दिया जाता है (ऑर्डर से जुड़ी कॉइन प्रविष्टियाँ ऑर्डर रिकॉर्ड के साथ रखी जाती हैं)।"],
                 ["#WearTheHood फ़ोटो", "जब तक आप उन्हें न हटाएँ या खाता न हटाएँ; अस्वीकृत फ़ोटो 30 दिनों में हटा दी जाती हैं।"],
                 ["प्रोडक्ट अलर्ट", "अलर्ट भेजे जाने या आपके हटाने तक; भेजे गए अलर्ट 90 दिनों बाद हटा दिए जाते हैं।"],
-                ["ऑफ़र सदस्यता (ईमेल/WhatsApp)", "जब तक आप सदस्यता समाप्त न करें या सहमति वापस न लें; फिर 30 दिनों के भीतर हटा दी जाती है।"],
+                ["ऑफ़र सदस्यता (ईमेल/WhatsApp/SMS)", "जब तक आप सदस्यता समाप्त न करें या सहमति वापस न लें; फिर 30 दिनों के भीतर हटा दी जाती है।"],
                 ["सहमति के रिकॉर्ड (आपने क्या, कब और किस संस्करण पर सहमति दी)", "सहमति प्रमाणित करने के लिए जितना आवश्यक हो — सहमति वापस लेने या खाता बंद करने के बाद अधिकतम 7 वर्ष।"],
                 ["गोपनीयता अनुरोध और शिकायतें", "अनुरोध बंद होने के 3 वर्ष बाद तक।"],
                 ["सुरक्षा और एक्सेस लॉग", "DPDP नियमों के अनुसार कम से कम 1 वर्ष, फिर हटा दिए जाते हैं।"],

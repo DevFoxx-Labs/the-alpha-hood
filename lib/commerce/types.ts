@@ -39,8 +39,11 @@ export interface ProductImage {
   alt: string;
   art: GarmentKind;
   colour: string;
-  /** Placeholder shot type until photography exists (front / back / detail close-up / on model). */
-  view?: "front" | "back" | "detail" | "model";
+  /**
+   * Shot type. Drawings: front / back / detail close-up / on model. Photos: staff tag the on-hanger cutouts
+   * front / back / side — the collection rail (PLP-08) turns a garment from its side shot to its front shot.
+   */
+  view?: "front" | "back" | "side" | "detail" | "model";
 }
 
 export interface SizeOption {

@@ -190,3 +190,13 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
       the same time, or staff TOTP secrets saved in dev can't be opened. Never reuse the production key locally.
 - [ ] Confirm with the CA: HSN code and GST class for every product type (the editor's defaults are placeholders).
 - [ ] Decide whether any size should cost more (e.g. 3XL). Per-size pricing isn't built yet.
+
+## 2026-11-25 (admin password reset)
+- [ ] Pick an email provider for transactional mail (e.g. Amazon SES, Resend, Zoho ZeptoMail, or your mail host's
+      SMTP) and send me its name. Staff "Forgot password?" codes only work on the live store once it is connected.
+      Put its API key in the hosting secret store (never in git); turn on MFA on the provider account; set up
+      SPF / DKIM / DMARC for the sending domain.
+- [ ] Make sure every owner's email is a mailbox you control long-term. Whoever controls that mailbox can reset the
+      password (the authenticator code is still needed to sign in).
+- [ ] Keep a second owner account, or server shell access, for the break-glass case (lost mailbox and phone):
+      `pnpm admin:reset-link --email=… --reset-mfa`.

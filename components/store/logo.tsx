@@ -7,8 +7,10 @@ import { cn } from "@/lib/utils";
  * height, minimum 120 px wide for the lockup and 16 px for the mark. Width and height are always set (no CLS).
  *
  * Variants: `color` (black mark + wordmark, yellow eyes) on light backgrounds; `color-on-dark` on black.
+ * The lockup is the ™ version (™ at the top-right of the "D" of HOOD, from docs/brand/logo-kit/logo-symbols/tm,
+ * `*_tm-top.svg`). Use ® only once the mark is registered.
  */
-const LOCKUP = { w: 1072, h: 360 } as const;
+const LOCKUP = { w: 1131, h: 360 } as const;
 
 export function LogoMark({ tone = "dark", size = 28, className }: { tone?: "dark" | "light"; size?: number; className?: string }) {
   return (
@@ -41,7 +43,7 @@ export function Logo({
   className?: string;
   onClick?: () => void;
 }) {
-  const src = tone === "light" ? "/brand/logo/primary-horizontal_color-on-dark.svg" : "/brand/logo/primary-horizontal_color.svg";
+  const src = tone === "light" ? "/brand/logo/primary-horizontal_color-on-dark_tm.svg" : "/brand/logo/primary-horizontal_color_tm.svg";
   return (
     <Link href={href} onClick={onClick} aria-label="The Alpha Hood — home" className={cn("inline-flex shrink-0 items-center", className)}>
       {/* eslint-disable-next-line @next/next/no-img-element */}

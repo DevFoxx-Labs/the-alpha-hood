@@ -131,6 +131,28 @@ for (const target of testTargets()) {
       expect(await s.newsletter.unsubscribe(subs[0].id)).toBe(false);
       expect(await s.newsletter.unsubscribe(again.id)).toBe(true);
     });
+
+    it("newsletter list: newest first, filters, literal search (no wildcard / regex injection), paging + total", async () => {
+      const t = Date.parse("2030-01-01T00:00:00Z");
+      const tag = `ls${Date.now().toString(36)}`;
+      const a = await s.newsletter.upsert("email", `${tag}.a@example.com`, new Date(t));
+      const b = await s.newsletter.upsert("email", `${tag}_b@example.com`, new Date(t + 1000));
+      const c = await s.newsletter.upsert("whatsapp", "+919800000077", new Date(t + 2000));
+      await s.newsletter.unsubscribe(a.id);
+
+      const mine = await s.newsletter.list({ q: tag, limit: 10, offset: 0 });
+      expect(mine.total).toBe(2);
+      expect(mine.rows.map((r) => r.id)).toEqual([b.id, a.id]); // newest first
+      // `_` and `.` are literal: "<tag>_" matches only b, "<tag>." only a (no LIKE / regex wildcards).
+      expect((await s.newsletter.list({ q: `${tag}_`, limit: 10, offset: 0 })).rows.map((r) => r.id)).toEqual([b.id]);
+      expect((await s.newsletter.list({ q: `${tag}.`, limit: 10, offset: 0 })).rows.map((r) => r.id)).toEqual([a.id]);
+      expect((await s.newsletter.list({ q: "%", limit: 10, offset: 0 })).total).toBe(0);
+      expect((await s.newsletter.list({ q: ".*", limit: 10, offset: 0 })).total).toBe(0);
+      expect((await s.newsletter.list({ q: tag, status: "unsubscribed", limit: 10, offset: 0 })).rows.map((r) => r.id)).toEqual([a.id]);
+      expect((await s.newsletter.list({ channel: "whatsapp", q: "0000077", limit: 10, offset: 0 })).rows.map((r) => r.id)).toEqual([c.id]);
+      const page2 = await s.newsletter.list({ q: tag, limit: 1, offset: 1 });
+      expect(page2).toMatchObject({ total: 2, rows: [{ id: a.id }] });
+    });
   });
 }
 

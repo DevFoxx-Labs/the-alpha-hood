@@ -8,7 +8,7 @@ import type { TrackingConfig } from "@/lib/config/tracking";
 export const COOKIE_PURPOSES = ["analytics", "advertising"] as const;
 export type CookiePurpose = (typeof COOKIE_PURPOSES)[number];
 
-export const COMMUNICATION_PURPOSES = ["marketing_email", "marketing_whatsapp"] as const;
+export const COMMUNICATION_PURPOSES = ["marketing_email", "marketing_whatsapp", "marketing_sms"] as const;
 export type CommunicationPurpose = (typeof COMMUNICATION_PURPOSES)[number];
 
 /** M9 optional service purposes: each is off until the customer switches it on, and can be withdrawn. */
@@ -42,6 +42,11 @@ export const PURPOSES: Record<ConsentPurpose, { label: string; description: stri
   marketing_whatsapp: {
     label: "Offers on WhatsApp",
     description: "New drops, sales and offers on WhatsApp.",
+    required: false,
+  },
+  marketing_sms: {
+    label: "Offers by SMS",
+    description: "New drops, sales and offers by SMS to your mobile number.",
     required: false,
   },
   alpha_club: {

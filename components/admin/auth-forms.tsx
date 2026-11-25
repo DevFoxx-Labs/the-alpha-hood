@@ -1,9 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useId, useState } from "react";
+import { ViewIcon, ViewOffSlashIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import { AButton, AInput, ALabel } from "./ui";
 
 async function post<T>(url: string, body: unknown): Promise<T> {
@@ -13,19 +16,25 @@ async function post<T>(url: string, body: unknown): Promise<T> {
   return data as T;
 }
 
+/**
+ * Staff sign-in backdrop: the storefront photo fills the page (dimmed for contrast) and the card is frosted
+ * glass, so the store shows through it.
+ */
 function AuthCard({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4 py-10">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-sm">
+    <div className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-neutral-950 px-4 py-10">
+      <Image src="/admin/login-store.webp" alt="" aria-hidden fill preload sizes="100vw" className="-z-20 object-cover" />
+      <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-b from-black/45 via-black/30 to-black/60" />
+      <div className="w-full max-w-sm rounded-xl border border-white/40 bg-white/45 p-6 shadow-2xl backdrop-blur-md dark:border-white/10 dark:bg-neutral-950/45">
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/logo/primary-horizontal_color.svg" alt="The Alpha Hood" width={119} height={40} className="h-10 w-auto dark:hidden" />
+          <img src="/brand/logo/primary-horizontal_color_tm.svg" alt="The Alpha Hood" width={126} height={40} className="h-10 w-auto dark:hidden" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/logo/primary-horizontal_color-on-dark.svg" alt="The Alpha Hood" width={119} height={40} className="hidden h-10 w-auto dark:block" />
-          <span className="ml-auto text-xs font-bold tracking-widest text-muted-foreground">ADMIN</span>
+          <img src="/brand/logo/primary-horizontal_color-on-dark_tm.svg" alt="The Alpha Hood" width={126} height={40} className="hidden h-10 w-auto dark:block" />
+          <span className="ml-auto text-xs font-bold tracking-widest text-foreground/70">ADMIN</span>
         </div>
         <h1 className="mt-2 text-xl font-semibold">{title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <p className="mt-1 text-sm text-foreground/75">{description}</p>
         <div className="mt-6">{children}</div>
       </div>
     </div>
@@ -37,7 +46,34 @@ function Field({ id, label, help, ...props }: React.ComponentProps<"input"> & { 
     <div className="space-y-1.5">
       <ALabel htmlFor={id}>{label}</ALabel>
       <AInput id={id} {...props} />
-      {help ? <p className="text-xs text-muted-foreground">{help}</p> : null}
+      {help ? <p className="text-xs text-foreground/70">{help}</p> : null}
+    </div>
+  );
+}
+
+/** Password input with a show / hide toggle (the toggle never submits the form). `aside` sits right of the label. */
+function PasswordField({ id, label, help, aside, ...props }: Omit<React.ComponentProps<"input">, "type"> & { id: string; label: string; help?: string; aside?: React.ReactNode }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <ALabel htmlFor={id}>{label}</ALabel>
+        {aside}
+      </div>
+      <div className="relative">
+        <AInput id={id} type={visible ? "text" : "password"} className="pr-10" {...props} />
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          aria-label={visible ? "Hide password" : "Show password"}
+          aria-pressed={visible}
+          aria-controls={id}
+          className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-foreground/60 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+        >
+          <Icon icon={visible ? ViewOffSlashIcon : ViewIcon} size={18} />
+        </button>
+      </div>
+      {help ? <p className="text-xs text-foreground/70">{help}</p> : null}
     </div>
   );
 }
@@ -124,12 +160,14 @@ export function AdminLogin() {
           ) : null}
           <Field id={`${id}-code`} label="6-digit code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} autoFocus onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} />
           {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
-          <AButton type="submit" className="w-full" loading={busy} disabled={code.length !== 6}>
-            Verify and sign in
-          </AButton>
-          <button type="button" className="w-full text-xs text-muted-foreground underline" onClick={() => (setTicket(null), setEnrol(null), setCode(""))}>
-            Start again
-          </button>
+          <div className="flex items-center justify-between gap-3">
+            <button type="button" className="text-xs text-foreground/70 underline" onClick={() => (setTicket(null), setEnrol(null), setCode(""))}>
+              Start again
+            </button>
+            <AButton type="submit" loading={busy} disabled={code.length !== 6}>
+              Verify and sign in
+            </AButton>
+          </div>
         </form>
       </AuthCard>
     );
@@ -138,12 +176,30 @@ export function AdminLogin() {
   return (
     <AuthCard title="Sign in" description="Staff only. Every sign-in needs your password and an authenticator code.">
       <form onSubmit={submitPassword} className="space-y-4">
+        {params.get("reset") === "1" ? (
+          <p role="status" className="rounded-md border border-emerald-600/30 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-100">
+            Password updated. Sign in with your new password and your authenticator code.
+          </p>
+        ) : null}
         <Field id={`${id}-email`} label="Work email" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <Field id={`${id}-pw`} label="Password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <PasswordField
+          id={`${id}-pw`}
+          label="Password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          aside={
+            <Link href="/admin/forgot" className="text-xs font-medium underline underline-offset-2">
+              Forgot password?
+            </Link>
+          }
+        />
         {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
-        <AButton type="submit" className="w-full" loading={busy} disabled={!email || !password}>
-          Continue
-        </AButton>
+        <div className="flex justify-end">
+          <AButton type="submit" loading={busy} disabled={!email || !password}>
+            Continue
+          </AButton>
+        </div>
         {setupNeeded ? (
           <p className="text-center text-xs text-muted-foreground">
             No staff yet?{" "}
@@ -182,45 +238,171 @@ export function AdminSetup() {
       <form onSubmit={submit} className="space-y-4">
         <Field id={`${id}-n`} label="Your name" autoComplete="name" value={form.name} onChange={set("name")} />
         <Field id={`${id}-e`} label="Work email" type="email" autoComplete="username" value={form.email} onChange={set("email")} />
-        <Field id={`${id}-p`} label="Password" type="password" autoComplete="new-password" value={form.password} onChange={set("password")} help="At least 12 characters. A passphrase works well." />
+        <PasswordField id={`${id}-p`} label="Password" autoComplete="new-password" value={form.password} onChange={set("password")} help="At least 12 characters. A passphrase works well." />
         <Field id={`${id}-t`} label="Setup token (production only)" autoComplete="off" value={form.token} onChange={set("token")} />
         {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
-        <AButton type="submit" className="w-full" loading={busy}>
-          Create owner
-        </AButton>
+        <div className="flex justify-end">
+          <AButton type="submit" loading={busy}>
+            Create owner
+          </AButton>
+        </div>
       </form>
     </AuthCard>
   );
 }
 
-/** Accept a one-time staff invite: set your own password. */
-export function AcceptInvite() {
+/**
+ * One-time link from an owner: a staff invite ("join", set your first password) or a password-reset link
+ * ("reset", set a new one). Both post to the same endpoint; the server decides from the token what it is.
+ */
+export function AcceptInvite({ mode = "join" }: { mode?: "join" | "reset" }) {
   const id = useId();
   const router = useRouter();
   const { token } = useParams<{ token: string }>();
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const reset = mode === "reset";
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
       await post("/api/admin/invite/accept", { token, password });
-      router.replace("/admin/login");
+      router.replace(reset ? "/admin/login?reset=1" : "/admin/login");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't accept the invite.");
+      setError(err instanceof Error ? err.message : reset ? "Couldn't reset the password." : "Couldn't accept the invite.");
       setBusy(false);
     }
   };
   return (
-    <AuthCard title="Join the team" description="Choose your password. You'll set up two-step verification at your first sign-in.">
+    <AuthCard
+      title={reset ? "Set a new password" : "Join the team"}
+      description={
+        reset
+          ? "Choose a new password. You'll still need your authenticator code to sign in, and you'll be signed out everywhere else."
+          : "Choose your password. You'll set up two-step verification at your first sign-in."
+      }
+    >
       <form onSubmit={submit} className="space-y-4">
-        <Field id={`${id}-p`} label="Password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} help="At least 12 characters." />
+        <PasswordField id={`${id}-p`} label={reset ? "New password" : "Password"} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} help="At least 12 characters." />
         {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
-        <AButton type="submit" className="w-full" loading={busy} disabled={password.length < 12}>
-          Set password
-        </AButton>
+        <div className="flex justify-end">
+          <AButton type="submit" loading={busy} disabled={password.length < 12}>
+            {reset ? "Save new password" : "Set password"}
+          </AButton>
+        </div>
+      </form>
+    </AuthCard>
+  );
+}
+
+/**
+ * "Forgot password?" — self-service for every staff member, owners included:
+ * email → 6-digit code by email → code + new password → back to sign-in (the authenticator code is still needed).
+ * The server answers the same for unknown emails, so this screen never says whether an address is staff.
+ */
+export function AdminForgotPassword() {
+  const id = useId();
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [challenge, setChallenge] = useState<{ id: string; demoCode?: string } | null>(null);
+  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  const sendCode = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await post<{ challengeId: string; demoCode?: string }>("/api/admin/password/forgot", { email });
+      setChallenge({ id: r.challengeId, demoCode: r.demoCode });
+      setCode("");
+      setCooldown(30);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't send the code.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!challenge) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await post("/api/admin/password/reset", { email, challengeId: challenge.id, code, password });
+      router.replace("/admin/login?reset=1");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't reset the password.");
+      setBusy(false);
+    }
+  };
+
+  if (!challenge) {
+    return (
+      <AuthCard title="Forgot your password?" description="Enter your work email. If it belongs to a staff account, we'll email you a 6-digit code.">
+        <form onSubmit={sendCode} className="space-y-4">
+          <Field id={`${id}-email`} label="Work email" type="email" autoComplete="username" value={email} autoFocus onChange={(e) => setEmail(e.target.value)} />
+          {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/admin/login" className="text-xs text-foreground/70 underline underline-offset-2">
+              Back to sign in
+            </Link>
+            <AButton type="submit" loading={busy} disabled={!email}>
+              Send code
+            </AButton>
+          </div>
+        </form>
+      </AuthCard>
+    );
+  }
+
+  return (
+    <AuthCard title="Check your email" description={`If ${email} is a staff account, a 6-digit code is on its way. It works once and expires in 5 minutes.`}>
+      <form onSubmit={reset} className="space-y-4">
+        {challenge.demoCode ? (
+          <p role="status" className="rounded-md border border-dashed border-foreground/40 bg-background/70 px-3 py-2 text-xs">
+            Demo email (development only — nothing was sent): your code is <b className="font-mono">{challenge.demoCode}</b>
+          </p>
+        ) : null}
+        <Field
+          id={`${id}-code`}
+          label="6-digit code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          value={code}
+          autoFocus
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+        />
+        <PasswordField id={`${id}-pw`} label="New password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} help="At least 12 characters. You'll still need your authenticator code to sign in." />
+        {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
+        <div className="flex items-center justify-between gap-3">
+          <button type="button" disabled={cooldown > 0 || busy} onClick={() => void sendCode()} className="text-xs text-foreground/70 underline underline-offset-2 disabled:no-underline disabled:opacity-60">
+            {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
+          </button>
+          <AButton type="submit" loading={busy} disabled={code.length !== 6 || password.length < 12}>
+            Save new password
+          </AButton>
+        </div>
+        <p className="text-xs text-foreground/70">
+          No email? Check spam, or ask an owner for a reset link from <span className="font-medium">Staff</span>. Lost your authenticator too? An owner
+          can also use <span className="font-medium">Reset 2-step</span>.
+        </p>
+        <button type="button" className="text-xs text-foreground/70 underline underline-offset-2" onClick={() => (setChallenge(null), setError(null))}>
+          Use a different email
+        </button>
       </form>
     </AuthCard>
   );

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { useId } from "react";
+import { isProductPhotoUrl } from "@/lib/catalog/photo-url";
 import type { GarmentKind, ProductImage } from "@/lib/commerce/types";
 import { cn } from "@/lib/utils";
 
@@ -192,7 +193,7 @@ export function GarmentArt({
   const patternId = useId().replace(/:/g, "");
   // A real product photo (own-backend media, served from /api/media/<id>) replaces the drawing. The container keeps
   // its own aspect ratio, so swapping art for a photo never shifts layout (CLS).
-  if (image.url && /^\/api\/media\/med_[a-f0-9]{32}$/.test(image.url)) {
+  if (isProductPhotoUrl(image.url)) {
     return (
       <div className={cn("relative overflow-hidden bg-soft", className)}>
         <Image src={image.url} alt={image.alt} fill sizes={sizes} priority={priority} className="object-cover" />

@@ -208,4 +208,13 @@ export const MONGO_MIGRATIONS: MongoMigration[] = [
       // additive only — nothing to undo
     },
   },
+  {
+    name: "2026_11_28_008_staff_password_reset",
+    async up() {
+      // Schemaless: `resetFor` is an optional field on staff_invites; documents without it read as join invites.
+    },
+    async down() {
+      // additive only — nothing to undo
+    },
+  },
 ];

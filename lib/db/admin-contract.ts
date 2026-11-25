@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { acceptInvite, createOwner, passwordStep, totpStep } from "@/lib/admin/auth";
+import { acceptInvite, createOwner, createPasswordReset, passwordStep, totpStep } from "@/lib/admin/auth";
 import { totpAt } from "@/lib/admin/crypto";
-import { createInvite, newStaff } from "@/lib/admin/staff";
+import { createAdminSession, createInvite, newStaff } from "@/lib/admin/staff";
 import { getMongo } from "./mongo";
 import { createSecretBox } from "./secret-box";
 import { getSqlDb } from "./sql";
@@ -85,6 +85,45 @@ for (const target of testTargets()) {
       const id = (await s.staff.byEmail("new@example.test"))!.id;
       const updated = await s.staff.update(id, (x) => void (x.role = "support"));
       expect(updated).toMatchObject({ role: "support", email: "new@example.test", totpEnabled: false });
+    });
+
+    it("password-reset link: single use (raced), new password works, old one fails, sessions revoked, MFA kept", async () => {
+      const owner = (await s.staff.list())[0];
+      const before = (await s.staff.get(owner.id))!;
+      await createAdminSession(s.staff, owner.id);
+      const token = await createPasswordReset(s.staff, owner, "stf_other");
+      // The link round-trips as a reset (not a join invite) on every driver.
+      expect((await s.staff.listInvites(Date.now())).find((i) => i.resetFor === owner.id)).toBeTruthy();
+      const NEW = "a brand new long passphrase";
+      const race = await Promise.allSettled([acceptInvite(s.staff, token, NEW), acceptInvite(s.staff, token, NEW)]);
+      expect(race.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      expect(race.find((r) => r.status === "rejected")).toMatchObject({ reason: { code: "invite_invalid" } });
+      expect((await s.staff.list()).filter((x) => x.email === owner.email)).toHaveLength(1);
+      expect(await s.staff.deleteSessionsOf(owner.id)).toBe(0); // already revoked
+      const after = (await s.staff.get(owner.id))!;
+      expect(after).toMatchObject({ totpEnabled: before.totpEnabled, lastTotpStep: before.lastTotpStep, failedLogins: 0, lockedUntil: 0 });
+      const t = Date.parse("2026-11-26T14:00:00Z");
+      await expect(passwordStep(s.staff, owner.email, PASSWORD, t)).rejects.toMatchObject({ code: "invalid_credentials" });
+      await expect(passwordStep(s.staff, owner.email, NEW, t)).resolves.toMatchObject({ step: "totp" });
+      // Put the shared fixture password back for later tests (through the same reset path).
+      await acceptInvite(s.staff, await createPasswordReset(s.staff, after, "stf_other"), PASSWORD);
+    });
+
+    it("password-reset link: expired, disabled account and changed email are refused", async () => {
+      const t0 = Date.parse("2026-11-26T15:00:00Z");
+      const victim = newStaff({ email: "reset-me@example.test", name: "Reset Me", role: "support", passwordHash: null });
+      await s.staff.insert(victim);
+      const expired = await createPasswordReset(s.staff, victim, "stf_other", t0);
+      await expect(acceptInvite(s.staff, expired, "long enough passphrase", t0 + 61 * 60_000)).rejects.toMatchObject({ code: "invite_invalid" });
+      const forDisabled = await createPasswordReset(s.staff, victim, "stf_other");
+      await s.staff.update(victim.id, (x) => void (x.disabled = true));
+      await expect(acceptInvite(s.staff, forDisabled, "long enough passphrase")).rejects.toMatchObject({ code: "invite_invalid" });
+      await expect(createPasswordReset(s.staff, (await s.staff.get(victim.id))!, "stf_other")).rejects.toMatchObject({ code: "disabled" });
+      await s.staff.update(victim.id, (x) => void (x.disabled = false));
+      const stale = await createPasswordReset(s.staff, victim, "stf_other");
+      await s.staff.update(victim.id, (x) => void (x.email = "moved@example.test"));
+      await expect(acceptInvite(s.staff, stale, "long enough passphrase")).rejects.toMatchObject({ code: "invite_invalid" });
+      expect((await s.staff.get(victim.id))!.passwordHash).toBeNull();
     });
 
     it("TOTP secrets are encrypted in the database (never stored in the clear)", async () => {

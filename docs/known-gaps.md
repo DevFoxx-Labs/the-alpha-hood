@@ -10,6 +10,12 @@
   Remaining step: choose and host the production database (owner TODO).
 - 🟠 Privacy requests are worked in `/admin/privacy` (M7); the acknowledgement message and identity-check OTP still need
   an email/SMS provider.
+- 🟠 Newsletter subscribers can't be messaged from the admin yet (no email / WhatsApp provider). Today: export CSV
+  from `/admin/subscribers` and send from the provider. Statuses stay `pending_confirmation` ("Subscribed" in the
+  admin) until double opt-in exists.
+- 🟡 `lib/db/contract.test.ts` › "own-backend store end to end · mongodb" › "style editor, CSV export -> import and
+  bulk actions" fails on local MongoDB (2026-11-25): it expected `['E2E Overshirt']` and got `[]`. This is the
+  uncommitted catalog CSV / bulk work; not caused by the newsletter change. Investigate before committing that work.
 - 🟠 Newsletter double opt-in (confirmation message before any offer) when the email/WhatsApp provider is added;
   unsubscribe link in every message.
 - 🟠 Account paths (M6): `terms_privacy` ledger row at every sign-up path, "Your consents" per user across devices,
@@ -58,10 +64,18 @@
 ## Product / design
 - 🟠 Trademark files (`docs/brand/trademark/`) are cut from a vector-traced logo concept. Before filing, confirm who
   owns the concept artwork and get a designer's final master. No clearance search has been done yet.
-- 🟡 PLP-08 rail gallery (`components/listing/product-rail-gallery.tsx`): uses `GarmentArt` placeholders; the "Back"
-  view is the mirrored placeholder until real front/back/side cut-out photos (transparent PNG/WebP) exist. Products are
-  auto-picked (popularity, one colour per style) — per-collection hand-picking belongs to PLP-07 admin merchandising.
-  PLP-08 is not in the PRD yet (owner to confirm the ID / priority).
+- 🟡 PLP-08 rail gallery (`components/listing/product-rail-gallery.tsx`):
+  - **Only one colour has photos so far.** The rail turns real on-hanger photos once staff tag them in the style
+    editor; only the DEMO "Heavyweight Oversized Hoodie — Black" has them (owner mock-ups in `public/demo/products/`).
+    Every other colour shows a `GarmentArt` drawing turned side-on.
+  - **Staff photos must share one frame.** Front, back and side need the same canvas, scale and hook position, or
+    the garment jumps as it turns. Nothing checks this on upload. Fix: an aspect / transparency check in
+    `prepareProductPhoto`, or a server-side cut-out and normalise step (needs an image library; owner OK first).
+  - **No autoplay.** The reference component in `docs/rail.md` can turn garments one by one on its own; that would
+    need a pause control (WCAG 2.2.2).
+  - **Picking is automatic:** popularity, one colour per style, photographed colour first. Per-collection hand-picking
+    belongs to PLP-07 admin merchandising.
+  - PLP-08 is not in the PRD yet (owner to confirm the ID / priority).
 - 🟡 Dev console warns "`params` accessed outside `<Suspense>`" on `/collections/[handle]` (instant-navigation hint for
   the existing `await params`); not caused by PLP-08 — consider `export const instant = false` or streaming the header.
 - 🟠 All imagery is placeholder art — real photography + hero campaign crops (16:7 / 4:5) required (DESIGN.md §5).
@@ -122,6 +136,16 @@
   (edited in that platform).
 - 🟠 COD UPI payouts are recorded by hand (UTR) — needs the gateway payout API and a two-person approval above a limit.
 - 🟠 No new-device / new-IP alert for staff sign-ins, and no WebAuthn (phishing-resistant MFA) yet.
+- 🔴 **No email provider yet**, so on the live store "Forgot password?" (email code) answers 503 and the "password
+  changed" notices aren't sent. Staff then need an owner's Reset link, or `pnpm admin:reset-link` on the server.
+  - Fix: owner picks a provider (owner TODO), then add its adapter to `EMAIL_PROVIDERS` in `lib/notify/email.ts`
+    and set `EMAIL_PROVIDER`.
+- 🟡 "Forgot password?" step 1 answers the same for unknown emails, but returns a little faster for them (no email
+  is sent). A careful attacker could time it, within the per-IP limit of 5 per 15 min.
+  - Fix: send the email from a queue / after the response, so both paths take the same time.
+- 🟡 The admin contract tests (incl. the new password-reset ones) only ran on memory on 2026-11-25. The local
+  MongoDB test target timed out in setup (not running), and MySQL / PostgreSQL are commented out in `.env.test.local`.
+  Re-run `lib/db/contract.test.ts` against all three databases before deploying migration `2026_11_28_008`.
 - 🟡 Reports chart uses plain CSS bars (`recharts` not installed — needs the owner's OK to add the package).
 - 🟡 No notification bell feed in the admin topbar yet (counts only).
 - 🟡 Missing negative tests: admin ticket reuse, COD payout marked paid twice, production setup without/with a wrong token.
@@ -201,8 +225,14 @@
   UNIQUE(code), written in the same `writeMany` transaction.
 - 🟡 **Order lines placed before 2026-11-25 have no HSN** (invoice shows "—"). HSN defaults per GST class are
   placeholders; the CA must confirm every HSN and rate.
-- 🟡 **Missing from the products list:** bulk actions (publish / archive / category), CSV import / export from the UI
-  (CLI only), and a draft preview link.
+- 🟡 **Products list:** bulk actions and CSV import / export are built (2026-11-25). Still missing:
+  - a draft preview link;
+  - bulk price changes (e.g. −10 % on a selection). Use CSV for now.
+- 🟡 **CSV import is atomic per product, not per file.** A failure mid-way leaves the earlier products saved (they show
+  as unchanged on re-run). Very large files run in the request; move them to a background job if imports of
+  thousands of products become routine.
+- 🟡 **CSV doesn't carry photos.** Photos and their hanger front / back / side tags are set in the editor; an import
+  keeps a colour's existing photos and tags (`photosFromImages`).
 - 🟡 **Shipping data isn't used yet:** packed weight and package size are stored, but nothing reads them until the
   courier adapter exists.
 - 🟡 **Not browser-checked** at 1440 / 390 / 360 px.

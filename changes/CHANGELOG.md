@@ -1,5 +1,304 @@
 # Change log
 
+## 2026-11-25 — PLP-08 collection rail: design fixes from docs/rail.md + real Alpha Hood photos
+
+Compared our rail with the reference component in `docs/rail.md` and fixed every design flaw found:
+
+| Flaw in our rail | Fix |
+| --- | --- |
+| Photos and drawings at different sizes; each photo in its own frame, so the garment jumped as it turned | One hanger box for everything (1000 × 1250 canvas, hook tip at the top centre). Every photo is normalised to it |
+| The turned garment covered its neighbours, badly on phones | Footprints: side-on garments take only their side width. The faced one takes its full width and the neighbours slide apart (`footprint`, `railTargets`, `stepRailSim`; tested: never overlap) |
+| Phones squeezed 5 hangers on top of each other | Below ~580 px the rail is a carousel: one garment faces you in the middle; swipe or use the dots |
+| The "turn" was a crossfade | A real 3D turn: rotateY −70° → 0° with perspective. The side photo hands over to the front photo half way, and light falls off as it turns away (`railLight`, masked shade) |
+| A white price card covered the hem | A small price tag hangs from each hook on a string and lags the swing. The faced garment's name, price and discount show in a caption under the rail (`aria-live`) |
+| A box drop-shadow | The shadow takes the garment's own shape and narrows as it turns side-on |
+| A flat bar | A steel rod with wall brackets and a soft wall light |
+| Hit areas were the boxes, which overlap | Hit-testing uses each garment's current footprint, so you grab the one you see |
+| A drag could not push neighbours properly; the faced garment had no room | Drag shoves neighbours, releases coast then spring home, and the swing reacts to the hook's acceleration |
+| Dialog: crossfade between photos | The garment lifts off the rail into the dialog (FLIP, transform only), then spins front ↔ back (drag or buttons, spring). The side view is a third button |
+
+- Kept from our version: Radix Dialog (focus trap, Escape, focus back to the hanger), quick add, PDP link, square
+  corners, brand tokens, Hugeicons, `next/image`, reduced motion (no physics, instant turn, no lift), keyboard
+  (arrows / Home / End / Enter), lazy front photos (only side shots on first paint). Not taken: autoplay (moving
+  content above the grid would need a pause control) and the reference's hot-linked 21st.dev images.
+- **Photos.** The owner's four mock-ups of the black Alpha Hood hoodie (front, back, side, three-quarter back) were
+  white-background PNGs at two sizes; the front had no hanger.
+  - The background was cut out with an edge flood fill, so the white sleeve prints are kept, and edges were cleaned
+    so no white fringe shows.
+  - All views are at the same garment height on one 1000 × 1250 canvas, with the hook at the top centre. The front
+    gets the back photo's hanger, mirrored.
+  - Files: `public/demo/products/oversized-hoodie-black-{front,back,side,angle}.webp` (36–83 KB). They're on the demo
+    colour "Heavyweight Oversized Hoodie — Black". The three-quarter shot is a gallery photo.
+  - The Maestiq sample photos are removed; Grey Melange is back to a drawing.
+- **Seed.** `pnpm db:seed` now refreshes the DEMO photos of demo products already in a local database. Products with
+  a staff-uploaded photo are never touched (tested). The local dev DB was refreshed: 2 photo sets.
+
+**Threat model:** no new endpoints, data or trackers. The seed still runs only behind the local-database guard
+(tested). Photo URLs are still limited to our own media and `/demo/products/` (tested earlier).
+
+**Verification**
+- `pnpm typecheck` ✓ · `pnpm lint` ✓ · unit tests 357/357 ✓ (new: footprints, layout fits every width, carousel
+  centring, no overlap while turning / dragging, swing limits, frame-gap safety, photographed colour picked, seed refresh
+  and its guard) · DB contract on memory 45/45 ✓.
+- Headless Chrome, dev server, `/collections/combos` and `/collections/winter-drop` at 1440 / 768 / 390 / 360:
+  - rest, mid-turn, faced and dialog front / back all render; overflow-x 0; no console errors;
+  - a real mouse hover turns a garment and its neighbours make room;
+  - a drag shoves the neighbours, they spring back after release, and no dialog opens;
+  - Escape closes the dialog and focus goes back to the hanger;
+  - reduced motion turns instantly.
+
+## 2026-11-25 — Newsletter: "You're subscribed" alert + admin Subscribers screen (GLB-05)
+
+- **Footer form** (`components/store/newsletter-form.tsx`), with email or mobile (WhatsApp) number:
+  - After a successful sign-up a toast shows "You're subscribed" (`showSubscribedToast`, black bar, Hugeicons tick,
+    5 s, `role="status"`).
+  - The form turns into a confirmation with an "Add another email or number" button that resets the form, including
+    the consent tick.
+  - Placeholder now says "10-digit mobile number".
+  - Unchanged: the unticked consent box validated on the server, a consent ledger row per sign-up, the same answer
+    for repeats, 5 per 10 min per IP, one-click withdrawal.
+  - Checked on the dev server (MongoDB): email and mobile sign-ups → 201.
+- **Admin → People → Subscribers** (`/admin/subscribers`, new permission `subscribers.read` = owner + marketing):
+  - Search (literal, debounced), channel and status filters in the URL, 50 per page, newest first, contacts masked.
+  - **Export CSV**: full contacts for the current filter, unsubscribed left out unless filtered for, formula cells
+    neutralised, 10 per hour per staff member, audited `subscribers.export_csv` with the count.
+  - Routes: `GET /api/admin/subscribers`, `GET /api/admin/subscribers/export`.
+  - Service: list / mask / CSV in `lib/newsletter/service.ts`.
+- `NewsletterStore.list()` on memory, MySQL / PostgreSQL (LIKE with `%` / `_` / `\` escaped, bound) and MongoDB
+  (escaped regex). No schema change.
+- **Threat model.** Abuse cases and what stops each one:
+  - a staff member without the permission reads the list → 401 / 403 on the server;
+  - mass export of personal data → permission, rate limit, audit row;
+  - CSV injection → `csvCell`;
+  - search injection / ReDoS → escaped LIKE / regex;
+  - sign-up spam → the existing per-IP limit.
+- Tests:
+  - `app/api/admin-api.test.ts`: footer sign-ups appear masked; 401 / 403 for other roles; CSV has the full contact
+    with formulas neutralised; audit row.
+  - `lib/db/aftersales-contract.ts`: order, filters, literal `_` / `.` / `%` search, paging. Passed on memory and
+    local MongoDB.
+
+## 2026-11-25 — Admin: "Forgot password?" by email code (self-service, owners included)
+
+- `/admin/forgot` is now a real reset:
+  1. Enter your work email.
+  2. Get a 6-digit code by email.
+  3. Enter the code and a new password (with show / hide).
+  4. You're back at sign-in. The authenticator code is still needed.
+  - Works for every role, including the owner, with no other owner needed.
+- API (public, `app/api/admin/password/forgot` and `/reset`; allow-listed in the "every admin route is guarded" test):
+  - Same-origin only.
+  - Rate limits: 5 per 15 min and 20 per day per IP, plus a global cap. Per email, the OTP service adds a 30 s
+    cooldown, 5 per hour and 10 per day.
+  - Codes: random 6 digits, stored as an HMAC, single use, 5 minutes, 5 tries.
+  - The answer is the same for unknown, disabled or limited emails (no staff enumeration).
+  - Success: new password, lockout cleared, every session revoked, no session created, audit `staff.password_reset`
+    (`via: email_code`), and a "your password was changed" email.
+- Reuses the customer OTP service (`lib/auth/otp.ts`), with two new options:
+  - `purpose` is mixed into the code hash, so an admin code never verifies on customer sign-in and the other way
+    round. Customer hashes are unchanged.
+  - `deliver` sends the code by another channel (email).
+  - The OTP store key is a derived 16-char hash, so no email is stored in `otp_challenges`.
+- New `lib/notify/email.ts` (same pattern as SMS):
+  - `EmailAdapter`; plain-text fixed templates; header-injection check.
+  - Demo mailer in dev (code shown on screen), refused in production.
+  - Real providers via `EMAIL_PROVIDER`. None yet: the owner picks one, and until then the live store answers 503 there.
+- One password setter (`applyNewPassword`) for all three paths: email code, owner link, CLI.
+  - The owner-link path now also sends the "password changed" email.
+- `pnpm admin:reset-link --reset-mfa` also clears two-step verification (lost mailbox and phone), audited.
+- `.env.example`: `EMAIL_PROVIDER`.
+- **Threat model.** Abuse cases and what stops each one:
+  - email enumeration → same answer;
+  - mailbox spam → IP / email / global caps;
+  - code guessing → 5 tries, 1 M space, 5 min;
+  - code replay or race → atomic consume;
+  - a code from one flow used in another → purpose-scoped hash;
+  - a code bound to email A used for email B → key check;
+  - a weak password burning the code → checked first;
+  - takeover through a compromised mailbox → TOTP still required, a notice email, an audit row, and the owner can
+    disable the account.
+- Tests (`app/api/admin-api.test.ts`):
+  - an owner resets end-to-end with the email code;
+  - an unknown email gets the same response and no mail is sent;
+  - 422 / CSRF;
+  - the admin code is refused by `/api/otp/verify`;
+  - a weak password doesn't burn the code;
+  - a code is bound to its email; wrong code; single use;
+  - old session and old password dead, TOTP still required, notice sent, audit row;
+  - fails closed in production without a provider;
+  - per-IP rate limit.
+
+## 2026-11-25 — Fix: hand (pointer) cursor on every button and clickable control
+
+- **Cause:** Tailwind v4 no longer gives buttons `cursor: pointer`, so buttons across the store and the admin
+  showed the arrow cursor.
+- **Fix:**
+  - one base rule in `app/globals.css` covers buttons, Radix controls (tabs, menu items, select options,
+    checkbox / radio / switch, comboboxes), checkboxes, radios, colour and file pickers, `<summary>` and the
+    labels that wrap file inputs;
+  - disabled controls show the not-allowed cursor;
+  - removed the explicit `cursor-default` from admin select options and the "Sign out" menu item;
+  - the invisible full-screen menu backdrop keeps the arrow cursor.
+- **Verified:** the dev server serves the new rule. Not checked by hovering in a browser.
+
+## 2026-11-25 — Admin: sign-in screen polish + staff password reset
+
+**Sign-in screens** (`/admin/login`, `/admin/setup`, `/admin/invite/[token]`; shared `AuthCard` in
+`components/admin/auth-forms.tsx`):
+- The owner's storefront photo (`public/admin/login-store.webp`, 1672×941, 166 KB WebP from a 2.3 MB PNG) fills the
+  page (`next/image` `fill`, `preload`) under a dark gradient. Suspense fallbacks are `bg-neutral-950` (no white flash).
+- The card is more see-through: `bg-white/45` (dark `bg-neutral-950/45`) + `backdrop-blur-md`. Secondary text uses
+  `text-foreground/70–75` so it stays readable on the glass.
+- Mascot cutouts next to the card were tried and removed (owner's call).
+- Password fields have a show / hide button (Hugeicons `ViewIcon` / `ViewOffSlashIcon`, `aria-label`, `aria-pressed`).
+- Submit buttons are right-aligned and sized to their label (no longer full width).
+
+**Password reset for staff (High tier: auth)**
+- New pages: "Forgot password?" on the login links to `/admin/forgot`, which explains the reset steps.
+  Self-service email reset is deliberately not offered (no email provider yet, and email-only reset is the easiest
+  takeover path).
+- An owner chooses **Reset link** next to a staff member on `/admin/staff`
+  → `POST /api/admin/staff/[id]/reset-link` (`staff.manage`, CSRF-checked, rate-limited, audited
+  `staff.password_reset_link`).
+  - The owner gets a one-time link `/admin/reset/<token>`: 1 hour, SHA-256 hash stored, shown once.
+  - Refused for yourself (409), unknown (404) or disabled (409) accounts.
+- The person opens the link and sets a new password (`POST /api/admin/invite/accept`, audited `staff.password_reset`).
+  - Single use, also when two requests race (atomic consume).
+  - Refused if the account was disabled or its email changed after the link was made.
+  - The new password clears the lockout and revokes every session.
+  - **Two-step verification is kept**, so a leaked link alone can't sign anyone in.
+- Sole owner locked out: `pnpm admin:reset-link --email=… [--env-file=…]`. It needs server shell + database access,
+  prints the target database, and is audited with actor `cli`.
+- Storage: reset links reuse `staff_invites` with a new nullable `reset_for` column. Migration
+  `2026_11_28_008_staff_password_reset` is additive and idempotent, with a `down()`; MongoDB gets the same-named
+  no-op (optional field).
+- Fix: the Staff screen's `act()` chose PATCH for any URL containing `/staff/stf_`; it now matches the exact
+  `/staff/<id>` URL only.
+- **Threat model.**
+  - Abuse cases and what stops each one:
+    - a stranger requests a reset → no public endpoint;
+    - a non-owner issues one → 403;
+    - an owner resets themselves to dodge oversight → 409;
+    - the link leaks → 1 h expiry, single use, TOTP still required, audit;
+    - the link is replayed or raced → atomic consume;
+    - a disabled account is revived → refused;
+    - CSRF → origin check.
+  - Detect: audit entries.
+  - Recover: Disable / Reset 2-step.
+- Tests:
+  - `app/api/admin-api.test.ts`: 401 / 403 / 409 / 404 / CSRF; link works once; short password 422; old session
+    and old password dead; new password still needs TOTP; audit rows.
+  - `lib/db/admin-contract.ts`: raced single use, MFA kept, sessions revoked, expired / disabled / changed-email
+    links refused.
+
+## 2026-11-25 — Admin: bulk actions and CSV import / export for products
+
+- **Bulk actions (`/admin/catalog`):**
+  - tick products (or "select all on this page", max 100) and use the bar at the bottom: Publish, Unpublish,
+    Category (with sub-category), Tags (add / remove), Archive;
+  - Unpublish and Archive ask for confirmation first;
+  - every colour of each selected product changes in ONE transaction (`writeMany`, every version checked);
+  - a product edited meanwhile → 409 and nothing changes.
+  - Service: `lib/catalog/bulk.ts`. Route: `POST /api/admin/catalog/bulk` (`catalog.write`, audited as
+    `catalog.bulk.<action>` with the style ids).
+- **CSV export:** "Export CSV" button, `GET /api/admin/catalog/export`.
+  - One row per size, with every product, colour and size field and the live stock.
+  - `catalog.read`; the `cost_price_inr` column is included only for `catalog.write` roles.
+  - Formula cells neutralised; 20 exports per hour per staff member; audited (`catalog.export_csv`).
+- **CSV import:** `/admin/catalog/import`, `POST /api/admin/catalog/import` with `{ csv, apply }`.
+  - The file is planned first (dry run): new / update / unchanged per product, plus row-level errors.
+  - Apply is possible only when there are no errors, and asks for confirmation.
+  - Every product goes through the editor's rules (`saveStyle`) and is written in one transaction.
+  - Products are matched by `style_id`, else by a known `colour_sku`, so re-running a file is safe.
+  - Columns left out keep their values. Photos are never changed by CSV. `stock` is only the opening stock of
+    new sizes.
+  - Codes and web addresses are checked for uniqueness across the whole file too.
+  - Limits: 2.5 MB / 5000 rows; 60 runs per hour; applied imports audited (`catalog.import_csv`).
+  - Service: `lib/catalog/csv.ts` (RFC 4180 parser, no new package).
+- **Refactor:**
+  - `csvCell` moved to `lib/security/csv-cell.ts` (`lib/admin/ops.ts` re-exports it), plus `uncsvCell` so guarded
+    values round-trip.
+  - The products list moved from `components/admin/screens.tsx` to `components/admin/catalog-list.tsx`.
+  - `saveStyle` gained `dryRun` and reports which colours would change.
+  - DataTable column headers accept elements.
+- **Threat model:**
+  - a CSV is untrusted input: size / row / cell caps, unknown columns refused, `style_id` must exist, colours are
+    matched only inside their own product, every value is allow-listed;
+  - formula injection is guarded both ways;
+  - cost price is exported only to editors;
+  - bulk and import need `catalog.write`; export needs `catalog.read`;
+  - same-origin and rate limits; audit entries.
+- **Tests:**
+  - `lib/catalog/csv.test.ts` (11):
+    - parser edge cases;
+    - export (cost column, formula guard); export → import of the whole demo catalogue changes nothing;
+    - plan writes nothing; create; re-run is a no-op;
+    - partial-column update keeps the other values, photos, live stock and other colours;
+    - row errors → nothing applied; unknown / missing columns, size cap, duplicate barcodes across products;
+    - guard round-trip;
+    - bulk publish / archive / category / tags; invalid input; all-or-nothing on a concurrent edit.
+  - `admin-api.test.ts`: 401 / 403 (support can't export, marketing can't import or bulk) / cross-origin /
+    read-only 409.
+  - Contract (end to end on each database): export → import plan, CSV create, style editor PUT + stale 409,
+    bulk archive, audit actions.
+
+## 2026-11-25 — PLP-08 collection rail: real on-hanger photos (front / back / side) instead of drawings
+
+- **Rail turn with photos.** A colour with on-hanger cutouts tagged **side** and **front** (`hangerShots`,
+  `lib/catalog/rail.ts`) now hangs on the rail as its real side shot. Hover / focus / first tap turns it to the
+  front shot: rotateY + crossfade around the hook, transforms and opacity only. The cutouts carry their own hanger,
+  so the drawn hook and shoulders are skipped. Colours without the pair keep the drawing on a drawn hanger.
+- **Dialog.** "Lifted off the rail" shows Front / Back / Side photos when they exist. Drawings keep the Front / Back flip.
+- **Pick.** Within a style, the colour that has hanger photos is the one that hangs. Styles are still ranked by their
+  most popular in-stock colour, one hanger per style.
+- **Admin.** Style editor → each photo has a "Use" select: Gallery photo / Hanger · front / back / side. A view can
+  be on only one photo, and picking it on another photo moves it. Help text gives the shot spec: transparent PNG,
+  same frame for all three, hook at the top centre. The server allow-lists `view`, refuses a repeated view
+  (`photos[].view`, `lib/catalog/admin.ts`), and the editor and CSV round-trip it (`photosFromImages`). Untagged
+  photos no longer get an automatic `view: "front"`. A legacy record's automatic tag is dropped when it is read back.
+- **Demo.** The owner's three sample cutouts (645 × 1000 WebP, transparent) are now
+  `public/demo/products/oversized-hoodie-grey-melange-{front,back,side}.webp`, on a new DEMO colour **Grey Melange**
+  of "Heavyweight Oversized Hoodie" (mock catalogue). They show up in the Hoodies rail. `GarmentArt` renders
+  `/demo/products/*` like uploaded media. Demo photos survive an editor save or CSV re-import that sends no photos.
+- **Performance.** Side shots load lazily via `next/image` (AVIF/WebP, `sizes` = 112/140/190 px hanger widths). Front
+  shots mount only once the rail is "warm": first pointer, focus or touch on it, or browser idle (≤ 4 s). This halves
+  the first-load image requests. Every shot sits in a fixed 645 / 1000 box → no CLS.
+
+**Threat model**
+- Assets: catalogue integrity, storefront rendering. Actors: staff with `catalog.write`, a tampered admin client.
+- Arbitrary / remote image URL injected through a photo → `photos[]` accepts only `{id, alt, view}`. Any `url` is
+  an unknown field (422). Rendering only accepts `/api/media/med_<32 hex>` or `/demo/products/<slug>.(webp|png|jpg)`
+  (`lib/catalog/photo-url.ts`), otherwise the drawing is shown (prevent, tested incl. `..` traversal and `//host`).
+- Made-up view or the same view twice → allow-list + uniqueness check, 422 (prevent, tested).
+- No new endpoints, personal data or trackers → no DPDP change.
+
+**Verification**
+- `pnpm typecheck` ✓ · `pnpm lint` ✓ (0 warnings) · unit tests 346/346 ✓ (new: hanger shots, URL allow-list incl.
+  traversal, pick prefers the photographed colour, tag round-trip, bad / duplicate views refused, export → import
+  unchanged with demo photos) · DB contract on memory 44/44 ✓.
+- DB contract on MongoDB: **not confirmed**. While it ran, another `pnpm test` process was using the same
+  `alpha_hood_test` database, and failures moved between unrelated suites (MFA, invites, alerts) from run to run.
+  Re-run `pnpm test` alone.
+- `pnpm build` ✓ (162 pages) with a throwaway `SECRET_BOX_KEY` passed to that command only. Without a key, the build
+  stops at the existing fail-closed check, because `.env.local` turns on the MongoDB stores (owner TODO: production key).
+- Local dev DB: `pnpm db:seed` added the new demo colour (1 product, existing kept).
+- Headless Chrome on `/collections/combos` at 1440 / 390 / 360: the side shot hangs on the rail and focus turns it
+  to the front with its price tag. The dialog shows Front / Back / Side photos. Overflow-x 0, console clean.
+  Fixed during review: the photo hanger had no floor shadow next to the drawings (added a drop shadow).
+
+## 2026-11-25 — Brand: site logo shows ™ (top-right of the "D")
+
+- Every horizontal lockup on the site now uses the ™ version with the ™ at the top-right of the "D" of HOOD
+  (`logo-symbols/tm/*_tm-top.svg`, copied unchanged):
+  - `public/brand/logo/primary-horizontal_color_tm.svg` and `primary-horizontal_color-on-dark_tm.svg`;
+  - `assets/brand/primary-horizontal_color-on-dark_tm@600.png` for the per-product OG cards (`lib/seo/og.tsx`).
+- **Where:** `components/store/logo.tsx` (`<Logo>`: header, footer, coming-soon header, 404, checkout, menu
+  drawer), admin sidebar and mobile topbar (`admin-shell.tsx`) and the admin sign-in card (`auth-forms.tsx`).
+- The ™ lockup is 1131 × 360 (was 1072 × 360), so every `width`/`height` was updated → no layout shift.
+- **Not changed:** the mark-only logo (no wordmark, so no ™), favicons / app icons, the static site share image
+  (`app/opengraph-image.png`), the trademark filing images (must stay symbol-free). The old non-™ files stay in
+  `public/brand/logo/`.
+
 ## 2026-11-25 — Admin: product (style) editor with colour × size variants
 
 - **One product = a style with colours.** Each colour has:

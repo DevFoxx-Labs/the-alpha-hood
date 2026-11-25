@@ -12,7 +12,7 @@ export const OG_SIZE = { width: 1200, height: 630 };
 
 let lockup: Promise<string> | null = null;
 function lockupSrc(): Promise<string> {
-  lockup ??= readFile(join(process.cwd(), "assets/brand/primary-horizontal_color-on-dark@600.png"), "base64").then((b) => `data:image/png;base64,${b}`);
+  lockup ??= readFile(join(process.cwd(), "assets/brand/primary-horizontal_color-on-dark_tm@600.png"), "base64").then((b) => `data:image/png;base64,${b}`);
   return lockup;
 }
 
@@ -26,7 +26,7 @@ export async function ogCard({ eyebrow, title, footer }: { eyebrow: string; titl
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", fontSize: 34 }}>
           <span style={{ color: "#E4002B", fontWeight: 800 }}>{footer ?? ""}</span>
           {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
-          <img src={logo} width={300} height={101} />
+          <img src={logo} width={300} height={96} />
         </div>
       </div>
     ),

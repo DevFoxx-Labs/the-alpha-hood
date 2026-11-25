@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Sign in" };
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-muted/40" />}>
+    <Suspense fallback={<div className="min-h-screen bg-neutral-950" />}>
       <AdminLogin />
     </Suspense>
   );
