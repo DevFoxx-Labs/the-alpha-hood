@@ -25,6 +25,23 @@
   If added, ask for geolocation just-in-time and never send coordinates without consent.
 - 🟡 Hindi only for the Privacy Notice; Terms/Refund/Cookie and the banner are English.
 
+## Admin settings (2026-11-26)
+- 🟠 **Commercial settings are still constants.** Free-shipping threshold, shipping fee, COD fee and limit, max
+  quantity, return window, damage-report hours (`lib/config/store.ts` `STORE_CONFIG`) can't be edited in
+  Admin → Settings. Three client components import the constant directly (`mini-cart`, `bag-view`, dev showcase),
+  so a server-only override would make the bag show one threshold while the server charges another. Fix: pass the
+  values from the store layout into `StoreUIProvider`, then add a "Store" group to `lib/settings/catalog.ts`. A
+  change also alters the Refund notice text, so the notice version must be bumped with it.
+- 🟠 **Settings store not run on MySQL / PostgreSQL here.** `lib/db/stores/settings.ts` passed the contract on
+  memory and MongoDB only. Run `pnpm test` with `TEST_MYSQL_URL` / `TEST_POSTGRES_URL` before using those engines.
+- 🟡 Pages prerendered at build don't hold saved settings until their first revalidation (storefront pages
+  revalidate every minute; a save refreshes them at once).
+- 🟡 A save reaches other server instances within 60 s (`REFRESH_MS`), not instantly. For a kill switch across many
+  instances, a shared signal (Redis pub/sub) would make it immediate.
+- 🟡 No settings yet for: per-event notification channels, SMS / email provider keys, Turnstile, Sentry, marketing
+  automation, one-click checkout. Their adapters don't exist; add each group to the catalogue with its adapter.
+- 🟡 Step-up (fresh authenticator code) guards the Payments group only. Consider it for Analytics secrets too.
+
 ## Security
 - 🟡 With the own backend configured, rate limits are shared through the database (`rate_limits`, hashed keys); without it they are per process. At high traffic consider Redis for the counters (one DB write per limited request).
 - 🟠 `clientIp` trusts the first `X-Forwarded-For` hop — correct only behind our CDN/host; confirm with hosting choice.

@@ -631,5 +631,23 @@ export function sqlMigrations(d: Driver): Record<string, Migration> {
         if (await hasColumn(db, d, "staff_invites", "reset_for")) await db.schema.alterTable("staff_invites").dropColumn("reset_for").execute();
       },
     },
+
+    "2026_11_28_009_app_settings": {
+      async up(db: AnyDb) {
+        // Admin → Settings: one row per overridden environment variable; `value` is sealed (AES-256-GCM).
+        await db.schema
+          .createTable("app_settings")
+          .ifNotExists()
+          .addColumn("key", "varchar(64)", (col) => col.primaryKey())
+          .addColumn("value", "text", (col) => col.notNull())
+          .addColumn("updated_by", "varchar(64)", (col) => col.notNull())
+          .addColumn("updated_at", c.ts, (col) => col.notNull())
+          .modifyEnd(mysqlTable(d))
+          .execute();
+      },
+      async down(db: AnyDb) {
+        await db.schema.dropTable("app_settings").ifExists().execute();
+      },
+    },
   };
 }

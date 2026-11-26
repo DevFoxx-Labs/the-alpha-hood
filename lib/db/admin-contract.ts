@@ -147,6 +147,41 @@ for (const target of testTargets()) {
       expect(rotated.open(other.seal("x"))).toBe("x");
     });
 
+    it("settings: atomic set + clear, replace in place, sealed at rest", async () => {
+      const t = new Date("2026-11-28T08:00:00.000Z");
+      expect(await s.settings.all()).toEqual([]);
+      await s.settings.write({ set: { SUPPORT_EMAIL: "help@example.test", RAZORPAY_KEY_SECRET: "plain-secret-ABCDEFGH" }, clear: [] }, "stf_a", t);
+      await s.settings.write({ set: {}, clear: [] }, "stf_a", t); // nothing to do
+      expect(await s.settings.all()).toEqual([
+        { key: "RAZORPAY_KEY_SECRET", value: "plain-secret-ABCDEFGH", updatedBy: "stf_a", updatedAt: t.toISOString() },
+        { key: "SUPPORT_EMAIL", value: "help@example.test", updatedBy: "stf_a", updatedAt: t.toISOString() },
+      ]);
+      if (target.cfg) {
+        // At rest every value is ciphertext — public ones too.
+        const raw: unknown =
+          target.cfg.driver === "mongodb"
+            ? await (await getMongo(target.cfg)).db.collection("app_settings").find({}).toArray()
+            : await getSqlDb(target.cfg).selectFrom("app_settings").selectAll().execute();
+        const blob = JSON.stringify(raw);
+        expect(blob).not.toContain("plain-secret-ABCDEFGH");
+        expect(blob).not.toContain("help@example.test");
+        expect(blob).toContain("v1:");
+      }
+      // One change: replace one key, remove another, add a third; parallel writers leave one row per key.
+      const later = new Date(t.getTime() + 1000);
+      await Promise.all([
+        s.settings.write({ set: { SUPPORT_EMAIL: "care@example.test", SUPPORT_HOURS: "Mon–Sat" }, clear: ["RAZORPAY_KEY_SECRET"] }, "stf_b", later),
+        s.settings.write({ set: { SUPPORT_HOURS: "Mon–Sat" }, clear: [] }, "stf_b", later),
+      ]);
+      const rows = await s.settings.all();
+      expect(rows.map((r) => [r.key, r.value, r.updatedBy])).toEqual([
+        ["SUPPORT_EMAIL", "care@example.test", "stf_b"],
+        ["SUPPORT_HOURS", "Mon–Sat", "stf_b"],
+      ]);
+      await s.settings.write({ set: {}, clear: ["SUPPORT_EMAIL", "SUPPORT_HOURS", "NEVER_SAVED"] }, "stf_b");
+      expect(await s.settings.all()).toEqual([]);
+    });
+
     it("audit log: newest first, filters, no update path", async () => {
       for (const i of [1, 2, 3]) await s.audit.append({ actorId: "stf_a", actorEmail: "a@x", action: `test.${i}`, target: i === 2 ? "T2" : "T", details: { i }, ip: "10.0.0.1" }, new Date(Date.parse("2026-11-26T00:00:00Z") + i));
       const all = await s.audit.list({ actorId: "stf_a" });

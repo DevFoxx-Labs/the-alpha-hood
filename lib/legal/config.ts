@@ -1,4 +1,5 @@
 import type { Env } from "@/lib/mock-guard";
+import { live } from "@/lib/settings/version";
 
 /**
  * Legal / contact facts used in every notice. Never invented: each value comes from the environment and,
@@ -47,4 +48,5 @@ export function isPlaceholder(value: string): boolean {
   return value.startsWith(PLACEHOLDER_PREFIX);
 }
 
-export const LEGAL_CONFIG = readLegalConfig();
+/** Re-read after Admin → Settings changes a legal detail (lib/settings/runtime.ts). */
+export const LEGAL_CONFIG: LegalConfig = live(() => readLegalConfig());

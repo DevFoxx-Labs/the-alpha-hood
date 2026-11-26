@@ -24,6 +24,8 @@ import type { MediaStore } from "@/lib/catalog/media";
 import type { Maintenance } from "./retention";
 import { createMongoMaintenance, createSqlMaintenance } from "./stores/maintenance";
 import { createMongoMediaStore, createSqlMediaStore } from "./stores/media";
+import type { SettingsStore } from "@/lib/settings/store";
+import { createMongoSettingsStore, createSqlSettingsStore } from "./stores/settings";
 import { createMongoAudit, createMongoRateCounters, createMongoStaffStore, createSqlAudit, createSqlRateCounters, createSqlStaffStore } from "./stores/admin";
 import {
   createMongoAlertStore,
@@ -104,6 +106,8 @@ export interface DbStores {
   outbox: OutboxStore;
   flows: FlowStore;
   media: MediaStore;
+  /** Admin → Settings: sealed overrides of environment variables. */
+  settings: SettingsStore;
   maintenance: Maintenance;
   /** COMMERCE_PROVIDER=own: catalogue, bag and stock all on this database (built once, cached). */
   own(): OwnCommerce;
@@ -173,6 +177,7 @@ export function createDbStores(cfg: DbConfig): DbStores {
       outbox: createMongoOutbox(conn),
       flows: createMongoFlowStore(conn, p),
       media: createMongoMediaStore(conn),
+      settings: createMongoSettingsStore(conn, createSecretBox()),
       maintenance: createMongoMaintenance(conn),
       ...catalogParts(createMongoCatalogStore(conn), createMongoReviewStore(conn), (catalog) => ({ repo: createMongoCartRepo(conn), inventory: createMongoInventory(conn, p, catalog) })),
     };
@@ -204,6 +209,7 @@ export function createDbStores(cfg: DbConfig): DbStores {
     outbox: createSqlOutbox(db),
     flows: createSqlFlowStore(db, p),
     media: createSqlMediaStore(db),
+    settings: createSqlSettingsStore(db, createSecretBox()),
     maintenance: createSqlMaintenance(db),
     ...catalogParts(createSqlCatalogStore(db), createSqlReviewStore(db), (catalog) => ({ repo: createSqlCartRepo(db), inventory: createSqlInventory(db, p, catalog) })),
   };

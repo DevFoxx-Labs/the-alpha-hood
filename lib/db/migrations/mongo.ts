@@ -217,4 +217,14 @@ export const MONGO_MIGRATIONS: MongoMigration[] = [
       // additive only — nothing to undo
     },
   },
+  {
+    name: "2026_11_28_009_app_settings",
+    async up(db) {
+      // Admin → Settings: _id is the overridden environment variable; `value` is sealed (AES-256-GCM).
+      await ensureCollection(db, "app_settings");
+    },
+    async down(db) {
+      if (await db.listCollections({ name: "app_settings" }, { nameOnly: true }).hasNext()) await db.collection("app_settings").drop();
+    },
+  },
 ];

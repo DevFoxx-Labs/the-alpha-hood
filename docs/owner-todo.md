@@ -200,3 +200,14 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
       password (the authenticator code is still needed to sign in).
 - [ ] Keep a second owner account, or server shell access, for the break-glass case (lost mailbox and phone):
       `pnpm admin:reset-link --email=… --reset-mfa`.
+
+## 2026-11-26 (admin settings)
+- [ ] Production: run the pending migrations through the deploy pipeline (`2026_11_28_008`, `2026_11_28_009`).
+- [ ] `SECRET_BOX_KEY` now also encrypts everything saved in Admin → Settings. Keep it in the password manager;
+  if it is lost, saved settings fall back to the host environment and must be entered again.
+- [ ] Fill Admin → Settings → Legal & Grievance with the real company and Grievance Officer details, and have a
+  lawyer confirm them.
+- [ ] Decide which values stay in the host environment and which are managed in the admin (a value saved in the
+  admin wins). Suggested: keep live Razorpay keys in one place only.
+- [ ] Before adding a tracker ID in Admin → Settings → Analytics & Ads, confirm it is listed in the Cookie Policy
+  and Privacy Notice.

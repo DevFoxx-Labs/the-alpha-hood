@@ -1,5 +1,6 @@
 import { TRACKING } from "@/lib/config/tracking";
 import { activeCookiePurposes, COOKIE_INVENTORY, PURPOSES } from "@/lib/consent/purposes";
+import { live } from "@/lib/settings/version";
 import type { Notice } from "../types";
 
 /**
@@ -7,15 +8,16 @@ import type { Notice } from "../types";
  * policy can never drift from what the site sets. Bump `version` whenever a cookie or category is added —
  * that re-asks every visitor (lib/consent/cookie.ts).
  */
-const active = new Set(activeCookiePurposes(TRACKING));
 
 const categoryLabel = (c: (typeof COOKIE_INVENTORY)[number]["category"]) =>
   c === "necessary" ? "Strictly necessary" : PURPOSES[c].label;
 
-const inUse = (c: (typeof COOKIE_INVENTORY)[number]["category"]) =>
-  c === "necessary" || active.has(c) ? "In use" : "Not in use";
-
-export const COOKIES_NOTICE: Notice = {
+/** Built per settings version: the "In use" column follows the trackers configured right now. */
+function build(): Notice {
+  const active = new Set(activeCookiePurposes(TRACKING));
+  const inUse = (c: (typeof COOKIE_INVENTORY)[number]["category"]) =>
+    c === "necessary" || active.has(c) ? "In use" : "Not in use";
+  return {
   slug: "cookies",
   version: "2026-11-25",
   lastUpdated: "2026-11-25",
@@ -92,4 +94,7 @@ export const COOKIES_NOTICE: Notice = {
       ],
     },
   },
-};
+  };
+}
+
+export const COOKIES_NOTICE: Notice = live(build);

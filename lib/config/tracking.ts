@@ -1,4 +1,5 @@
 import type { Env } from "@/lib/mock-guard";
+import { live } from "@/lib/settings/version";
 
 /**
  * Third-party trackers (ANL-01). Each one is "in use" only when its public ID is configured, and even then
@@ -31,4 +32,5 @@ export function readTracking(env: Env = process.env): TrackingConfig {
   };
 }
 
-export const TRACKING = readTracking();
+/** Re-read after Admin → Settings changes a tracker ID (lib/settings/runtime.ts). */
+export const TRACKING: TrackingConfig = live(() => readTracking());

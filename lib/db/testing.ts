@@ -23,6 +23,7 @@ import { createMemoryCounters } from "@/lib/http/rate-limit";
 import { createMemoryOutbox } from "@/lib/notify/outbox";
 import { createMemoryUgcStore } from "@/lib/ugc/service";
 import { createMemoryMediaStore } from "@/lib/catalog/media";
+import { createMemorySettingsStore } from "@/lib/settings/store";
 import { noMaintenance } from "./stores/maintenance";
 import { createMemoryCreditLedger } from "@/lib/wallet/store-credit";
 import { assertDestructiveAllowed, type DbConfig } from "./config";
@@ -89,6 +90,7 @@ export function testTargets(): Target[] {
           outbox: createMemoryOutbox(),
           flows: createMemoryFlowStore(),
           media: createMemoryMediaStore(),
+          settings: createMemorySettingsStore(),
           maintenance: noMaintenance,
         };
       },
@@ -131,6 +133,7 @@ export function testTargets(): Target[] {
           outbox: s.outbox,
           flows: s.flows,
           media: s.media,
+          settings: s.settings,
           maintenance: s.maintenance,
         };
       },

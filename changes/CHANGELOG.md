@@ -1,5 +1,104 @@
 # Change log
 
+## 2026-11-26 — Admin → Settings (from the AstroGaon panel) + faster, steadier admin shell
+
+**Asked for:** bring the AstroGaon admin's settings to this admin, keep that panel's look, stop the layout moving
+about, and make the admin load fast.
+
+**What the AstroGaon panel manages, and what came across**
+
+| AstroGaon (Platform Settings + Integrations) | Here |
+| --- | --- |
+| General: support email / phone | **General**: support email, phone, hours, footer social links |
+| Legal & Grievance (DPDP contacts) | **Legal & Grievance**: company name, address, GSTIN, jurisdiction, privacy email, Grievance Officer |
+| Security / Marketplace switches | **Checkout & Accounts**: checkout, cash on delivery, customer accounts (kill switches) |
+| Integrations: Razorpay | **Payments**: gateway, key ID, key secret, webhook secret (authenticator code to save) |
+| Integrations: Analytics | **Analytics & Ads**: GA4 ID + API secret, Meta Pixel + Conversions API token + test code, Google Ads ID + label |
+| — | **Search Engines**: allow indexing |
+| Encrypted at rest, secrets write-only, "Database / .env / Not set" badge, blank = keep, "remove" = back to .env | Same behaviour |
+
+Not brought across because this store has no such feature to configure: video calls, chat transport, expert
+community + WhatsApp QR, marketplace visibility, careers page, blog text-to-speech, vendor fees, AstroEngine, Nutan
+feed, FCM, TURN, Jitsi, Anam, AdSense, Redis. Listed as gaps (`docs/known-gaps.md`): shipping / COD fees and return
+windows, per-event notification channels, SMS / email / Turnstile / Sentry keys.
+
+**Added**
+- `lib/settings`: `catalog.ts` (the one place a setting is declared), `store.ts` (interface + memory),
+  `runtime.ts` (saved values override their environment variable in this process), `service.ts` (payload,
+  validation, atomic save), `version.ts` (`live()` config objects that re-read after a save).
+- `lib/db/stores/settings.ts` for MySQL / PostgreSQL / MongoDB; migration `2026_11_28_009_app_settings` (additive,
+  reversible); every value sealed with the secret box (AES-256-GCM). Contract test on all configured engines.
+- `GET /api/admin/settings`, `PUT /api/admin/settings/[group]`; permission `settings.manage` (owner only).
+- `/admin/settings` + `components/admin/settings.tsx`: section list on the left, one card on the right, one save
+  per section — the AstroGaon layout. Sidebar item "Settings" (last) and a link in the user menu.
+- `instrumentation.ts`: applies saved settings before the first request and refreshes every 60 s (other servers).
+- `lib/admin/server.ts`: reads the signed-in staff member on the server for layouts and pages.
+- `confirmTotp` (step-up): payment keys need a fresh authenticator code even inside a signed-in session.
+
+**Changed — admin shell (look matched to the AstroGaon layout, no movement on load)**
+- The shell is in the first HTML: the layout reads the session on the server and passes it down. Before, every
+  full load showed a full-screen spinner while `/api/admin/me` loaded, then the panel appeared.
+- Sidebar collapsed state is a cookie the server reads, so the sidebar renders at its final width. Before, it
+  rendered expanded and jumped to collapsed after hydration.
+- Sidebar counts are fetched after a mutation or at most once a minute, not on every navigation.
+- Topbar like the reference: calendar icon + full date, bell with a count, avatar with initials + name + email +
+  chevron, role chip in the menu, red "Log out". Sidebar footer keeps only the theme switch (centred).
+  Mobile topbar: bell + avatar + log out.
+- Mobile bottom bar: a role with more than five sections gets a "More" tab holding the rest. Before, the sixth
+  section (Admin: Staff, Audit log) could not be reached on a phone.
+- `LEGAL_CONFIG`, `TRACKING` and the Cookie Policy table are now live objects: they follow a saved setting
+  without a restart. Their call sites are unchanged.
+
+**Decisions**
+- Saved settings are applied onto `process.env` for the catalogued keys only. Every reader already takes
+  `env = process.env` at call time, so the kill switches, gateway, trackers and notices pick a change up with no
+  second code path. Nothing saved = the environment value, exactly as before.
+- Never settable from the admin: database URL, `SECRET_BOX_KEY`, `OTP_PEPPER`, `CRON_SECRET`,
+  `ADMIN_SETUP_TOKEN`, `SITE_URL`, provider wiring, and the preview switches (`ALLOW_MOCK_DATA`,
+  `ALLOW_MOCK_PAYMENTS`, `ENABLE_DEV_PAGES`). A test fails if one is added to the catalogue.
+- Active section colour is the admin brand accent (red), where AstroGaon uses its amber.
+- No new package.
+
+**Threat model (High tier: admin powers + payment credentials)**
+- Assets: payment keys and webhook secret (where the money goes), tracker tokens, kill switches, legal details
+  shown to every shopper. Actors: guest, non-owner staff, stolen owner session, cross-site attacker, someone with a
+  database dump.
+- Non-owner staff reads or changes settings → `settings.manage` on both routes, owner only (prevent, tested 403).
+- No session → 401 (prevent, tested). Cross-site PUT → same-origin check (prevent, tested 403).
+- Stolen owner session swaps the Razorpay keys → fresh TOTP required, single use, 5 tries per 10 minutes per
+  staff member (prevent, tested 401 / replay / 429); the change is in the audit log (detect).
+- Admin turns on demo payments or dev pages, or repoints the database → those keys are not in the catalogue;
+  unknown group 404, unknown field 422 (prevent, tested).
+- Secret read back through the page or API → never in the payload, the save response or the audit log; only length
+  + fingerprint (prevent, tested).
+- Database dump → every value is ciphertext (prevent, tested on the real engine).
+- Stored XSS / header injection through a setting → allow-list per field: https-only URLs without credentials,
+  strict ID patterns, no control characters or line breaks (prevent, tested).
+- Half-saved group → one transaction; one writer at a time (prevent, tested).
+- Encryption key changed → unreadable rows fall back to the environment, are named on the page and logged once
+  (detect + recover, tested).
+- Settings pulled into the browser bundle → guard test on client imports (enforce).
+
+**Verification**
+- `pnpm typecheck` ✓ · `pnpm lint` ✓ (0 warnings) · `pnpm build` ✓ with a throwaway `SECRET_BOX_KEY` for that
+  command only (the first attempt failed on a stale Turbopack cache from a keyless run; it passed on re-run).
+- New tests: `lib/settings/settings.test.ts` (9), settings contract on memory + local MongoDB, 3 API tests in
+  `app/api/admin-api.test.ts`, navigation test in `components/admin/ui.test.ts`.
+- `pnpm test`: 476 of 477 pass. The one failure is the MongoDB catalogue test already in `docs/known-gaps.md`
+  (`lib/db/contract.test.ts` › "style editor, CSV export -> import and bulk actions"; today's message: "Olive:
+  Choose a valid placeholder drawing"). This change does not touch that code.
+- Local dev database (`mongodb://127.0.0.1:27018/alpha_hood_dev`, environment: local): `pnpm db:migrate` applied
+  `008_staff_password_reset` and `009_app_settings`.
+- Headless Chrome on a memory-only dev server (throwaway owner), 1440 / 390 / 360, light + dark, sidebar expanded +
+  collapsed: overflow-x 0, console clean, no spinner frame seen, sidebar 224 / 56 px from the first paint,
+  `/admin/settings` makes no `/api/admin/me` or settings fetch. Shell visible 180–370 ms after navigation (dev mode).
+  Save flow: bad email → field error + toast; valid save → 18 ms, badge "Saved here", value in the HTML after
+  reload, the Instagram link appears in the storefront footer. Mobile "More" tab lists Reports, Staff, Audit log,
+  View store, Settings.
+- Not measured: Lighthouse / production timings (dev mode only).
+- MySQL / PostgreSQL: the settings store is written and typed for both, but only memory and MongoDB ran here (no
+  `TEST_MYSQL_URL` / `TEST_POSTGRES_URL` on this machine).
+
 ## 2026-11-25 — PLP-08 collection rail: design fixes from docs/rail.md + real Alpha Hood photos
 
 Compared our rail with the reference component in `docs/rail.md` and fixed every design flaw found:

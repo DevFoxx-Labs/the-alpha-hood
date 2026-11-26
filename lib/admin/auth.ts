@@ -127,6 +127,22 @@ export async function totpStep(store: StaffStore, ticket: string, code: unknown,
   return { token: await createAdminSession(store, staff.id, now), staff: fresh };
 }
 
+/**
+ * Step-up for the most sensitive admin writes (payment keys): a fresh authenticator code inside an already
+ * signed-in session, so a stolen session cookie alone can't redirect the store's money. Attempts are limited per
+ * staff member; a code is accepted once (same replay rule as sign-in).
+ */
+export async function confirmTotp(staff: Staff, code: unknown, store: StaffStore = resolveStaffStore(), now = Date.now()): Promise<void> {
+  const rl = await rateLimiter.hit(`admin:stepup:${staff.id}`, 5, 10 * 60_000);
+  if (!rl.ok) throw new AdminAuthError(429, "rate_limited", "Too many attempts. Try again in a few minutes.");
+  const fresh = await store.get(staff.id);
+  const step = fresh?.totpSecret && typeof code === "string" ? verifyTotp(fresh.totpSecret, code.trim(), now, fresh.lastTotpStep) : null;
+  if (!fresh || step === null || !(await store.useTotpStep(fresh.id, step, new Date(now).toISOString(), null))) {
+    securityEvent("otp_verify_failed", { staff: staff.id, kind: "admin_stepup" });
+    throw new AdminAuthError(401, "invalid_code", "That code is incorrect. Use a new code from your authenticator app.");
+  }
+}
+
 /** Invite acceptance: single use (atomic), UNIQUE email, own password. */
 export async function acceptInvite(store: StaffStore, token: unknown, password: unknown, now = Date.now()) {
   const tokenOk = typeof token === "string" && /^[A-Za-z0-9_-]{40,60}$/.test(token);

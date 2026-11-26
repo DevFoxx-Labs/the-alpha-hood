@@ -29,10 +29,12 @@ export const PERMISSIONS = [
   "ugc.moderate",
   "giftcards.issue",
   "subscribers.read", // newsletter list (masked) + full-contact CSV export (audited)
+  "settings.manage", // store settings, kill switches and integration keys — owner only
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
 const ALL = [...PERMISSIONS];
+// "settings.manage" is deliberately in no list below: only the owner (ALL) holds it.
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   owner: ALL,

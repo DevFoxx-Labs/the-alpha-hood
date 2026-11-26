@@ -34,6 +34,10 @@ import { PATCH as staffPATCH } from "./admin/staff/[id]/route";
 import { POST as resetLinkPOST } from "./admin/staff/[id]/reset-link/route";
 import { POST as forgotPOST } from "./admin/password/forgot/route";
 import { GET as subscribersGET } from "./admin/subscribers/route";
+import { GET as settingsGET } from "./admin/settings/route";
+import { PUT as settingsPUT } from "./admin/settings/[group]/route";
+import { resetSettingsRuntime } from "@/lib/settings/runtime";
+import { resolveSettingsStore } from "@/lib/settings/store";
 import { GET as subscribersExportGET } from "./admin/subscribers/export/route";
 import { POST as newsletterPOST } from "./newsletter/route";
 import { POST as resetPOST } from "./admin/password/reset/route";
@@ -151,7 +155,7 @@ describe("guard: every admin route checks staff + permission", () => {
 
   it("one persistent admin shell: it lives in the (panel) layout, never inside a page (no remount per click)", () => {
     const panel = join(process.cwd(), "app", "admin", "(panel)");
-    expect(readFileSync(join(panel, "layout.tsx"), "utf8")).toContain("<AdminShell>");
+    expect(readFileSync(join(panel, "layout.tsx"), "utf8")).toContain("<AdminShell");
     // A loading boundary makes sidebar clicks switch the page area at once (dynamic, personal pages).
     expect(readFileSync(join(panel, "loading.tsx"), "utf8")).toContain("aria-busy");
     const pages: string[] = [];
@@ -508,5 +512,87 @@ describe("catalogue bulk / CSV routes: authorization", () => {
     expect((await bulkPOST(req("/api/admin/catalog/bulk", "POST", { action: "archive", styleIds: ["style_a"] }, { cookie: owner }))).status).toBe(409);
     expect((await importPOST(req("/api/admin/catalog/import", "POST", { csv: "x", apply: false }, { cookie: owner }))).status).toBe(409);
     expect((await exportGET(req("/api/admin/catalog/export", "GET", undefined, { cookie: owner }))).status).toBe(409);
+  });
+});
+
+describe("settings (owner only, lib/settings)", () => {
+  const put = (group: string, body: unknown, cookie?: string, headers?: Record<string, string>) =>
+    settingsPUT(req(`/api/admin/settings/${group}`, "PUT", body, { cookie, headers }), p({ group }));
+  const wipe = async () => {
+    const store = resolveSettingsStore();
+    await store.write({ set: {}, clear: (await store.all()).map((r) => r.key) }, "test");
+    resetSettingsRuntime();
+  };
+
+  it("401 without a session; 403 for every role but the owner; cross-origin refused; unknown group and field rejected", async () => {
+    try {
+      expect((await settingsGET(req("/api/admin/settings", "GET"))).status).toBe(401);
+      expect((await put("general", { fields: { SUPPORT_HOURS: "x" } })).status).toBe(401);
+      for (const role of Object.keys(ROLE_PERMISSIONS)) if (role !== "owner") expect(can(role as never, "settings.manage"), role).toBe(false);
+      const manager = await invite(`mgr-${ip}@example.test`, "store_manager");
+      expect((await settingsGET(req("/api/admin/settings", "GET", undefined, { cookie: manager }))).status).toBe(403);
+      expect((await put("checkout", { fields: { CHECKOUT_ENABLED: false } }, manager)).status).toBe(403);
+      expect((await put("general", { fields: { SUPPORT_HOURS: "x" } }, owner, { origin: "https://evil.example" })).status).toBe(403);
+      expect((await put("nope", { fields: {} }, owner)).status).toBe(404);
+      expect((await put("general", { fields: { ALLOW_MOCK_PAYMENTS: "true" } }, owner)).status).toBe(422);
+      expect((await put("general", { fields: { DATABASE_URL: "mysql://x" } }, owner)).status).toBe(422);
+      expect(await resolveSettingsStore().all()).toEqual([]);
+    } finally {
+      await wipe();
+    }
+  });
+
+  it("owner saves a group: in use at once, field errors returned, audit names the fields but never the values", async () => {
+    try {
+      const bad = await put("general", { fields: { SUPPORT_EMAIL: "nope", SOCIAL_INSTAGRAM_URL: "javascript:alert(1)" } }, owner);
+      expect(bad.status).toBe(422);
+      expect(Object.keys((await bad.json()).error.fields).sort()).toEqual(["SOCIAL_INSTAGRAM_URL", "SUPPORT_EMAIL"]);
+
+      const ok = await put("general", { fields: { SUPPORT_EMAIL: "care@example.test" } }, owner);
+      expect(ok.status).toBe(200);
+      expect(ok.headers.get("cache-control")).toContain("no-store");
+      expect((await ok.json()).changed).toEqual(["SUPPORT_EMAIL"]);
+      expect(process.env.SUPPORT_EMAIL).toBe("care@example.test");
+
+      // Kill switch: checkout off stops new orders on the very next request.
+      expect((await put("checkout", { fields: { CHECKOUT_ENABLED: false } }, owner)).status).toBe(200);
+      expect(process.env.CHECKOUT_ENABLED).toBe("false");
+
+      const audits = await resolveAudit().list({ target: "settings:general" });
+      expect(audits[0]).toMatchObject({ action: "settings.update", details: { fields: "SUPPORT_EMAIL", count: 1 } });
+      expect(JSON.stringify(audits)).not.toContain("care@example.test");
+    } finally {
+      await wipe();
+    }
+  });
+
+  it("payment keys need a fresh authenticator code (step-up), are never sent back, and wrong codes are limited", async () => {
+    try {
+      const secret = "rzp-secret-value-ABCDEFGH123";
+      const body = { fields: { RAZORPAY_KEY_SECRET: secret } };
+      expect((await put("payments", body, owner)).status).toBe(401); // no code
+      expect((await put("payments", { ...body, code: "000000" }, owner)).status).toBe(401);
+      // The code that signed this session in can't be replayed for the step-up.
+      const used = totpAt(secrets.get("owner@example.test")!, Math.floor(Date.now() / 30_000));
+      expect((await put("payments", { ...body, code: used }, owner)).status).toBe(401);
+      expect(await resolveSettingsStore().all()).toEqual([]);
+
+      tick();
+      const code = totpAt(secrets.get("owner@example.test")!, Math.floor(Date.now() / 30_000));
+      const ok = await put("payments", { ...body, code }, owner);
+      expect(ok.status).toBe(200);
+      const text = await ok.text();
+      expect(text).not.toContain(secret);
+      const page = await (await settingsGET(req("/api/admin/settings", "GET", undefined, { cookie: owner }))).text();
+      expect(page).not.toContain(secret);
+      expect(JSON.stringify(await resolveAudit().list({ target: "settings:payments" }))).not.toContain(secret);
+
+      // Guessing is capped per staff member (5 per 10 minutes), whatever the IP.
+      let last = 0;
+      for (let i = 0; i < 6; i++) last = (await put("payments", { ...body, code: "111111" }, owner, { "x-forwarded-for": `100.70.0.${i + 1}` })).status;
+      expect(last).toBe(429);
+    } finally {
+      await wipe();
+    }
   });
 });

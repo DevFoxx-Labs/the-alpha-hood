@@ -328,7 +328,16 @@ export interface ProductMediaTable {
   created_by: string;
 }
 
+export interface AppSettingsTable {
+  key: string;
+  /** Sealed with the secret box (lib/db/secret-box.ts). */
+  value: string;
+  updated_by: string;
+  updated_at: Date;
+}
+
 export interface Database {
+  app_settings: AppSettingsTable;
   product_media: ProductMediaTable;
   staff: StaffTable;
   staff_invites: StaffInvitesTable;
