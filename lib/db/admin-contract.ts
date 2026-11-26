@@ -232,6 +232,11 @@ for (const target of testTargets()) {
         await s.media.save({ id, type: "image/png", width: 800, height: 800, bytes: new Uint8Array([0x89, 0x50, 7]), createdAt: "2026-11-29T00:00:00.000Z", createdBy: "stf_a" });
         expect([...(await s.media.get(id))!.bytes]).toEqual([0x89, 0x50, 7]);
         expect((await s.media.existing([id])).has(id)).toBe(true);
+        const gone = `med_${"d".repeat(32)}`;
+        await s.media.save({ id: gone, type: "image/png", width: 1, height: 1, bytes: new Uint8Array([0x89, 0x50, 8]), createdAt: "2026-11-29T00:00:00.000Z", createdBy: "review:sub_x" });
+        await s.media.remove(gone);
+        expect(await s.media.get(gone)).toBeNull();
+        await s.media.remove(gone); // already gone = no-op
         if (target.cfg) {
           const raw =
             target.cfg.driver === "mongodb"

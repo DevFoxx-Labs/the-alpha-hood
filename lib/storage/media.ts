@@ -32,5 +32,13 @@ export function withObjectStorage(inner: MediaStore): MediaStore {
       return { ...item, bytes: await backend.get(m[2]) } satisfies MediaItem;
     },
     existing: (ids) => inner.existing(ids),
+    // The file on the backend that holds it first (so no row points at nothing), then the row.
+    async remove(id) {
+      const item = await inner.get(id);
+      if (!item) return;
+      const m = item.storageKey ? STORED_RE.exec(item.storageKey) : null;
+      if (m) await backendOf(m[1] as BackendKind)?.delete(m[2]);
+      await inner.remove(id);
+    },
   };
 }

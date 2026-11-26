@@ -45,6 +45,75 @@ interface MyReview extends ToReview {
   fit: "small" | "true" | "large";
   author: string;
   rejectReason?: string;
+  photoIds: string[];
+  reply: { text: string; at: string } | null;
+}
+
+const MAX_PHOTOS = 3;
+const ownPhoto = (id: string) => `/api/returns/photos/${id}`;
+
+/** Add up to 3 photos (JPEG / PNG, ≤ 5 MB). Private until the review is approved; metadata is removed on upload. */
+function PhotoPicker({ value, onChange }: { value: string[]; onChange: (ids: string[]) => void }) {
+  const id = useId();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const upload = async (file: File) => {
+    if (value.length >= MAX_PHOTOS) return;
+    if (!["image/jpeg", "image/png"].includes(file.type) || file.size > 5 * 1024 * 1024) return setError("Photos must be JPEG or PNG and 5 MB or smaller.");
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/returns/photos", { method: "POST", headers: { "Content-Type": file.type }, body: file });
+      const data = (await res.json().catch(() => null)) as { id?: string; error?: { message?: string } } | null;
+      if (!res.ok || !data?.id) throw new Error(data?.error?.message ?? "Upload failed.");
+      onChange([...value, data.id]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="grid gap-1.5">
+      <span className="text-[12px] font-bold uppercase tracking-[0.06em]">
+        Photos <span className="font-normal normal-case tracking-normal text-ink-2">(optional, up to {MAX_PHOTOS})</span>
+      </span>
+      <div className="flex flex-wrap items-center gap-2">
+        {value.map((pid, i) => (
+          <div key={pid} className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element -- private, owner-only image served by our API */}
+            <img src={ownPhoto(pid)} alt={`Your photo ${i + 1}`} className="h-20 w-16 border border-line object-cover" />
+            <button type="button" onClick={() => onChange(value.filter((x) => x !== pid))} aria-label={`Remove photo ${i + 1}`} className="absolute -right-2 -top-2 grid size-6 place-items-center rounded-full bg-black text-[12px] text-white">
+              ×
+            </button>
+          </div>
+        ))}
+        {value.length < MAX_PHOTOS ? (
+          <label htmlFor={id} className={cn("grid h-20 w-16 cursor-pointer place-items-center border border-dashed border-ink-2 text-center text-[11px] font-semibold", busy && "opacity-50")}>
+            {busy ? "Uploading…" : "+ Add photo"}
+            <input
+              id={id}
+              type="file"
+              accept="image/jpeg,image/png"
+              className="sr-only"
+              disabled={busy}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) void upload(f);
+              }}
+            />
+          </label>
+        ) : null}
+      </div>
+      <p className="text-[12px] text-ink-2">Photos of the product as you wear it help most. We remove location and camera details. Shown only after our check.</p>
+      {error ? (
+        <p role="alert" className="text-[12px] font-semibold text-accent">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 const STATUS: Record<MyReview["status"], { label: string; cls: string }> = {
@@ -75,6 +144,7 @@ function ReviewForm({ item, existing, onDone, onCancel }: { item: ToReview; exis
   const [title, setTitle] = useState(existing?.title ?? "");
   const [body, setBody] = useState(existing?.body ?? "");
   const [fit, setFit] = useState<MyReview["fit"]>(existing?.fit ?? "true");
+  const [photos, setPhotos] = useState<string[]>(existing?.photoIds ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,8 +154,8 @@ function ReviewForm({ item, existing, onDone, onCancel }: { item: ToReview; exis
     setBusy(true);
     setError(null);
     try {
-      if (existing) await api(`/api/account/reviews/${existing.id}`, { method: "PATCH", body: { rating, title, body, fit } });
-      else await api("/api/account/reviews", { method: "POST", body: { orderNumber: item.orderNumber, lineId: item.lineId, rating, title, body, fit } });
+      if (existing) await api(`/api/account/reviews/${existing.id}`, { method: "PATCH", body: { rating, title, body, fit, photos } });
+      else await api("/api/account/reviews", { method: "POST", body: { orderNumber: item.orderNumber, lineId: item.lineId, rating, title, body, fit, photos } });
       showMessageToast(existing ? "Review updated — it'll be live again after a quick check." : "Thanks! Your review will be live after a quick check.");
       onDone();
     } catch (err) {
@@ -132,6 +202,7 @@ function ReviewForm({ item, existing, onDone, onCancel }: { item: ToReview; exis
         <textarea id={`${id}-b`} rows={5} maxLength={1500} value={body} onChange={(e) => setBody(e.target.value)} className="border border-input bg-white px-3 py-2 text-[14px] outline-none focus-visible:border-black" placeholder="Fabric, fit, colour, how it washed — what would help another shopper?" />
         <p className="text-[12px] text-ink-2">At least 20 characters. Shown with your first name and last initial and a “Verified buyer” badge — never your phone or email.</p>
       </div>
+      <PhotoPicker value={photos} onChange={setPhotos} />
       {error ? (
         <p role="alert" className="text-[13px] font-semibold text-accent">
           {error}
@@ -232,6 +303,20 @@ export function ReviewsView() {
                     </div>
                     <p className="mt-2 text-[14px] font-semibold">{r.title}</p>
                     <p className="mt-1 whitespace-pre-line text-[13px] leading-relaxed text-ink-2">{r.body}</p>
+                    {r.photoIds.length ? (
+                      <div className="mt-2 flex gap-2">
+                        {r.photoIds.map((pid, i) => (
+                          // eslint-disable-next-line @next/next/no-img-element -- private, owner-only image served by our API
+                          <img key={pid} src={ownPhoto(pid)} alt={`Your photo ${i + 1}`} className="h-16 w-12 border border-line object-cover" />
+                        ))}
+                      </div>
+                    ) : null}
+                    {r.reply ? (
+                      <div className="mt-3 border-l-2 border-black pl-3">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.1em]">Reply from The Alpha Hood · {dateLabel(r.reply.at)}</p>
+                        <p className="mt-1 whitespace-pre-line text-[13px] text-ink-2">{r.reply.text}</p>
+                      </div>
+                    ) : null}
                     {r.status === "rejected" && r.rejectReason ? <p className="mt-2 text-[12px] text-accent">Why: {r.rejectReason} — edit it and we&apos;ll check it again.</p> : null}
                     <p className="mt-2 text-[11px] text-ink-2">Written {dateLabel(r.createdAt)} as “{r.author}”</p>
                   </div>

@@ -15,6 +15,8 @@ export interface ReviewStore {
   insertMany(reviews: Review[]): Promise<void>;
   /** Removes one review and its helpful votes (a customer deleted or edited it, or erased their account). */
   remove(id: string): Promise<boolean>;
+  /** Sets (or with null removes) the store's public reply. Helpful votes are kept. False when the review is gone. */
+  setReply(id: string, reply: { text: string; at: string } | null): Promise<boolean>;
   /** How many reviews have an id starting with `prefix` (go-live check: demo reviews are `rv_style_…`). */
   countByIdPrefix(prefix: string): Promise<number>;
 }
@@ -71,6 +73,12 @@ export function createMemoryReviewStore(initial: Review[] = []): ReviewStore {
     async insertMany(list) {
       const have = new Set(reviews.map((r) => r.id));
       for (const r of list) if (!have.has(r.id)) reviews.push({ ...r });
+    },
+    async setReply(id, reply) {
+      const r = reviews.find((x) => x.id === id);
+      if (!r) return false;
+      r.reply = reply;
+      return true;
     },
     async remove(id) {
       const i = reviews.findIndex((r) => r.id === id);

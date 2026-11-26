@@ -75,13 +75,15 @@ export function ReviewCard({
   meta,
   verified,
   photos = [],
+  reply = null,
 }: {
   rating: number;
   title: string;
   body: string;
   meta: string;
   verified: boolean;
-  photos?: Pick<ProductImage, "art" | "colour" | "alt">[];
+  photos?: Pick<ProductImage, "art" | "colour" | "alt" | "url">[];
+  reply?: { text: string; at: string } | null;
 }) {
   return (
     <article className="border-b border-line py-5 first:pt-0">
@@ -101,11 +103,17 @@ export function ReviewCard({
       {photos.length > 0 ? (
         <div className="mt-3 flex gap-2">
           {photos.map((p, i) => (
-            <GarmentArt key={i} image={p} className="h-20 w-16" />
+            <GarmentArt key={i} image={{ ...p, alt: p.alt || `Photo ${i + 1} from this review` }} sizes="64px" className="h-20 w-16" />
           ))}
         </div>
       ) : null}
       <p className="mt-2.5 text-[11px] text-muted">{meta}</p>
+      {reply ? (
+        <div className="mt-3 border-l-2 border-black pl-3">
+          <p className="text-[11px] font-bold uppercase tracking-[0.1em]">Reply from The Alpha Hood</p>
+          <p className="type-body mt-1 whitespace-pre-line text-ink-2">{reply.text}</p>
+        </div>
+      ) : null}
     </article>
   );
 }

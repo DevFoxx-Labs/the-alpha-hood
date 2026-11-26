@@ -2,6 +2,7 @@ import { ValidationError } from "@/lib/http/guard";
 import { ORDER_NUMBER_RE } from "@/lib/checkout/parse";
 import { type OrderStore, resolveOrders } from "@/lib/orders/store";
 import { asObject, cleanText, rejectUnknownFields } from "@/lib/validation";
+import { notify } from "@/lib/notify/outbox";
 import { resolveSubmissions, type Submission, type SubmissionStore } from "./store";
 
 /**
@@ -69,7 +70,7 @@ export async function sendFeedback(customerId: string, body: unknown, d: { submi
 }
 
 /** Staff reply / close (permission `feedback.manage`). */
-export async function answerFeedback(id: string, body: unknown, staffId: string, d: { submissions?: SubmissionStore } = {}) {
+export async function answerFeedback(id: string, body: unknown, staffId: string, d: { submissions?: SubmissionStore; notify?: (customerId: string, template: "feedback_answered", refs: Record<string, string>) => Promise<unknown> } = {}) {
   const submissions = d.submissions ?? resolveSubmissions();
   const input = asObject(body);
   rejectUnknownFields(input, ["reply", "status"]);
@@ -80,6 +81,8 @@ export async function answerFeedback(id: string, body: unknown, staffId: string,
   const doc: FeedbackDoc = { ...s.doc, ...(reply !== s.doc.reply ? { reply, repliedAt: new Date().toISOString(), repliedBy: staffId } : {}) };
   const next = await submissions.update<FeedbackDoc>(id, ["open", "resolved"], status, doc);
   if (!next) throw new FeedbackError(409, "busy", "This message just changed. Reload and try again.");
+  // A new reply → tell the customer (email, Notifications → Reviews & help). Re-saving the same reply sends nothing.
+  if (reply && reply !== s.doc.reply) await (d.notify ?? ((c, t, r) => notify(c, t, r)))(s.customerId, "feedback_answered", {}).catch(() => undefined);
   return next;
 }
 

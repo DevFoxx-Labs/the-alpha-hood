@@ -30,6 +30,10 @@ const T: Record<Template, { needs: string[]; subject: (r: Refs) => string; lines
   price_drop: { needs: ["handle"], subject: () => "A price dropped", lines: () => ["Something you're watching just got cheaper."], link: product },
   abandoned_checkout_1h: { needs: [], subject: () => "Your bag is waiting", lines: () => ["You left something in your bag. It's saved for you."], link: () => "/bag" },
   abandoned_checkout_24h: { needs: [], subject: () => "Still thinking it over?", lines: () => ["Your bag is still saved. Sizes and stock can change."], link: () => "/bag" },
+  review_published: { needs: ["handle"], subject: () => "Your review is live", lines: () => ["Thanks — your review passed our check and is now on the product page, with a “Verified buyer” badge."], link: product },
+  review_rejected: { needs: [], subject: () => "About your review", lines: () => ["We couldn't publish your review as it is. The reason is in My reviews — edit it and we'll check it again."], link: () => "/account/reviews" },
+  review_replied: { needs: ["handle"], subject: () => "We replied to your review", lines: () => ["We've posted a reply under your review."], link: product },
+  feedback_answered: { needs: [], subject: () => "We replied to your message", lines: () => ["Our team has answered your message. Read the reply in your account."], link: () => "/account/help" },
   new_device_sign_in: {
     needs: ["device", "when"],
     subject: () => "New sign-in to your The Alpha Hood account",

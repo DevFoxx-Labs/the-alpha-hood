@@ -255,3 +255,8 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] Decide who moderates reviews (`/admin/reviews`) and answers feedback (`/admin/feedback`), and how fast.
 - [ ] Lawyer: Privacy Notice 2026-11-30 (addresses for someone else, location, reviews, feedback, map providers).
 - [ ] Production: run migrations `2026_11_30_014` and `2026_11_30_015` through the deploy pipeline.
+
+## 2026-12-01 (review photos, store replies, review / feedback emails)
+- [ ] Lawyer: Privacy Notice 2026-12-01 (review photos, public store replies, review / feedback emails).
+- [ ] Tell moderators what a review photo may not show (other people's faces, addresses, phone numbers, nudity).
+- [ ] Check Admin → Settings → Notifications → "Reviews & help" and switch off any email you don't want sent.

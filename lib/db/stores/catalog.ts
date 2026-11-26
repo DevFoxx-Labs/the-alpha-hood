@@ -164,6 +164,16 @@ export function createSqlReviewStore(db: SqlDb): ReviewStore {
         }
       }
     },
+    async setReply(id, reply) {
+      // The reply lives in the review document; `helpful` (its own column) is untouched.
+      return sqlTx(db, async (trx) => {
+        const row = await trx.selectFrom("reviews").select("doc").where("id", "=", id).forUpdate().executeTakeFirst();
+        if (!row) return false;
+        const doc = { ...fromJson<Review>(row.doc, null as unknown as Review), reply };
+        await trx.updateTable("reviews").set({ doc: JSON.stringify(doc) }).where("id", "=", id).execute();
+        return true;
+      });
+    },
     async remove(id) {
       return sqlTx(db, async (trx) => {
         await trx.deleteFrom("review_votes").where("review_id", "=", id).execute();
@@ -312,6 +322,9 @@ export function createMongoReviewStore(conn: Promise<MongoConn>): ReviewStore {
       if (!list.length) return;
       const ops = list.map((r) => ({ updateOne: { filter: { _id: r.id }, update: { $setOnInsert: { ...r } }, upsert: true } }));
       await (await col()).bulkWrite(ops, { ordered: false, ignoreUndefined: true });
+    },
+    async setReply(id, reply) {
+      return (await (await col()).updateOne({ _id: id }, { $set: { reply } })).matchedCount === 1;
     },
     async remove(id) {
       const c = await conn;

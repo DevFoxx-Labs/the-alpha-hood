@@ -28,10 +28,11 @@
   Google in Settings → Maps (or a paid Nominatim host). Check the OSM tile usage policy for your volume.
 - 🟠 **No CSP yet** — once a Content-Security-Policy is added, allow `tile.openstreetmap.org` /
   `api.maptiler.com` in `img-src`.
-- 🟡 Review photos are not supported (text, stars and fit only). The upload pipeline from return photos could be
-  reused with moderation.
-- 🟡 Customers aren't notified when their review is published / rejected or their feedback answered (they see it
-  in the account). Add `review_decided` / `feedback_answered` to the notification catalogue.
+- 🟡 Review photos removed after an edit / delete may stay in a CDN or browser cache for up to a year
+  (`/api/media/<id>` is `immutable`). Purge the CDN path on removal once a CDN is in front (`lib/storage/media.ts`).
+- 🟡 Private review photos replaced in an edit stay attached to that review (owner can still see them) until the
+  retention job for unattached / old photos exists (`lib/returns/photos.ts`).
+- 🟡 Review photos are not auto-checked for faces / nudity; moderators check them by eye in Admin → Reviews.
 - 🟡 Couriers don't receive the map pin yet: no shipping provider adapter exists (labels show the address text).
 - 🟡 Addresses saved before this change have no pin, no alternate number and no default until the customer
   edits them; the first one becomes default only when another is added or set.

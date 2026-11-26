@@ -3,7 +3,8 @@ import { commerceErrorResponse, privateJson, requireAccount } from "@/lib/http/c
 import { MAX_PHOTO_BYTES, resolvePhotos } from "@/lib/returns/photos";
 
 /**
- * POST /api/returns/photos — raw JPEG/PNG body (≤ 5 MB) → `{ id }`. Signed-in customers only, 20 uploads per
+ * POST /api/returns/photos — raw JPEG/PNG body (≤ 5 MB) → `{ id }`, for a return or a review (attached to one only).
+ * Signed-in customers only, 20 uploads per
  * day each plus a per-IP limit. Type is verified by magic bytes; metadata (EXIF/GPS) is stripped.
  */
 export async function POST(request: Request) {

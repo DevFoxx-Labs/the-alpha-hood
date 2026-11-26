@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const rows = await resolveSubmissions().listByStatus<ReviewDoc>("review", status, 200);
     return privateJson({
       status,
-      reviews: rows.map((s) => ({ id: s.id, status: s.status, createdAt: s.createdAt, author: s.doc.author, productTitle: s.doc.productTitle, productHandle: s.doc.productHandle, size: s.doc.size, rating: s.doc.rating, title: s.doc.title, body: s.doc.body, fit: s.doc.fit, orderNumber: s.doc.orderNumber, rejectReason: s.doc.rejectReason ?? null })),
+      reviews: rows.map((s) => ({ id: s.id, status: s.status, createdAt: s.createdAt, author: s.doc.author, productTitle: s.doc.productTitle, productHandle: s.doc.productHandle, size: s.doc.size, rating: s.doc.rating, title: s.doc.title, body: s.doc.body, fit: s.doc.fit, orderNumber: s.doc.orderNumber, rejectReason: s.doc.rejectReason ?? null, photoIds: s.doc.photoIds ?? [], mediaIds: s.doc.mediaIds ?? [], reply: s.doc.reply ? { text: s.doc.reply.text, at: s.doc.reply.at } : null })),
     });
   } catch (error) {
     return adminError(error);

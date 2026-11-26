@@ -24,6 +24,9 @@ interface Row {
   fit: string;
   orderNumber: string;
   rejectReason: string | null;
+  photoIds: string[];
+  mediaIds: string[];
+  reply: { text: string; at: string } | null;
 }
 const TABS = [
   { id: "pending", label: "Waiting" },
@@ -37,6 +40,18 @@ export function ReviewsModeration() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reasons, setReasons] = useState<Record<string, string>>({});
+  const [replies, setReplies] = useState<Record<string, string>>({});
+
+  const saveReply = async (r: Row) => {
+    const text = (replies[r.id] ?? r.reply?.text ?? "").trim();
+    try {
+      const res = await adminApi<{ reply: Row["reply"] }>(`/api/admin/reviews/${r.id}/reply`, { method: "POST", body: { text } });
+      notify("success", res.reply ? "Reply published under the review. The customer gets an email." : "Reply removed.");
+      setRows((all) => all?.map((x) => (x.id === r.id ? { ...x, reply: res.reply } : x)) ?? null);
+    } catch (e) {
+      notify("error", e instanceof Error ? e.message : "Failed.");
+    }
+  };
 
   const load = useCallback(() => {
     setRows(null);
@@ -85,7 +100,36 @@ export function ReviewsModeration() {
               </p>
               <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">{r.body}</p>
               <p className="mt-1 text-xs text-muted-foreground">Fit: {r.fit === "true" ? "true to size" : r.fit === "small" ? "runs small" : "runs large"}</p>
+              {r.photoIds.length ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {r.photoIds.map((pid, i) => (
+                    <a key={pid} href={`/api/admin/reviews/${r.id}/photos/${pid}`} target="_blank" rel="noopener" className="block">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- private photo for the check, served by our API */}
+                      <img src={`/api/admin/reviews/${r.id}/photos/${pid}`} alt={`Customer photo ${i + 1}`} className="h-24 w-20 rounded-md border border-border object-cover" />
+                    </a>
+                  ))}
+                </div>
+              ) : null}
+              {r.photoIds.length && tab === "pending" ? <p className="mt-1 text-xs text-muted-foreground">Check the photos too: no faces of other people, no personal details, the product shown.</p> : null}
               {r.rejectReason ? <p className="mt-2 text-xs text-destructive">Rejected: {r.rejectReason}</p> : null}
+              {tab === "published" ? (
+                <div className="mt-4 space-y-2 border-t border-border pt-3">
+                  <ALabel htmlFor={`reply-${r.id}`} className="text-xs">
+                    Public reply from the store {r.reply ? "(shown under the review)" : "(optional)"}
+                  </ALabel>
+                  <ATextarea id={`reply-${r.id}`} rows={2} maxLength={1000} value={replies[r.id] ?? r.reply?.text ?? ""} onChange={(e) => setReplies((x) => ({ ...x, [r.id]: e.target.value }))} />
+                  <div className="flex justify-end gap-2">
+                    {r.reply ? (
+                      <AButton variant="outline" onClick={() => (setReplies((x) => ({ ...x, [r.id]: "" })), void adminApi(`/api/admin/reviews/${r.id}/reply`, { method: "POST", body: { text: "" } }).then(() => (notify("success", "Reply removed."), setRows((all) => all?.map((x) => (x.id === r.id ? { ...x, reply: null } : x)) ?? null))).catch((e) => notify("error", e instanceof Error ? e.message : "Failed.")))}>
+                        Remove reply
+                      </AButton>
+                    ) : null}
+                    <AButton disabled={!(replies[r.id] ?? r.reply?.text ?? "").trim()} onClick={() => void saveReply(r)}>
+                      {r.reply ? "Update reply" : "Publish reply"}
+                    </AButton>
+                  </div>
+                </div>
+              ) : null}
               {tab === "pending" ? (
                 <div className="mt-4 flex flex-col gap-3 border-t border-border pt-3 sm:flex-row sm:items-end">
                   <div className="flex-1 space-y-1.5">

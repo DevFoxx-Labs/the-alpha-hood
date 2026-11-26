@@ -34,7 +34,11 @@ export type Template =
   | "price_drop"
   | "abandoned_checkout_1h"
   | "abandoned_checkout_24h"
-  | "new_device_sign_in";
+  | "new_device_sign_in"
+  | "review_published"
+  | "review_rejected"
+  | "review_replied"
+  | "feedback_answered";
 
 export type Channel = "sms" | "email" | "whatsapp";
 

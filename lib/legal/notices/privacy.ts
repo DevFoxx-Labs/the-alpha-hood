@@ -7,8 +7,8 @@ import type { Notice } from "../types";
  */
 export const PRIVACY_NOTICE: Notice = {
   slug: "privacy",
-  version: "2026-11-30",
-  lastUpdated: "2026-11-30",
+  version: "2026-12-01",
+  lastUpdated: "2026-12-01",
   text: {
     en: {
       title: "Privacy Notice",
@@ -44,8 +44,8 @@ export const PRIVACY_NOTICE: Notice = {
                 ["Mobile number (verified by OTP), name, email (optional)", "Create and secure your account, sign you in, place and update orders", "Your consent when you sign up or check out"],
                 ["Delivery addresses: receiver's name and mobile (yours or someone you order for), alternate mobile, address, pincode, delivery instructions and, if you place one, a map pin", "Deliver orders, help the courier find the door, check serviceability, delivery dates and Cash on Delivery eligibility. If you save an address for someone else, please tell them", "Your consent when you save an address or check out"],
                 ["Your location — only when you tap “Use my current location” or place a pin on the map", "Suggest the address fields and pin the delivery spot. Your browser asks you first; we never track your location", "Your consent (the browser prompt and your tap)"],
-                ["Product reviews you write (rating, title, text, fit, size bought)", "Shown on the product page after a check, with your first name and last initial and a “Verified buyer” badge. You can edit or delete them any time", "Your consent when you submit a review"],
-                ["Messages you send us (Help & feedback) and our replies", "Answer your question and improve the store", "Our legitimate use: answering you"],
+                ["Product reviews you write (rating, title, text, fit, size bought) and up to 3 photos you add", "Shown on the product page after a check, with your first name and last initial and a “Verified buyer” badge. Photos stay private (only you and our moderators see them) until the review is approved; location and camera details are removed when you upload. We may post a public reply under your review and email you when it is published, not published (with the reason) or replied to. You can edit or delete a review any time — its public copy and photos come off the page straight away", "Your consent when you submit a review"],
+                ["Messages you send us (Help & feedback) and our replies", "Answer your question (our team replies in your account and emails you that a reply is waiting) and improve the store", "Our legitimate use: answering you"],
                 ["Order details: items, sizes, amounts, coupons, payment status and payment reference", "Fulfil orders, issue GST invoices, handle cancellations, returns and refunds", "Your consent; and keeping records required by tax and consumer law"],
                 ["Order, return and delivery history; address quality signals", "Prevent fraud and Cash on Delivery misuse (for example, limiting COD for repeated refused deliveries)", "Your consent when you check out; preventing fraud"],
                 ["Return and exchange requests, including photos you upload", "Assess and complete returns and exchanges", "Your consent when you raise the request"],
@@ -288,8 +288,8 @@ export const PRIVACY_NOTICE: Notice = {
                 ["मोबाइल नंबर (OTP से सत्यापित), नाम, ईमेल (वैकल्पिक)", "आपका खाता बनाना और सुरक्षित रखना, साइन-इन, ऑर्डर देना और अपडेट भेजना", "साइन-अप या चेकआउट के समय आपकी सहमति"],
                 ["डिलीवरी पते: पाने वाले का नाम और मोबाइल (आपका या जिसके लिए आप ऑर्डर करते हैं), दूसरा मोबाइल, पता, पिनकोड, डिलीवरी निर्देश और, अगर आप लगाएँ, मैप पिन", "ऑर्डर पहुँचाना, कूरियर को दरवाज़ा ढूँढने में मदद, सेवा-क्षेत्र, डिलीवरी की तारीख और कैश ऑन डिलीवरी की पात्रता जाँचना। किसी और का पता सहेजें तो कृपया उन्हें बताएँ", "पता सहेजते या चेकआउट करते समय आपकी सहमति"],
                 ["आपकी लोकेशन — केवल तब जब आप “मेरी मौजूदा लोकेशन” दबाएँ या मैप पर पिन लगाएँ", "पते के खाने सुझाना और डिलीवरी की जगह पिन करना। पहले आपका ब्राउज़र पूछता है; हम आपकी लोकेशन कभी ट्रैक नहीं करते", "आपकी सहमति (ब्राउज़र की अनुमति और आपका टैप)"],
-                ["आपके लिखे प्रोडक्ट रिव्यू (रेटिंग, शीर्षक, टेक्स्ट, फ़िट, खरीदा गया साइज़)", "जाँच के बाद प्रोडक्ट पेज पर, आपके पहले नाम और उपनाम के पहले अक्षर और “Verified buyer” के साथ दिखाए जाते हैं। आप इन्हें कभी भी बदल या हटा सकते हैं", "रिव्यू भेजते समय आपकी सहमति"],
-                ["आपके भेजे संदेश (मदद और फ़ीडबैक) और हमारे जवाब", "आपके सवाल का जवाब देना और स्टोर बेहतर बनाना", "हमारा वैध उपयोग: आपको जवाब देना"],
+                ["आपके लिखे प्रोडक्ट रिव्यू (रेटिंग, शीर्षक, टेक्स्ट, फ़िट, खरीदा गया साइज़) और आपकी जोड़ी गई अधिकतम 3 फ़ोटो", "जाँच के बाद प्रोडक्ट पेज पर, आपके पहले नाम और उपनाम के पहले अक्षर और “Verified buyer” के साथ दिखाए जाते हैं। रिव्यू स्वीकृत होने तक फ़ोटो निजी रहती हैं (केवल आप और हमारे मॉडरेटर देख सकते हैं); अपलोड करते समय लोकेशन और कैमरे की जानकारी हटा दी जाती है। हम आपके रिव्यू के नीचे सार्वजनिक जवाब दे सकते हैं और रिव्यू प्रकाशित होने, प्रकाशित न होने (कारण सहित) या जवाब मिलने पर आपको ईमेल करते हैं। आप रिव्यू कभी भी बदल या हटा सकते हैं — उसकी सार्वजनिक कॉपी और फ़ोटो तुरंत पेज से हट जाती हैं", "रिव्यू भेजते समय आपकी सहमति"],
+                ["आपके भेजे संदेश (मदद और फ़ीडबैक) और हमारे जवाब", "आपके सवाल का जवाब देना (हमारी टीम आपके खाते में जवाब देती है और ईमेल से बताती है कि जवाब आ गया है) और स्टोर बेहतर बनाना", "हमारा वैध उपयोग: आपको जवाब देना"],
                 ["ऑर्डर का विवरण: सामान, साइज़, राशि, कूपन, भुगतान की स्थिति और भुगतान संदर्भ", "ऑर्डर पूरा करना, GST चालान देना, रद्दीकरण, रिटर्न और रिफ़ंड", "आपकी सहमति; और कर व उपभोक्ता कानून के तहत आवश्यक रिकॉर्ड"],
                 ["ऑर्डर, रिटर्न और डिलीवरी का इतिहास; पते की गुणवत्ता के संकेत", "धोखाधड़ी और कैश ऑन डिलीवरी के दुरुपयोग को रोकना", "चेकआउट के समय आपकी सहमति; धोखाधड़ी की रोकथाम"],
                 ["रिटर्न/एक्सचेंज अनुरोध, आपके द्वारा अपलोड की गई तस्वीरों सहित", "रिटर्न और एक्सचेंज की जाँच और उन्हें पूरा करना", "अनुरोध करते समय आपकी सहमति"],

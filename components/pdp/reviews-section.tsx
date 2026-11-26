@@ -185,6 +185,7 @@ export function ReviewsSection({
                       body={r.body}
                       verified={r.verified}
                       photos={r.photos}
+                      reply={r.reply ?? null}
                       meta={`${r.author} · Size ${r.size} · Fit: ${FIT_LABEL[r.fit]} · ${reviewDate(r.createdAt)}`}
                     />
                     <button

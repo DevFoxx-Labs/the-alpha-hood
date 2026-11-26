@@ -4,7 +4,7 @@ import type { PhotoType } from "@/lib/returns/photos";
 import type { MongoConn } from "../mongo";
 import { type SqlDb, toIso } from "../sql";
 
-/** Product photos on the own backend (phase 6). Immutable rows: written once, never updated. */
+/** Product photos on the own backend (phase 6). Immutable rows: written once, never updated (removed only for review photos). */
 export function createSqlMediaStore(db: SqlDb): MediaStore {
   return {
     async save(m) {
@@ -24,6 +24,9 @@ export function createSqlMediaStore(db: SqlDb): MediaStore {
       const valid = ids.filter((id) => MEDIA_ID_RE.test(id));
       if (!valid.length) return new Set();
       return new Set((await db.selectFrom("product_media").select("id").where("id", "in", valid).execute()).map((r) => r.id));
+    },
+    async remove(id) {
+      if (MEDIA_ID_RE.test(id)) await db.deleteFrom("product_media").where("id", "=", id).execute();
     },
   };
 }
@@ -47,6 +50,9 @@ export function createMongoMediaStore(conn: Promise<MongoConn>): MediaStore {
       const valid = ids.filter((id) => MEDIA_ID_RE.test(id));
       if (!valid.length) return new Set();
       return new Set((await (await col()).find({ _id: { $in: valid } }, { projection: { _id: 1 } }).toArray()).map((d) => d._id));
+    },
+    async remove(id) {
+      if (MEDIA_ID_RE.test(id)) await (await col()).deleteOne({ _id: id });
     },
   };
 }

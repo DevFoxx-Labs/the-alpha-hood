@@ -1,4 +1,6 @@
 import { randomBytes } from "node:crypto";
+import { dbStores } from "@/lib/db";
+import { devSingleton, mockDataAllowed } from "@/lib/mock-guard";
 import { type PhotoType, sniffType, stripJpeg, stripPng } from "@/lib/returns/photos";
 
 /**
@@ -80,6 +82,15 @@ export interface MediaStore {
   get(id: string): Promise<MediaItem | null>;
   /** Which of these ids exist (used to validate a product's photo list). */
   existing(ids: string[]): Promise<Set<string>>;
+  /** Deletes a photo (used for a customer's review photos when the review is edited or deleted). Missing = no-op. */
+  remove(id: string): Promise<void>;
+}
+
+/** The public photo store: the database (own backend), memory in development, refused in production otherwise. */
+export function resolveMedia(env: Record<string, string | undefined> = process.env): MediaStore | null {
+  const db = dbStores(env);
+  if (db) return db.media;
+  return mockDataAllowed(env) ? devSingleton("media_store", createMemoryMediaStore) : null;
 }
 
 export function createMemoryMediaStore(): MediaStore {
@@ -93,6 +104,9 @@ export function createMemoryMediaStore(): MediaStore {
     },
     async existing(ids) {
       return new Set(ids.filter((id) => items.has(id)));
+    },
+    async remove(id) {
+      items.delete(id);
     },
   };
 }

@@ -15,7 +15,10 @@ export interface Review {
   author: string;
   size: string;
   fit: FitVote;
-  photos: Pick<ProductImage, "art" | "colour" | "alt">[];
+  /** Drawings for demo reviews; customer photos carry `url` (/api/media/<id>, published after a check). */
+  photos: Pick<ProductImage, "art" | "colour" | "alt" | "url">[];
+  /** The store's public reply, shown under the review. */
+  reply?: { text: string; at: string } | null;
   /** Only verified purchasers can review (PDP-08); kept explicit for imported reviews. */
   verified: boolean;
   createdAt: string;

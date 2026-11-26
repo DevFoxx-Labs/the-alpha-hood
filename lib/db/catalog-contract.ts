@@ -89,6 +89,23 @@ for (const target of testTargets()) {
       expect(await rv.summary("style_none", "co-ords")).toBeNull();
     });
 
+    it("customer reviews: store reply set / replaced / removed without touching helpful votes; remove deletes it", async () => {
+      const id = "rv_c_" + "e".repeat(24);
+      const base = { ...MOCK_REVIEWS[0], id, title: "Contract review", photos: [{ url: `/api/media/med_${"e".repeat(32)}`, art: MOCK_REVIEWS[0].photos[0]?.art ?? "tee", colour: "#111111", alt: "Customer photo 1" }], reply: null, helpful: 0, verified: true, createdAt: "2026-11-27T09:00:00.000Z" };
+      await s.reviewStore.insertMany([base as never]);
+      const rv = reviewsFromStore(s.reviewStore);
+      expect(await rv.voteHelpful(id, "vis_r1")).toBe(1);
+      const find = async () => (await rv.list({ styleId: base.styleId }, { sort: "recent", page: 1 })).reviews.find((r) => r.id === id);
+      await s.reviewStore.setReply(id, { text: "Thank you!", at: "2026-11-27T10:00:00.000Z" });
+      expect(await find()).toMatchObject({ reply: { text: "Thank you!" }, helpful: 1, photos: [{ url: base.photos[0].url }] });
+      await s.reviewStore.setReply(id, { text: "Updated reply", at: "2026-11-27T11:00:00.000Z" });
+      expect((await find())?.reply?.text).toBe("Updated reply");
+      await s.reviewStore.setReply(id, null);
+      expect((await find())?.reply ?? null).toBeNull();
+      await s.reviewStore.remove(id);
+      expect(await find()).toBeUndefined();
+    });
+
     it("admin: create (draft hidden, active shown), join a style, refuse stale edits and taken handles/SKUs", async () => {
       const draft = await createProduct(deps, productBody({ status: "draft" }));
       expect(draft.id).toMatch(/^prd_[0-9a-f]{20}$/);

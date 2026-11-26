@@ -1,5 +1,49 @@
 # Change log
 
+## 2026-12-01 — Review photos, store replies to reviews, customer emails for reviews and feedback
+
+**Asked for:** feedback stays answered by the admin team; add store replies to reviews, photos in reviews, and tell
+the customer when their review or feedback gets an answer.
+
+### Review photos
+- My reviews → write / edit: **up to 3 photos** (JPEG / PNG, ≤ 5 MB), with preview and remove. They upload through the
+  existing private photo pipeline (`POST /api/returns/photos`: signed in, 20 a day, type sniffed, EXIF / text chunks
+  removed, server-chosen id). A photo is attached to one review or return only, and only the owner's photos can be
+  attached; if any photo is refused, the review isn't saved (no half-saved rows).
+- Moderators see the private photos in Admin → Reviews (`GET /api/admin/reviews/{id}/photos/{photoId}`, `ugc.moderate`,
+  only photos listed on that review, `no-store`, `nosniff`, sandbox CSP).
+- On **approve**, public copies go to the media store (`/api/media/<id>`, local / S3 / R2 as set in Admin → Storage)
+  and show on the product page. The private originals stay private.
+- **Edit or delete** takes the public copy, its photos and any store reply off the site immediately (new
+  `MediaStore.remove` on memory, MySQL, PostgreSQL, MongoDB and object storage).
+
+### Store replies
+- Admin → Reviews → Published: "Public reply from the store" box (publish, update, remove).
+  `POST /api/admin/reviews/{id}/reply` (`ugc.moderate`, rate-limited, audited `review.reply` / `review.reply_removed`).
+- Shown under the review on the product page ("Reply from The Alpha Hood") and in the customer's My reviews.
+  New `ReviewStore.setReply` on all engines (SQL: in a transaction with the row locked; helpful votes untouched).
+
+### Customer emails (Admin → Settings → Notifications → "Reviews & help", all on by default, email only)
+- Review published (links to the product), review not published (links to My reviews, where the reason is), store
+  replied (sent for the first reply only, not for edits), help & feedback answered (links to `/account/help`; the
+  reply text itself is not put in the email).
+
+### Threat model
+- Assets: customers' photos (personal data), the product page (public content), the moderator's power.
+- Abuse → defence: attaching someone else's or a return's photo → owner-scoped `attach`, refused (422, test);
+  path tricks in photo ids → id allow-list (test); viewing another review's photos from admin → photo must be
+  listed on that review; un-moderated photos reaching the public → public copies are made only on approve (test);
+  photos lingering after withdrawal → removed on edit / delete (test); staff ids leaking to customers → stripped from
+  `publicReview` (test); reply spam / XSS → `cleanText` (2–1,000 chars, no markup), React escaping, rate limit;
+  email flood → one email per decision / first reply (test); a reply on an unpublished review → 409 (test).
+
+### Legal
+- Privacy Notice **2026-12-01** (EN + HI): review photos (private until approved, metadata removed), store replies,
+  review / feedback emails, removal on edit / delete. Needs the lawyer's review.
+
+### Verified
+- See the commands at the end of this task (lint, typecheck, full tests on memory + local MySQL, build).
+
 ## 2026-11-30 — Customer dashboard: address book with a map, reviews, help & feedback, every section linked
 
 **Asked for:** start with addresses — professional e-commerce fields, several addresses (own or someone else's),

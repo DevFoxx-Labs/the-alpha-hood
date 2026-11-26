@@ -1,5 +1,4 @@
-import { MEDIA_ID_RE } from "@/lib/catalog/media";
-import { dbStores } from "@/lib/db";
+import { MEDIA_ID_RE, resolveMedia } from "@/lib/catalog/media";
 import { clientIp, jsonError } from "@/lib/http/guard";
 import { rateLimiter } from "@/lib/http/rate-limit";
 
@@ -14,7 +13,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/media/[id]">
   const rl = await rateLimiter.hit(`media:ip:${clientIp(request)}`, 600, 60_000);
   if (!rl.ok) return jsonError(429, "rate_limited", "Too many requests.");
   try {
-    const item = await dbStores()?.media.get(id);
+    const item = await resolveMedia()?.get(id);
     if (!item) return jsonError(404, "not_found", "Not found.");
     return new Response(item.bytes.slice().buffer, {
       headers: {
