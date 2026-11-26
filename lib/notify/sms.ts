@@ -12,7 +12,7 @@ import type { Template } from "./outbox";
  * on screen, and records order messages in memory. It is refused on the live store (same rule as the demo payment
  * gateway). A real provider adapter is added once its API contract is confirmed (docs/known-gaps.md).
  */
-export type SmsTemplate = "otp" | Exclude<Template, "abandoned_checkout_1h" | "abandoned_checkout_24h">;
+export type SmsTemplate = "otp" | Exclude<Template, "abandoned_checkout_1h" | "abandoned_checkout_24h" | "new_device_sign_in">;
 
 /** Variables each template may carry — the only values that ever leave our servers in an SMS. No names / addresses. */
 export const SMS_VARIABLES: Record<SmsTemplate, readonly string[]> = {

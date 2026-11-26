@@ -1,4 +1,4 @@
-import { SESSION_IDLE_MS } from "@/lib/admin/staff";
+import { securityPolicy } from "@/lib/security/policy";
 import type { MongoConn } from "../mongo";
 import { type Maintenance, RETENTION as R } from "../retention";
 import type { SqlDb } from "../sql";
@@ -19,7 +19,7 @@ export function createSqlMaintenance(db: SqlDb): Maintenance {
       await del("sessions", db.deleteFrom("sessions").where("expires_at", "<=", at(R.sessionsAfterExpiryMs)));
       await del("otp_challenges", db.deleteFrom("otp_challenges").where("expires_at", "<=", at(R.otpChallengeAfterExpiryMs)));
       await del("otp_sends", db.deleteFrom("otp_sends").where("sent_at", "<=", at(R.otpSendLogMs)));
-      await del("staff_sessions", db.deleteFrom("staff_sessions").where((eb) => eb.or([eb("expires_at", "<=", t), eb("last_seen", "<=", t - SESSION_IDLE_MS)])));
+      await del("staff_sessions", db.deleteFrom("staff_sessions").where((eb) => eb.or([eb("expires_at", "<=", t), eb("last_seen", "<=", t - securityPolicy().staffIdleMs)])));
       await del("staff_tickets", db.deleteFrom("staff_tickets").where("expires_at", "<=", t - R.staffTicketAfterExpiryMs));
       await del("staff_invites", db.deleteFrom("staff_invites").where("expires_at", "<=", t - R.staffInviteAfterExpiryMs));
       await del("rate_limits", db.deleteFrom("rate_limits").where("reset_at", "<=", t - R.rateWindowAfterResetMs));
@@ -48,7 +48,7 @@ export function createMongoMaintenance(conn: Promise<MongoConn>): Maintenance {
       await del("sessions", { expires_at: { $lte: at(R.sessionsAfterExpiryMs) } });
       await del("otp_challenges", { expires_at: { $lte: at(R.otpChallengeAfterExpiryMs) } });
       await del("otp_sends", { sent_at: { $lte: at(R.otpSendLogMs) } });
-      await del("staff_sessions", { $or: [{ expiresAt: { $lte: t } }, { lastSeen: { $lte: t - SESSION_IDLE_MS } }] });
+      await del("staff_sessions", { $or: [{ expiresAt: { $lte: t } }, { lastSeen: { $lte: t - securityPolicy().staffIdleMs } }] });
       await del("staff_tickets", { expiresAt: { $lte: t - R.staffTicketAfterExpiryMs } });
       await del("staff_invites", { expiresAt: { $lte: t - R.staffInviteAfterExpiryMs } });
       await del("rate_limits", { resetAt: { $lte: t - R.rateWindowAfterResetMs } });

@@ -17,6 +17,7 @@ const newCustomer = (phone: string, now: Date): Customer => ({
   phone,
   name: null,
   email: null,
+  emailVerified: false,
   createdAt: now.toISOString(),
   addresses: [],
   orderCount: 0,
@@ -28,7 +29,7 @@ const likeEscape = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 // ── SQL (MySQL + PostgreSQL) ──────────────────────────────────────────────────────────────────────
 
-type CustomerRow = { id: string; phone: string; name: string | null; email: string | null; created_at: Date; order_count: number; coupon_uses: unknown; cod_blocked: boolean | number; rto_count: number };
+type CustomerRow = { id: string; phone: string; name: string | null; email: string | null; email_verified_at: Date | null; created_at: Date; order_count: number; coupon_uses: unknown; cod_blocked: boolean | number; rto_count: number };
 type AddressRow = Address & { customer_id: string; position: number };
 
 function toAddress(r: AddressRow): Address {
@@ -49,6 +50,7 @@ export function createSqlCustomerStore(db: SqlDb): CustomerStore {
       phone: r.phone,
       name: r.name,
       email: r.email,
+      emailVerified: !!r.email && !!r.email_verified_at,
       createdAt: toIso(r.created_at),
       addresses: addresses.filter((a) => a.customer_id === r.id).map(toAddress),
       orderCount: Number(r.order_count),
@@ -73,7 +75,7 @@ export function createSqlCustomerStore(db: SqlDb): CustomerStore {
       try {
         await db
           .insertInto("customers")
-          .values({ id: c.id, phone, name: null, email: null, created_at: now, order_count: 0, coupon_uses: "{}", cod_blocked: false, rto_count: 0, erased_at: null })
+          .values({ id: c.id, phone, name: null, email: null, email_verified_at: null, created_at: now, order_count: 0, coupon_uses: "{}", cod_blocked: false, rto_count: 0, erased_at: null })
           .execute();
         return { customer: c, created: true };
       } catch (e) {
@@ -84,7 +86,7 @@ export function createSqlCustomerStore(db: SqlDb): CustomerStore {
     },
     get: (id) => one("id", id),
     findByPhone: (phone) => one("phone", phone),
-    setEmail: (id, email) => set(id, { email }),
+    setEmail: (id, email, verified = false) => set(id, { email, email_verified_at: email && verified ? new Date() : null }),
     setName: (id, name) => set(id, { name }),
     async addAddress(id, address: AddressInput) {
       return sqlTx(db, async (trx) => {
@@ -108,7 +110,7 @@ export function createSqlCustomerStore(db: SqlDb): CustomerStore {
     async erase(id, now = new Date()) {
       await sqlTx(db, async (trx) => {
         await trx.deleteFrom("customer_addresses").where("customer_id", "=", id).execute();
-        await trx.updateTable("customers").set({ phone: `erased:${id}`, name: null, email: null, erased_at: now }).where("id", "=", id).execute();
+        await trx.updateTable("customers").set({ phone: `erased:${id}`, name: null, email: null, email_verified_at: null, erased_at: now }).where("id", "=", id).execute();
       });
     },
     async recordOrder(id, couponCode) {
@@ -151,13 +153,14 @@ export function createSqlCustomerStore(db: SqlDb): CustomerStore {
 
 // ── MongoDB (addresses embedded in the customer document) ─────────────────────────────────────────
 
-type CustomerDoc = Omit<Customer, "id" | "createdAt"> & { _id: string; created_at: Date; erased_at: Date | null };
+type CustomerDoc = Omit<Customer, "id" | "createdAt" | "emailVerified"> & { _id: string; created_at: Date; erased_at: Date | null; emailVerifiedAt?: Date | null };
 
 const fromDoc = (d: CustomerDoc): Customer => ({
   id: d._id,
   phone: d.phone,
   name: d.name,
   email: d.email,
+  emailVerified: !!d.email && !!d.emailVerifiedAt,
   createdAt: toIso(d.created_at),
   addresses: d.addresses ?? [],
   orderCount: d.orderCount ?? 0,
@@ -205,7 +208,7 @@ export function createMongoCustomerStore(conn: Promise<MongoConn>): CustomerStor
       const d = await (await col()).findOne({ phone });
       return d ? fromDoc(d) : null;
     },
-    setEmail: (id, email) => set(id, { email }),
+    setEmail: (id, email, verified = false) => set(id, { email, emailVerifiedAt: email && verified ? new Date() : null }),
     setName: (id, name) => set(id, { name }),
     async addAddress(id, address) {
       const saved: Address = { ...address, id: `adr_${randomToken(9)}` };
@@ -222,7 +225,7 @@ export function createMongoCustomerStore(conn: Promise<MongoConn>): CustomerStor
       return r.modifiedCount > 0;
     },
     async erase(id, now = new Date()) {
-      await set(id, { phone: `erased:${id}`, name: null, email: null, addresses: [], erased_at: now });
+      await set(id, { phone: `erased:${id}`, name: null, email: null, emailVerifiedAt: null, addresses: [], erased_at: now });
     },
     async recordOrder(id, couponCode) {
       await (await col()).updateOne({ _id: id }, { $inc: { orderCount: 1, ...(couponCode ? { [`couponUses.${couponCode}`]: 1 } : {}) } });

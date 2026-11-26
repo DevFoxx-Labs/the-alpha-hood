@@ -1,5 +1,72 @@
 # Change log
 
+## 2026-11-30 — Settings: Notifications and Security (from AstroGaon), with every flow wired end to end
+
+**Asked for:** AstroGaon's Notification settings and Security settings, "the whole flow, not one part".
+
+### How AstroGaon does it (read first)
+- *Notifications:* `NotificationCatalog` (event → group, label, channel defaults) + `NotificationSettings::channels`
+  saved from a switch matrix; `allows(event, channel)` is checked by every sender; an "always on" list.
+- *Security:* four switches — email verification on sign-up, email OTP on login, phone OTP on login, 2FA — read by
+  the auth middleware and OTP / 2FA services; plus a new-device sign-in alert in the notification catalogue.
+
+### What was built here
+**Notifications (Settings → Notifications tab)** — a switch matrix like AstroGaon's, grouped (Orders, Returns &
+refunds, Alerts, Marketing, Account), SMS + Email per message, and an "Always sent" list.
+- `lib/notify/catalog.ts` (events, groups, defaults, always-on), `lib/notify/switches.ts` (in force now),
+  `lib/notify/switches-service.ts`, `PUT /api/admin/settings/notifications` (owner only, audited).
+- Enforced twice: when a message is queued (`channelsFor` drops switched-off channels) and again when it is sent
+  (the delivery worker re-checks), so switching off also stops what is already queued.
+- **Email is now actually delivered** for customer messages: `lib/notify/email-templates.ts` (one fixed plain-text
+  template per message) + the email channel in `lib/notify/delivery.ts`, through the provider live in
+  Admin → Email providers. Before this, the email channel was recorded as `no_provider`.
+- A switch can only take a channel away: customers' own choices (marketing consent, WhatsApp updates) still apply.
+
+**Security (Settings → Security group)** — adapted to how this store signs people in:
+- *Send emails only to verified addresses* (on by default) — AstroGaon's "email verification". Full flow:
+  Account → Settings shows Verified / Not verified; "Send verification code" emails a 6-digit code
+  (`POST /api/account/email/send`, `/confirm`); changing the address makes it unverified again; a Google-verified
+  email from social sign-in counts as verified. New column `customers.email_verified_at` (migration 013).
+- *New-device sign-in alert* to customers and to staff (both on by default) — AstroGaon's `new_device_sign_in`.
+  A random device id in a strictly necessary HttpOnly cookie (`ah_device`); only a hash of (account, device) is
+  kept, through the existing one-time markers. Runs on every sign-in path: mobile code, Google / Facebook, staff
+  password + authenticator. Customers get the email through the outbox (switchable in Notifications); staff get
+  a direct email. Never on sign-up, never blocks a sign-in.
+- *Staff idle sign-out* (5–120 min, default 30), *staff session length* (1–24 h, default 12), *customer session
+  length* (1–90 days, default 30) — previously constants; now read at sign-in / every request.
+- **Not taken from AstroGaon, on purpose:** "email OTP on login", "phone OTP on login" and "2FA" switches. Here
+  customers always sign in with a code to their mobile, and staff always use password + authenticator; making
+  either optional would weaken sign-in (global rule: MFA mandatory for admins). The section says so.
+
+**Cookie Policy** (version 2026-11-30 — visitors are asked again, as the policy requires when cookies change):
+`ah_device`, plus `ah_oauth` and `ah_social_link` from the social sign-in change (they had been missed).
+
+### Threat model
+- Assets: customer contact channels, sign-in sessions, account takeover signals. Actors: guest, other customer,
+  stolen session, someone who typed another person's email, non-owner staff.
+- Settings changed by non-owners → `settings.manage` (owner only) on both settings routes (prevent, tested
+  earlier for the settings API; the new route uses the same guard).
+- Unknown events / channels / fields stored or a switch adding a channel → allow-listed and cleaned (prevent, tested).
+- Order emails to an address the customer doesn't own → verified-only by default (prevent, tested).
+- Verification code used for another customer or a changed address → code key bound to customer + address,
+  own purpose, can't sign in (prevent, tested). Code guessing / email flooding → OTP rules (5 tries, cooldown,
+  hourly/daily caps) + per-IP limits (prevent).
+- Account takeover unnoticed → new-device alerts on every sign-in path (detect). Session lifetimes bounded with
+  floors and ceilings; a bad value falls back to the default (prevent, tested).
+- Email template injection → fixed templates, shape-checked references only (prevent, tested).
+- Tracking via the device id → random per browser, HttpOnly, only hashed (account, device) stored, never used
+  for analytics; listed as strictly necessary (DPDP / cookie rule).
+
+### Verification
+- `pnpm typecheck` ✓ · `pnpm lint` ✓ · `pnpm test` **540/540** ✓ (memory + local MySQL). New:
+  `lib/notify/notifications-security.test.ts` (11 tests, incl. the full email-verification route flow).
+- `pnpm build` ✓ (throwaway `SECRET_BOX_KEY`), no warnings.
+- Local MySQL dev database (`mysql://127.0.0.1:3306/alpha_hood_dev`, environment: local): migration 013 applied.
+- Bugs found by the tests and fixed: switching an on-by-default security switch off was not saved; the first
+  settings load reported a change when nothing changed.
+- **Not verified:** a real email (no live email provider on this machine); the two new admin screens and the
+  account "verify email" step were not seen in a browser. PostgreSQL / MongoDB not run.
+
 ## 2026-11-29 — Admin → Email providers, Storage (database / server folder / S3 / R2), Google + Facebook sign-in
 
 **Asked for:** nodemailer for email, storage on S3, R2 and the server's own disk "managed like AstroGaon", and

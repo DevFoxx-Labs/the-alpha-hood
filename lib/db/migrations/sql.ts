@@ -703,5 +703,17 @@ export function sqlMigrations(d: Driver): Record<string, Migration> {
         await db.schema.dropTable("customer_identities").ifExists().execute();
       },
     },
+
+    "2026_11_30_013_customer_email_verified": {
+      async up(db: AnyDb) {
+        // Additive + nullable: existing emails read as not verified until the customer confirms them.
+        if (!(await hasColumn(db, d, "customers", "email_verified_at"))) {
+          await db.schema.alterTable("customers").addColumn("email_verified_at", c.ts).execute();
+        }
+      },
+      async down(db: AnyDb) {
+        if (await hasColumn(db, d, "customers", "email_verified_at")) await db.schema.alterTable("customers").dropColumn("email_verified_at").execute();
+      },
+    },
   };
 }

@@ -39,7 +39,9 @@ export async function PATCH(request: Request) {
     if (input.email !== undefined) {
       const email = input.email === "" ? null : normaliseEmail(input.email);
       if (input.email !== "" && !email) return jsonError(422, "invalid_input", "Enter a valid email address.");
-      await customers.setEmail(auth.customerId, email);
+      const current = await customers.get(auth.customerId);
+      // Re-saving the same address keeps it verified; a new address must be confirmed again.
+      if (current?.email !== email) await customers.setEmail(auth.customerId, email);
     }
     const customer = await customers.get(auth.customerId);
     return privateJson({ customer: customer ? publicCustomer(customer) : null });

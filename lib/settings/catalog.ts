@@ -14,7 +14,7 @@
  *   ALLOW_MOCK_DATA, ALLOW_MOCK_PAYMENTS, ENABLE_DEV_PAGES   preview-only switches: a signed-in admin must never
  *                                         be able to turn demo payments or dev pages on for the live store
  */
-export type SettingType = "string" | "text" | "email" | "url" | "bool" | "select";
+export type SettingType = "string" | "text" | "email" | "url" | "bool" | "select" | "int";
 
 export interface SettingField {
   /** Environment variable this field overrides. */
@@ -32,6 +32,10 @@ export interface SettingField {
   pattern?: RegExp;
   patternHint?: string;
   max?: number;
+  /** "bool" fields that are ON when nothing is set (the safe default for security switches). */
+  defaultOn?: boolean;
+  /** "int" fields: inclusive bounds and the value used when nothing is set. */
+  range?: { min: number; max: number; def: number; unit: string };
 }
 
 export interface SettingGroup {
@@ -132,6 +136,20 @@ export const SETTING_GROUPS: readonly SettingGroup[] = [
     description: "Whether search engines may index the store. Off = robots.txt disallows everything and every page is noindex.",
     warning: "Switch this on at launch only. It also needs a production build with the real site address and no demo data.",
     fields: [{ env: "ALLOW_INDEXING", label: "Allow indexing", type: "bool", help: "Search engines may crawl and list the store." }],
+  },
+  {
+    id: "security",
+    label: "Security",
+    description:
+      "Sign-in and account protection. Staff two-step verification (password + authenticator code) is always required, and customers always sign in with a one-time code to their mobile — neither can be switched off.",
+    fields: [
+      { env: "REQUIRE_VERIFIED_EMAIL", label: "Send emails only to verified addresses", type: "bool", defaultOn: true, help: "On (recommended): order and account emails go only to an address the customer confirmed with a code. Off: to any address they typed." },
+      { env: "NEW_DEVICE_ALERT_CUSTOMERS", label: "New-device sign-in alert to customers", type: "bool", defaultOn: true, help: "Email the customer when their account signs in on a phone or browser it hasn't used before. Uses Notifications → Account." },
+      { env: "NEW_DEVICE_ALERT_STAFF", label: "New-device sign-in alert to staff", type: "bool", defaultOn: true, help: "Email a staff member when their admin account signs in on a new phone or browser." },
+      { env: "STAFF_SESSION_IDLE_MINUTES", label: "Staff idle sign-out", type: "int", range: { min: 5, max: 120, def: 30, unit: "minutes" }, help: "Signed out after this long without activity. 5–120 minutes." },
+      { env: "STAFF_SESSION_HOURS", label: "Staff session length", type: "int", range: { min: 1, max: 24, def: 12, unit: "hours" }, help: "Signed out after this long, active or not. 1–24 hours." },
+      { env: "CUSTOMER_SESSION_DAYS", label: "Customer session length", type: "int", range: { min: 1, max: 90, def: 30, unit: "days" }, help: "Customers stay signed in this long on a device. 1–90 days. Applies to new sign-ins." },
+    ],
   },
   {
     id: "turnstile",

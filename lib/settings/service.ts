@@ -30,6 +30,7 @@ export interface FieldState {
   help: string | null;
   placeholder: string | null;
   options: { value: string; label: string }[] | null;
+  range: { min: number; max: number; def: number; unit: string } | null;
   isSet: boolean;
   source: "database" | "env" | null;
   /** Secrets: always null — a description is sent instead, never the thing itself. */
@@ -72,9 +73,11 @@ function fieldState(f: SettingField, env: Env): FieldState {
     help: f.help ?? null,
     placeholder: f.placeholder ?? null,
     options: f.options ? f.options.map((o) => ({ ...o })) : null,
+    range: f.range ? { ...f.range } : null,
     isSet: effective !== "",
     source: effective === "" ? null : fromDb ? "database" : "env",
-    value: f.secret ? null : effective,
+    // A switch shows what is in force: with nothing set, its default.
+    value: f.secret ? null : f.type === "bool" && effective === "" ? (f.defaultOn ? "true" : "false") : effective,
     hint: f.secret && effective !== "" ? fingerprint(effective) : null,
     envFallback: envValue(f.env, env) !== "",
   };
@@ -131,6 +134,11 @@ function clean(f: SettingField, raw: unknown): string {
       if (u.protocol !== "https:" || u.username || u.password || !/^https:\/\/[^\s"'<>]+$/.test(v)) throw new Error("Enter a full https:// address.");
       return v;
     }
+    case "int": {
+      const n = Number(v);
+      if (!/^\d{1,6}$/.test(v) || !f.range || n < f.range.min || n > f.range.max) throw new Error(`Enter a whole number from ${f.range?.min} to ${f.range?.max}.`);
+      return String(n);
+    }
     case "select":
       if (!f.options?.some((o) => o.value === v)) throw new Error("Choose one of the options.");
       return v;
@@ -181,7 +189,8 @@ export async function saveSettingsGroup(store: SettingsStore, groupId: string, b
     // Unchanged: same as the saved row, or (nothing saved) same as the environment — don't pin a copy of .env.
     // A switch with nothing saved and no "true" in the environment is already off.
     const saved = current.get(f.env);
-    const fallback = f.type === "bool" ? (envValue(f.env, env) === "true" ? "true" : "false") : envValue(f.env, env);
+    const fromEnv = envValue(f.env, env);
+    const fallback = f.type === "bool" ? (fromEnv === "" ? (f.defaultOn ? "true" : "false") : fromEnv === "true" ? "true" : "false") : fromEnv;
     if (saved === value || (saved === undefined && fallback === value)) continue;
     set[f.env] = value;
   }

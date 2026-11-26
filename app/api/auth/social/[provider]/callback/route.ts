@@ -8,6 +8,8 @@ import { resolveCustomers } from "@/lib/customers/store";
 import { clientIp, jsonError } from "@/lib/http/guard";
 import { rateLimiter } from "@/lib/http/rate-limit";
 import { securityEvent } from "@/lib/security/log";
+import { checkDevice, setDeviceCookie } from "@/lib/security/devices";
+import { alertNewCustomerDevice } from "@/lib/security/sign-in-alerts";
 
 /**
  * GET /api/auth/social/<provider>/callback — Google / Facebook send the browser back here.
@@ -43,7 +45,12 @@ export async function GET(request: Request, { params }: RouteContext<"/api/auth/
       const customer = await resolveCustomers().get(linked.customerId);
       if (!customer) return back(request, "/account?social=error");
       const res = back(request, profile.next);
-      if (!signedIn) setSessionCookie(res, await createSession(customer.id));
+      if (!signedIn) {
+        setSessionCookie(res, await createSession(customer.id));
+        const device = await checkDevice("customer", customer.id, request);
+        setDeviceCookie(res, device);
+        if (device.isNew) await alertNewCustomerDevice(customer.id, request.headers.get("user-agent"));
+      }
       securityEvent("login", { customer: customer.id, kind: `social_${provider}` });
       return res;
     }

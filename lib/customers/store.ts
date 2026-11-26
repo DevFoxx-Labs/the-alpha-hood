@@ -12,6 +12,8 @@ export interface Customer {
   phone: string;
   name: string | null;
   email: string | null;
+  /** True once the customer proved they own `email` (a code sent to it, or a Google-verified address). */
+  emailVerified: boolean;
   createdAt: string;
   addresses: Address[];
   orderCount: number;
@@ -27,7 +29,8 @@ export interface CustomerStore {
   findOrCreateByPhone(phone: string, now?: Date): Promise<{ customer: Customer; created: boolean }>;
   get(id: string): Promise<Customer | null>;
   findByPhone(phone: string): Promise<Customer | null>;
-  setEmail(id: string, email: string | null): Promise<void>;
+  /** Sets the email; `verified` only when ownership was just proved. Any change resets it to unverified. */
+  setEmail(id: string, email: string | null, verified?: boolean): Promise<void>;
   setName(id: string, name: string | null): Promise<void>;
   addAddress(id: string, address: AddressInput): Promise<Address>;
   removeAddress(id: string, addressId: string): Promise<boolean>;
@@ -54,6 +57,7 @@ export function createMemoryCustomerStore(): CustomerStore {
         phone,
         name: null,
         email: null,
+        emailVerified: false,
         createdAt: now.toISOString(),
         addresses: [],
         orderCount: 0,
@@ -72,9 +76,12 @@ export function createMemoryCustomerStore(): CustomerStore {
       const id = byPhone.get(phone);
       return id ? (byId.get(id) ?? null) : null;
     },
-    async setEmail(id, email) {
+    async setEmail(id, email, verified = false) {
       const c = byId.get(id);
-      if (c) c.email = email;
+      if (c) {
+        c.email = email;
+        c.emailVerified = !!email && verified;
+      }
     },
     async setName(id, name) {
       const c = byId.get(id);
@@ -94,6 +101,7 @@ export function createMemoryCustomerStore(): CustomerStore {
       c.phone = `erased:${now.toISOString()}`;
       c.name = null;
       c.email = null;
+      c.emailVerified = false;
       c.addresses = [];
     },
     async addAddress(id, address) {
@@ -165,6 +173,7 @@ export function publicCustomer(c: Customer) {
     phone: `+91 ${"•".repeat(6)}${c.phone.slice(-4)}`,
     name: c.name,
     email: c.email,
+    emailVerified: c.emailVerified,
     addresses: c.addresses,
   };
 }

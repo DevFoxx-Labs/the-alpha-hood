@@ -1,3 +1,4 @@
+import { securityPolicy } from "@/lib/security/policy";
 import { randomBytes } from "node:crypto";
 import { randomToken, sha256 } from "@/lib/auth/secrets";
 import { dbStores } from "@/lib/db";
@@ -256,6 +257,7 @@ export function newStaff(input: { email: string; name: string; role: Role; passw
 export const INVITE_TTL_MS = 24 * 3_600_000;
 export const TICKET_TTL_MS = 5 * 60_000;
 export const TICKET_MAX_ATTEMPTS = 5;
+/** Defaults; the values in force come from Admin → Settings → Security (lib/security/policy.ts). */
 export const SESSION_ABSOLUTE_MS = 12 * 3_600_000;
 export const SESSION_IDLE_MS = 30 * 60_000;
 export const MAX_FAILED_LOGINS = 5;
@@ -288,7 +290,7 @@ export async function consumeTicket(store: StaffStore, token: string) {
 
 export async function createAdminSession(store: StaffStore, staffId: string, now = Date.now()): Promise<string> {
   const token = randomToken(32);
-  await store.putSession(sha256(token), { staffId, createdAt: now, lastSeen: now, expiresAt: now + SESSION_ABSOLUTE_MS });
+  await store.putSession(sha256(token), { staffId, createdAt: now, lastSeen: now, expiresAt: now + securityPolicy().staffSessionMs });
   return token;
 }
 

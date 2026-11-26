@@ -7,6 +7,7 @@ import { clientIp, jsonError } from "@/lib/http/guard";
 import { rateLimiter } from "@/lib/http/rate-limit";
 import { BackendUnavailableError, type Env } from "@/lib/mock-guard";
 import { securityEvent } from "@/lib/security/log";
+import { securityPolicy } from "@/lib/security/policy";
 import { OTP_TTL_MS, OtpError, type OtpStore, resolveOtpStore, sendOtp, verifyOtp } from "@/lib/auth/otp";
 import { type EmailAdapter, resolveEmail } from "@/lib/notify/email";
 import { normaliseEmail } from "@/lib/validation";
@@ -25,7 +26,6 @@ import {
   readTicket,
   resolveStaffStore,
   revokeStaffSessions,
-  SESSION_IDLE_MS,
   type Staff,
   StaffConflictError,
   type StaffStore,
@@ -335,7 +335,7 @@ export async function staffFromRequest(request: Request, store: StaffStore = res
   const key = sha256(token);
   const s = await store.getSession(key);
   if (!s) return null;
-  if (s.expiresAt <= now || now - s.lastSeen > SESSION_IDLE_MS) {
+  if (s.expiresAt <= now || now - s.lastSeen > securityPolicy().staffIdleMs) {
     await store.deleteSession(key);
     return null;
   }

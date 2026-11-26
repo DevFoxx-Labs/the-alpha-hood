@@ -349,7 +349,9 @@ describe("RBAC on the server", () => {
     expect((await loginPOST(req("/api/admin/login", "POST", { email, password: "another strong passphrase" }))).status).toBe(401);
     expect((await (await loginPOST(req("/api/admin/login", "POST", { email, password: NEW }))).json()).step).toBe("totp"); // MFA still required
     expect(await adminSignIn(email, NEW)).toBeTruthy();
-    expect(demoMail().sent.at(-1)).toMatchObject({ to: email, subject: expect.stringContaining("password was changed") });
+    // The sign-in above came from a browser without a device cookie, so a new-device alert may follow the notice.
+    expect(demoMail().sent.slice(-3)).toEqual(expect.arrayContaining([expect.objectContaining({ to: email, subject: expect.stringContaining("password was changed") })]));
+    expect(demoMail().sent.at(-1)).toMatchObject({ to: email, subject: expect.stringContaining("New sign-in") });
     const id = (await resolveStaffStore().byEmail(email))!.id;
     expect((await resolveAudit().list({ target: id })).map((a) => a.action)).toContain("staff.password_reset");
   });

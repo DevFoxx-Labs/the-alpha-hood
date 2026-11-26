@@ -1,3 +1,4 @@
+import { securityPolicy } from "@/lib/security/policy";
 import type { NextResponse } from "next/server";
 import { readCookie } from "@/lib/consent/cookie";
 import { dbStores } from "@/lib/db";
@@ -11,6 +12,7 @@ import { randomToken, sha256 } from "./secrets";
  * database (MySQL / PostgreSQL / MongoDB) — see lib/db.
  */
 export const SESSION_COOKIE = "ah_session";
+/** Default; the value in force comes from Admin → Settings → Security (lib/security/policy.ts). */
 export const SESSION_TTL_MS = 30 * 86_400_000;
 
 export interface SessionRecord {
@@ -61,7 +63,7 @@ export function resolveSessionStore(env: Env = process.env): SessionStore {
 
 export async function createSession(customerId: string, store = resolveSessionStore(), now = Date.now()): Promise<string> {
   const token = randomToken(32);
-  await store.put(sha256(token), { customerId, createdAt: now, expiresAt: now + SESSION_TTL_MS });
+  await store.put(sha256(token), { customerId, createdAt: now, expiresAt: now + securityPolicy().customerSessionMs });
   return token;
 }
 
@@ -100,6 +102,6 @@ export function setSessionCookie(response: NextResponse, token: string) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: SESSION_TTL_MS / 1000,
+    maxAge: securityPolicy().customerSessionMs / 1000,
   });
 }

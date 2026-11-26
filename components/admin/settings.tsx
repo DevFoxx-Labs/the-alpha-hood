@@ -15,6 +15,7 @@ import {
   Search01Icon,
   SecurityCheckIcon,
   Settings01Icon,
+  Shield01Icon,
   ShoppingCart01Icon,
   UserIcon,
   ViewIcon,
@@ -25,7 +26,9 @@ import { Switch as SwitchPrimitive } from "radix-ui";
 import { useId, useState } from "react";
 import type { FieldState, GroupState, SettingsPayload } from "@/lib/settings/service";
 import { cn } from "@/lib/utils";
+import type { NotificationsPayload } from "@/lib/notify/switches-service";
 import { notify } from "./admin-shell";
+import { NotificationSettings } from "./notification-settings";
 import { AButton, AIcon, AInput, ALabel, ASelect, ATextarea, EmptyState, PageHeader } from "./ui";
 
 /**
@@ -35,6 +38,8 @@ import { AButton, AIcon, AInput, ALabel, ASelect, ATextarea, EmptyState, PageHea
  * A secret is never present in the payload: the form can replace one, not read it.
  */
 const ICONS: Record<string, IconSvgElement> = {
+  notifications: Notification03Icon,
+  security: Shield01Icon,
   turnstile: SecurityCheckIcon,
   sentry: Alert02Icon,
   social: UserIcon,
@@ -167,6 +172,25 @@ function TextField({
         onValueChange={(v) => onChange(v === UNSET ? "" : v)}
         options={[{ value: UNSET, label: "Not set" }, ...(field.options ?? [])]}
       />
+    );
+  } else if (field.type === "int" && field.range) {
+    control = (
+      <div className="flex items-center gap-2">
+        <AInput
+          id={id}
+          type="number"
+          inputMode="numeric"
+          min={field.range.min}
+          max={field.range.max}
+          step={1}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={String(field.range.def)}
+          className="w-28"
+          aria-invalid={!!error}
+        />
+        <span className="text-sm text-muted-foreground">{field.range.unit}</span>
+      </div>
     );
   } else if (field.type === "text") {
     control = <ATextarea id={id} rows={3} value={value} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder ?? undefined} aria-invalid={!!error} />;
@@ -360,9 +384,13 @@ function GroupForm({ group, onSaved, onDirty }: { group: GroupState; onSaved: (g
   );
 }
 
-export function SettingsScreen({ initial, initialSection }: { initial: SettingsPayload | null; initialSection?: string }) {
+/** The Notifications tab is not a catalogue group (it is a matrix), so it is listed next to them. */
+const NOTIFICATIONS_TAB = { id: "notifications", label: "Notifications" };
+
+export function SettingsScreen({ initial, initialSection, notifications }: { initial: SettingsPayload | null; initialSection?: string; notifications?: NotificationsPayload | null }) {
   const [groups, setGroups] = useState<GroupState[]>(initial?.groups ?? []);
-  const [active, setActive] = useState(() => (initial?.groups.some((g) => g.id === initialSection) ? initialSection! : (initial?.groups[0]?.id ?? "")));
+  const tabs = [...groups.slice(0, 1), ...(notifications ? [NOTIFICATIONS_TAB] : []), ...groups.slice(1)];
+  const [active, setActive] = useState(() => (tabs.some((g) => g.id === initialSection) ? initialSection! : (initial?.groups[0]?.id ?? "")));
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
 
   if (!initial) {
@@ -393,7 +421,7 @@ export function SettingsScreen({ initial, initialSection }: { initial: SettingsP
 
       <div className="grid gap-4 sm:gap-6 lg:grid-cols-[220px_1fr]">
         <nav aria-label="Settings sections" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:block lg:space-y-1 lg:overflow-visible lg:p-0">
-          {groups.map((g) => {
+          {tabs.map((g) => {
             const isActive = g.id === active;
             return (
               <button
@@ -419,6 +447,11 @@ export function SettingsScreen({ initial, initialSection }: { initial: SettingsP
 
         <div className="min-w-0 rounded-xl border border-border bg-card p-4 sm:p-6">
           {/* Every section stays mounted (hidden) so switching sections never drops what was typed. */}
+          {notifications ? (
+            <div hidden={active !== NOTIFICATIONS_TAB.id}>
+              <NotificationSettings initial={notifications} onDirty={(d) => setDirty((all) => (all.notifications === d ? all : { ...all, notifications: d }))} />
+            </div>
+          ) : null}
           {groups.map((g) => (
             <div key={g.id} hidden={g.id !== active}>
               <GroupForm

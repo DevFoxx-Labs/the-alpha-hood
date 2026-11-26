@@ -1,3 +1,4 @@
+import { resolveEmail } from "@/lib/notify/email";
 import { resolveAlerts } from "@/lib/alerts/service";
 import { commerce } from "@/lib/commerce";
 import { dbStores } from "@/lib/db";
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
     const result = await runSweep({ orders: resolveOrders(), commerce, alerts: resolveAlerts() });
     // Notifications queued so far (order updates now; the alerts / reminders queued above go next run).
     const outbox = resolveOutbox();
-    const delivery = outbox ? await deliverOutbox({ outbox, sms: resolveSms(), customers: resolveCustomers() }) : null;
+    const delivery = outbox ? await deliverOutbox({ outbox, sms: resolveSms(), email: resolveEmail(), customers: resolveCustomers() }) : null;
     const purged = (await dbStores()?.maintenance.purgeExpired()) ?? {};
     return Response.json({ ok: true, reconciled, ...result, delivery, purged }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

@@ -1,6 +1,7 @@
 import type { Env } from "@/lib/mock-guard";
 import { SETTING_ENV_KEYS } from "./catalog";
 import { resolveSettingsStore, type SettingRow, type SettingsStore } from "./store";
+import { NOTIFY_SWITCHES_KEY, setNotifySwitches } from "@/lib/notify/switches";
 import { bumpSettingsVersion } from "./version";
 
 /**
@@ -26,6 +27,8 @@ interface State {
   /** Keys whose saved row couldn't be opened (SECRET_BOX_KEY changed) — reported once. */
   unreadable: Set<string>;
   timer: ReturnType<typeof setInterval> | null;
+  /** Last applied notification switches (raw JSON), to notice a change. */
+  switches?: string | null;
 }
 
 const g = globalThis as { __alpha_hood_settings_runtime?: State };
@@ -71,6 +74,13 @@ export function applySettings(rows: SettingRow[], env: Env = process.env): boole
     // Names only, never values. Almost always SECRET_BOX_KEY differing from the one that saved the row.
     console.error(JSON.stringify({ type: "settings", event: "unreadable", keys: [...unreadable], hint: "SECRET_BOX_KEY changed? Add the old key to SECRET_BOX_PREVIOUS_KEYS." }));
   }
+  // Notification switches live in the same table (one JSON row); they are not an environment variable.
+  const switches = rows.find((r) => r.key === NOTIFY_SWITCHES_KEY)?.value ?? null;
+  if (switches !== (s.switches ?? null)) {
+    setNotifySwitches(switches);
+    s.switches = switches;
+    changed = true;
+  }
   s.unreadable = unreadable;
   s.applied = applied;
   if (changed) bumpSettingsVersion();
@@ -106,5 +116,6 @@ export function resetSettingsRuntime(env: Env = process.env): void {
   }
   if (s.timer) clearInterval(s.timer);
   g.__alpha_hood_settings_runtime = undefined;
+  setNotifySwitches(null);
   bumpSettingsVersion();
 }

@@ -108,9 +108,30 @@ export const COOKIE_INVENTORY: CookieInfo[] = [
   },
   {
     name: "ah_session",
-    purpose: "Keeps you signed in after you verify your phone number at checkout.",
+    purpose: "Keeps you signed in after you verify your phone number.",
     category: "necessary",
-    lifetime: "30 days",
+    lifetime: "Up to 90 days (30 by default; set by the store)",
+    provider: "The Alpha Hood (first party, HTTP-only)",
+  },
+  {
+    name: "ah_device",
+    purpose: "A random ID for this browser, so we can warn you when your account signs in on a device it hasn't used before. Security only — never used for tracking.",
+    category: "necessary",
+    lifetime: "12 months",
+    provider: "The Alpha Hood (first party, HTTP-only)",
+  },
+  {
+    name: "ah_oauth",
+    purpose: "Only while you use “Continue with Google / Facebook”: ties the sign-in to this browser, so nobody else can finish it for you.",
+    category: "necessary",
+    lifetime: "10 minutes",
+    provider: "The Alpha Hood (first party, HTTP-only)",
+  },
+  {
+    name: "ah_social_link",
+    purpose: "Only after “Continue with Google / Facebook”, until you verify your mobile number to link the two.",
+    category: "necessary",
+    lifetime: "10 minutes",
     provider: "The Alpha Hood (first party, HTTP-only)",
   },
   {

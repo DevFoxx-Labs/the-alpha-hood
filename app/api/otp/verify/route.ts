@@ -11,6 +11,8 @@ import { maskPhone, securityEvent } from "@/lib/security/log";
 import { LINK_COOKIE, openPendingLink } from "@/lib/auth/social";
 import { resolveSocialIdentities } from "@/lib/auth/social-identities";
 import { readCookie } from "@/lib/consent/cookie";
+import { alertNewCustomerDevice } from "@/lib/security/sign-in-alerts";
+import { checkDevice, setDeviceCookie } from "@/lib/security/devices";
 import { asObject, normaliseEmail, rejectUnknownFields } from "@/lib/validation";
 
 /**
@@ -45,7 +47,7 @@ export async function POST(request: Request) {
         ctx: { ip: guard.ip, userAgent: userAgent(request), source: "web" },
       });
     }
-    if (email) await customers.setEmail(customer.id, email);
+    if (email && email !== customer.email) await customers.setEmail(customer.id, email);
 
     // "Continue with Google / Facebook" from a signed-out browser ends here: the mobile is now verified, so the social
     // account is linked to this customer and is enough to sign in next time. Only a verified Google email is ever
@@ -56,7 +58,8 @@ export async function POST(request: Request) {
       const ok = await resolveSocialIdentities().link({ provider: pending.provider, subject: pending.subject, customerId: customer.id, email: pending.email, createdAt: new Date().toISOString() });
       if (ok) {
         linked = pending.provider;
-        if (pending.email && !email && !customer.email) await customers.setEmail(customer.id, pending.email);
+        // Google said this address is verified: it is stored as verified.
+        if (pending.email && !email && !customer.email) await customers.setEmail(customer.id, pending.email, true);
         if (pending.name && !customer.name) await customers.setName(customer.id, pending.name);
       }
       securityEvent("login", { customer: customer.id, kind: `social_${pending.provider}_linked`, ok });
@@ -66,6 +69,9 @@ export async function POST(request: Request) {
     const response = privateJson({ ok: true, ...(linked ? { linked } : {}) });
     setSessionCookie(response, await createSession(customer.id));
     if (pending) response.cookies.set(LINK_COOKIE, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 0 });
+    const device = await checkDevice("customer", customer.id, request);
+    setDeviceCookie(response, device);
+    if (device.isNew && !created) await alertNewCustomerDevice(customer.id, userAgent(request));
     return response;
   } catch (error) {
     return commerceErrorResponse(error);

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { SettingsScreen } from "@/components/admin/settings";
 import { can } from "@/lib/admin/permissions";
 import { currentStaff } from "@/lib/admin/server";
+import { notificationsPayload } from "@/lib/notify/switches-service";
 import { settingsPayload } from "@/lib/settings/service";
 import { resolveSettingsStore } from "@/lib/settings/store";
 
@@ -16,7 +17,8 @@ export const instant = false;
 export default async function Page({ searchParams }: PageProps<"/admin/settings">) {
   const [staff, params] = await Promise.all([currentStaff(), searchParams]);
   const allowed = !!staff && can(staff.role, "settings.manage");
-  const payload = allowed ? await settingsPayload(resolveSettingsStore()).catch(() => null) : null;
+  const store = resolveSettingsStore();
+  const [payload, notifications] = allowed ? await Promise.all([settingsPayload(store).catch(() => null), notificationsPayload(store).catch(() => null)]) : [null, null];
   const section = typeof params.section === "string" ? params.section : undefined;
-  return <SettingsScreen initial={payload} initialSection={section} />;
+  return <SettingsScreen initial={payload} initialSection={section} notifications={notifications} />;
 }

@@ -239,3 +239,12 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
   Admin → Settings → Social Sign-in, then sign in once with each.
 - [ ] Lawyer: Privacy Notice rows for Google and Facebook sign-in (version 2026-11-29).
 - [ ] Production: run migrations `2026_11_29_011` and `2026_11_29_012` through the deploy pipeline.
+
+## 2026-11-30 (notifications & security settings)
+- [ ] Admin → Settings → Notifications: review which messages go by SMS (each SMS costs money and needs a DLT
+  template) and by email.
+- [ ] Admin → Settings → Security: confirm the defaults (verified-email only, new-device alerts on, staff idle
+  30 min / 12 h, customer 30 days).
+- [ ] Decide how to get existing customers to verify their email (see docs/known-gaps.md).
+- [ ] Lawyer: Cookie Policy version 2026-11-30 (`ah_device`, `ah_oauth`, `ah_social_link`).
+- [ ] Production: run migration `2026_11_30_013` through the deploy pipeline.

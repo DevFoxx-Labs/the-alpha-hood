@@ -258,4 +258,13 @@ export const MONGO_MIGRATIONS: MongoMigration[] = [
       if (await db.listCollections({ name: "customer_identities" }, { nameOnly: true }).hasNext()) await db.collection("customer_identities").drop();
     },
   },
+  {
+    name: "2026_11_30_013_customer_email_verified",
+    async up() {
+      // Schemaless: `emailVerifiedAt` is optional on customers; documents without it read as not verified.
+    },
+    async down() {
+      // additive only — nothing to undo
+    },
+  },
 ];

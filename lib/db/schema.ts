@@ -25,6 +25,8 @@ export interface CustomersTable {
   phone: string;
   name: string | null;
   email: string | null;
+  /** Set when the customer proved they own `email`; NULL = not verified. */
+  email_verified_at: Date | null;
   created_at: Date;
   order_count: number;
   /** JSON object: coupon code → uses. */

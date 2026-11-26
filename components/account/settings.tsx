@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useMe } from "./account-frame";
 import { dateLabel } from "./labels";
+import { EmailVerify } from "./email-verify";
 import { SignInMethods } from "./social-sign-in";
 
 interface Prefs {
@@ -104,6 +105,7 @@ export function SettingsView() {
             Email <span className="font-normal normal-case tracking-normal text-ink-2">(invoices and order updates)</span>
           </label>
           <Input id={`${id}-email`} type="email" autoComplete="email" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} />
+          {email === (me.customer.email ?? "") ? <EmailVerify email={me.customer.email} verified={!!me.customer.emailVerified} onVerified={() => void reload()} /> : <p className="text-[12px] text-ink-2">Save to change your email — you&apos;ll then confirm the new address with a code.</p>}
           <Button type="submit" loading={savingProfile} className="mt-1 justify-self-start">
             Save
           </Button>

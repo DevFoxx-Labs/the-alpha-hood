@@ -21,6 +21,7 @@ export type SecurityEvent =
   | "human_check_unavailable"
   | "sms_provider_changed"
   | "provider_changed"
+  | "new_device_sign_in"
   | "email_provider_test"
   | "sms_provider_test";
 

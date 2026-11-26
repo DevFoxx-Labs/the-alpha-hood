@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { OtpSignIn } from "./otp-sign-in";
 
 export interface Me {
-  customer: { phone: string; name: string | null; email: string | null; addresses: Address[] };
+  customer: { phone: string; name: string | null; email: string | null; emailVerified?: boolean; addresses: Address[] };
   storeCredit: { balance: number; history: { amount: number; reason: string; createdAt: string }[] };
 }
 

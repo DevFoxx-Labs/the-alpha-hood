@@ -1,3 +1,4 @@
+import { allows } from "./switches";
 import type { ConsentLedger, ConsentRecord } from "@/lib/consent/ledger";
 import { resolveLedger } from "@/lib/consent/ledger";
 import { locks } from "@/lib/concurrency/lock";
@@ -32,7 +33,8 @@ export type Template =
   | "back_in_stock"
   | "price_drop"
   | "abandoned_checkout_1h"
-  | "abandoned_checkout_24h";
+  | "abandoned_checkout_24h"
+  | "new_device_sign_in";
 
 export type Channel = "sms" | "email" | "whatsapp";
 
@@ -151,8 +153,11 @@ function latest(rows: ConsentRecord[], purpose: string) {
 export async function channelsFor(customerId: string, template: Template, ledger: ConsentLedger = resolveLedger()): Promise<Channel[]> {
   const rows = await ledger.listByUser(customerId).catch(() => [] as ConsentRecord[]);
   const on = (p: string) => latest(rows, p) === "granted";
-  if (isMarketing(template)) return [...(on("marketing_email") ? (["email"] as const) : []), ...(on("marketing_whatsapp") ? (["whatsapp"] as const) : [])];
-  return ["sms", "email", ...(on("whatsapp_updates") ? (["whatsapp"] as const) : [])];
+  // The customer's own choices first; then the owner's switches can only take channels away (lib/notify/catalog.ts).
+  const wanted: Channel[] = isMarketing(template)
+    ? [...(on("marketing_email") ? (["email"] as const) : []), ...(on("marketing_whatsapp") ? (["whatsapp"] as const) : [])]
+    : ["sms", "email", ...(on("whatsapp_updates") ? (["whatsapp"] as const) : [])];
+  return wanted.filter((ch) => ch === "whatsapp" || allows(template, ch));
 }
 
 /** Queues a message; returns false when nothing may be sent (no consent, over the cap, or no outbox). */

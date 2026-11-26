@@ -22,6 +22,18 @@
   If added, ask for geolocation just-in-time and never send coordinates without consent.
 - 🟡 Hindi only for the Privacy Notice; Terms/Refund/Cookie and the banner are English.
 
+## Notifications & security settings (2026-11-30)
+- 🟠 **Existing customer emails are unverified.** With "Send emails only to verified addresses" on (default),
+  customers who typed an email before this change get no order emails until they confirm it in
+  Account → Settings. Nothing prompts them yet (no banner, no SMS nudge). Decide: a one-time prompt after sign-in,
+  or switch the setting off until most have verified.
+- 🟠 **New-device alerts fire once for every existing account** on its first sign-in after deploy (no device was
+  known before). Expected, but tell support.
+- 🟡 Checkout's contact step still collects an email without offering to verify it there.
+- 🟡 Staff new-device alerts need a live email provider; without one they are only in the security log.
+- 🟡 Session-length changes apply to new sign-ins (customers) and to the next request (staff idle); existing
+  customer sessions keep the expiry they were created with.
+
 ## Admin providers, integrations, storage (2026-11-26 — asked for, from the AstroGaon panel)
 - 🔴 **SMS provider not proven with a real send.** Admin → SMS providers is built and tested against a fake HTTP
   layer; request shapes come from the AstroGaon gateway. Before launch: add the real provider, send a test SMS,
