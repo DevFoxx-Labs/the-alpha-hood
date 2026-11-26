@@ -20,6 +20,8 @@ export type SecurityEvent =
   | "human_check_failed"
   | "human_check_unavailable"
   | "sms_provider_changed"
+  | "provider_changed"
+  | "email_provider_test"
   | "sms_provider_test";
 
 export function maskPhone(phone: string): string {

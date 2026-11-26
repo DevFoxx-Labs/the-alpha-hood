@@ -1,5 +1,98 @@
 # Change log
 
+## 2026-11-29 — Admin → Email providers, Storage (database / server folder / S3 / R2), Google + Facebook sign-in
+
+**Asked for:** nodemailer for email, storage on S3, R2 and the server's own disk "managed like AstroGaon", and
+Google + Facebook sign-in. AI providers on hold.
+
+### Email providers (`/admin/email-providers`, AstroGaon → Email Providers)
+- SMTP through **nodemailer 10.6.1** (owner approved; `pnpm audit --prod`: no known vulnerabilities). Presets fill
+  host / port / encryption: Zoho Mail, Zoho ZeptoMail, Google Workspace, Microsoft 365, Hostinger, Amazon SES
+  (Mumbai SMTP), Brevo, SendGrid, Mailgun, Postmark, Resend, other.
+- Same rules as SMS providers and AstroGaon: test email before live, one live, a live edit is tested before saving,
+  live can't be deleted, password write-only, username masked, fresh authenticator code to switch.
+- The warning about a change is sent through the provider that was live **before** the change (as AstroGaon does).
+- Differences from AstroGaon: no Amazon SES API driver (SES works through its SMTP preset); fresh authenticator
+  code instead of password re-confirmation.
+
+### Storage (`/admin/storage`, AstroGaon → Storage)
+- Where new **product photos** go: **Database** (default, unchanged), **Server folder** (`STORAGE_LOCAL_DIR`,
+  default `.data/uploads`, git-ignored), **Amazon S3**, **Cloudflare R2**. Connection test = write, read back,
+  delete. Switching needs a passed test and a fresh authenticator code.
+- Old photos stay where they were written and keep working: each row records its backend (`storage_key`).
+  Photo URLs (`/api/media/<id>`) and their `immutable` caching are unchanged.
+- S3 / R2 without an SDK: AWS Signature V4 in `lib/storage/sigv4.ts`, **checked against the "GET Object" example
+  in the Amazon S3 SigV4 documentation** (test passes with the published signature).
+- Buckets stay **private** (no public ACL): photos are served through the store. Once a backend has held photos,
+  its bucket / region / account are locked; keys can rotate with a passing test.
+- Differences from AstroGaon: no public bucket URL, no file browser, no thumbnail presets, no SQL-files tab, no
+  WebP conversion at upload (Next.js already serves AVIF/WebP). Return photos still stay in the database.
+
+### Google + Facebook sign-in
+- "Continue with Google / Facebook" on the account sign-in form, only for providers whose keys are saved in
+  Settings → Social Sign-in (the "Not in use yet" badge is gone). Account → Settings → Sign-in methods: link, unlink.
+- **Account rule:** the account stays phone-based. The first time from a signed-out browser, the person verifies
+  their mobile number once; the social account is then linked and signs in with one tap after that. A social
+  account never opens an account on its own, and is never matched to a customer by email (customer emails here
+  are typed, not verified — matching on them would let one person take over another's account).
+- Signed in → "Link" attaches the social account to the current customer. Linked to someone else → refused.
+- Only Google's `email_verified` email is used (to fill an empty email field); Facebook's email is not requested.
+- Removed on unlink and on account deletion (DPDP). Privacy Notice (EN + HI, 2026-11-29): Google and Facebook
+  sign-in rows.
+
+**Added (main files)**
+- `lib/providers`: `email-catalog.ts`, `email-transport.ts`, `email-service.ts`, `email-runtime.ts`, `net-guard.ts`,
+  `errors.ts`; routes `app/api/admin/email-providers/**`; `components/admin/email-providers.tsx`,
+  `components/admin/provider-kit.tsx` (shared with the SMS screen).
+- `lib/storage`: `sigv4.ts`, `backends.ts`, `runtime.ts`, `media.ts`, `service.ts`; routes `app/api/admin/storage/**`;
+  `components/admin/storage.tsx`.
+- `lib/auth/social.ts`, `lib/auth/social-identities.ts`, `lib/db/stores/social-identities.ts`; routes
+  `app/api/auth/social/**`, `app/api/account/social`; `components/account/social-sign-in.tsx`.
+- Migrations (additive, reversible): `2026_11_29_011_media_storage_key` (nullable column),
+  `2026_11_29_012_customer_identities` (new table, primary key (provider, subject)). MySQL + PostgreSQL + MongoDB.
+
+**Threat model (High tier: email route, file storage, authentication)**
+- *Email — whoever controls the live provider reads staff reset codes.* Owner only + fresh TOTP to switch; test
+  before live; previous route carries the warning (prevent + detect, tested).
+- *Email — SMTP host aimed at the internal network (SSRF).* Host must be a DNS name; every resolved address must
+  be public; the connection goes to the checked address with TLS verifying the host name, so DNS rebinding fails;
+  checked on save and on every send (prevent, tested). Plain-text SMTP never offered; certificates checked; TLS 1.2+.
+- *Email — header injection / file read through a message.* Messages checked before any connection; nodemailer
+  file and URL access off (prevent, tested).
+- *Storage — saved identifiers change the host (SSRF).* Hosts fixed in code; account, bucket, region, keys match
+  strict patterns (prevent, tested).
+- *Storage — path traversal / executable upload on the server folder.* Server-chosen keys only
+  (`media/med_<32 hex>.(jpg|png)`), resolved path must stay inside the folder, folder outside `public/`, never
+  overwrites, files 0600 (prevent, tested). Uploads are still sniffed JPEG/PNG with metadata stripped.
+- *Storage — switching breaks old photos.* Per-photo backend key; locked bucket once used; a missing backend gives
+  a clear 503, never wrong bytes; tampered storage key refused (prevent, tested).
+- *Storage — keys leak.* Write-only, masked hint, scrubbed from errors, sealed at rest (prevent, tested).
+- *Sign-in — login CSRF / code injection.* `state` in a sealed HttpOnly cookie bound to the browser, PKCE S256 and
+  nonce for Google; foreign, missing, expired or tampered state refused before any provider call (prevent, tested).
+- *Sign-in — forged or foreign ID token.* Token only from Google's token endpoint over TLS with our secret; issuer,
+  audience, expiry and nonce checked (prevent, tested). Facebook calls carry `appsecret_proof`.
+- *Sign-in — account takeover via email matching.* Never matched by email; linking needs a verified mobile or an
+  existing session (prevent, tested). One social account → one customer (primary key; raced contract test).
+- *Sign-in — open redirect via `next`.* Same-site relative paths only (prevent, tested).
+- Not covered: the real providers. See verification.
+
+**Verification**
+- `pnpm typecheck` ✓ · `pnpm lint` ✓ · `pnpm test` **529/529** ✓ on memory + local MySQL (`alpha_hood_test`).
+  New: `lib/providers/email.test.ts` (7), `lib/storage/storage.test.ts` (8), `lib/auth/social.test.ts` (10),
+  contract tests for `storage_key` and social identities on MySQL.
+- `pnpm build` ✓ (throwaway `SECRET_BOX_KEY` for that command only). A first build warned that the server-folder
+  code made Turbopack trace the whole project into the deploy; fixed (`turbopackIgnore` on runtime paths), the
+  rebuild has no warnings.
+- Local MySQL dev database (`mysql://127.0.0.1:3306/alpha_hood_dev`, environment: local): migrations 011 and 012
+  applied.
+- **Bugs the tests caught and that are fixed:** SMTP error classes were inverted (5xx is permanent, 4xx temporary).
+- **Not verified against the real services:** no real email was sent, no real S3 / R2 bucket was used, and no
+  real Google / Facebook sign-in ran (no accounts or keys on this machine). The SigV4 maths is checked against
+  AWS's published example; request shapes for Google and Facebook are from their documented endpoints, from
+  memory, not checked against the live services.
+- **Not seen in a browser:** the three admin screens, the sign-in buttons and the link notice.
+- Not run: PostgreSQL and MongoDB. `/security-review` (High tier) not run yet.
+
 ## 2026-11-26 — Settings: Bot Protection, Error Tracking, Social Sign-in, Push, AI Providers
 
 **Asked for:** Turnstile, Sentry, Google / Facebook sign-in, push notifications and AI providers in Admin → Settings.

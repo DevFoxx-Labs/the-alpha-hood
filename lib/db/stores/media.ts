@@ -10,14 +10,14 @@ export function createSqlMediaStore(db: SqlDb): MediaStore {
     async save(m) {
       await db
         .insertInto("product_media")
-        .values({ id: m.id, type: m.type, width: m.width, height: m.height, bytes: Buffer.from(m.bytes), created_at: new Date(m.createdAt), created_by: m.createdBy })
+        .values({ id: m.id, type: m.type, width: m.width, height: m.height, bytes: Buffer.from(m.bytes), created_at: new Date(m.createdAt), created_by: m.createdBy, storage_key: m.storageKey ?? null })
         .execute();
     },
     async get(id) {
       if (!MEDIA_ID_RE.test(id)) return null;
       const r = await db.selectFrom("product_media").selectAll().where("id", "=", id).executeTakeFirst();
       return r
-        ? ({ id: r.id, type: r.type as PhotoType, width: Number(r.width), height: Number(r.height), bytes: new Uint8Array(r.bytes), createdAt: toIso(r.created_at), createdBy: r.created_by } satisfies MediaItem)
+        ? ({ id: r.id, type: r.type as PhotoType, width: Number(r.width), height: Number(r.height), bytes: new Uint8Array(r.bytes), createdAt: toIso(r.created_at), createdBy: r.created_by, storageKey: r.storage_key ?? null } satisfies MediaItem)
         : null;
     },
     async existing(ids) {

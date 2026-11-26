@@ -8,6 +8,9 @@ import { resolveCustomers } from "@/lib/customers/store";
 import { guardPublicWrite, jsonError, userAgent } from "@/lib/http/guard";
 import { commerceErrorResponse, privateJson } from "@/lib/http/commerce-http";
 import { maskPhone, securityEvent } from "@/lib/security/log";
+import { LINK_COOKIE, openPendingLink } from "@/lib/auth/social";
+import { resolveSocialIdentities } from "@/lib/auth/social-identities";
+import { readCookie } from "@/lib/consent/cookie";
 import { asObject, normaliseEmail, rejectUnknownFields } from "@/lib/validation";
 
 /**
@@ -44,9 +47,25 @@ export async function POST(request: Request) {
     }
     if (email) await customers.setEmail(customer.id, email);
 
+    // "Continue with Google / Facebook" from a signed-out browser ends here: the mobile is now verified, so the social
+    // account is linked to this customer and is enough to sign in next time. Only a verified Google email is ever
+    // used, and only when the customer has none.
+    const pending = openPendingLink(readCookie(request.headers.get("cookie"), LINK_COOKIE));
+    let linked: string | null = null;
+    if (pending) {
+      const ok = await resolveSocialIdentities().link({ provider: pending.provider, subject: pending.subject, customerId: customer.id, email: pending.email, createdAt: new Date().toISOString() });
+      if (ok) {
+        linked = pending.provider;
+        if (pending.email && !email && !customer.email) await customers.setEmail(customer.id, pending.email);
+        if (pending.name && !customer.name) await customers.setName(customer.id, pending.name);
+      }
+      securityEvent("login", { customer: customer.id, kind: `social_${pending.provider}_linked`, ok });
+    }
+
     securityEvent("login", { customer: customer.id, phone: maskPhone(phone), created });
-    const response = privateJson({ ok: true });
+    const response = privateJson({ ok: true, ...(linked ? { linked } : {}) });
     setSessionCookie(response, await createSession(customer.id));
+    if (pending) response.cookies.set(LINK_COOKIE, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 0 });
     return response;
   } catch (error) {
     return commerceErrorResponse(error);

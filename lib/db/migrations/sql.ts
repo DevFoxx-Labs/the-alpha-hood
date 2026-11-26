@@ -670,5 +670,38 @@ export function sqlMigrations(d: Driver): Record<string, Migration> {
         await db.schema.dropTable("providers").ifExists().execute();
       },
     },
+
+    "2026_11_29_011_media_storage_key": {
+      async up(db: AnyDb) {
+        // Additive + nullable: existing photos keep their bytes in the row (storage_key = NULL).
+        if (!(await hasColumn(db, d, "product_media", "storage_key"))) {
+          await db.schema.alterTable("product_media").addColumn("storage_key", "varchar(200)").execute();
+        }
+      },
+      async down(db: AnyDb) {
+        if (await hasColumn(db, d, "product_media", "storage_key")) await db.schema.alterTable("product_media").dropColumn("storage_key").execute();
+      },
+    },
+
+    "2026_11_29_012_customer_identities": {
+      async up(db: AnyDb) {
+        // Google / Facebook sign-in links. Primary key (provider, subject): one social account → one customer.
+        await db.schema
+          .createTable("customer_identities")
+          .ifNotExists()
+          .addColumn("provider", "varchar(16)", (col) => col.notNull())
+          .addColumn("subject", "varchar(128)", (col) => col.notNull())
+          .addColumn("customer_id", "varchar(40)", (col) => col.notNull())
+          .addColumn("email", "varchar(254)")
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addPrimaryKeyConstraint("customer_identities_pk", ["provider", "subject"])
+          .modifyEnd(mysqlTable(d))
+          .execute();
+        await createIndex(db, d, "customer_identities_customer_idx", "customer_identities", ["customer_id"]);
+      },
+      async down(db: AnyDb) {
+        await db.schema.dropTable("customer_identities").ifExists().execute();
+      },
+    },
   };
 }

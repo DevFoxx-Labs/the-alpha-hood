@@ -12,6 +12,7 @@ import { checkHuman, readTurnstile, TURNSTILE_VERIFY_URL } from "./turnstile";
 const SITE = "0x4AAAAAAABBBBCCCCDDDD";
 const SECRET = "0x4AAAAAAA-secret-key-for-tests-1234567890";
 const TOKEN = "0.valid-token-abcdefghijklmnopqrstuvwxyz";
+const FAKE_ANTHROPIC = ["sk", "ant", "test-only-not-a-secret-000000"].join("-"); // built at runtime: no key-shaped literal in git
 const DSN = "https://0123456789abcdef0123456789abcdef@o123456.ingest.sentry.io/7654321";
 const ENV = { NODE_ENV: "test", TURNSTILE_SITE_KEY: SITE, TURNSTILE_SECRET_KEY: SECRET };
 
@@ -126,12 +127,12 @@ describe("Sentry (error tracking)", () => {
 describe("integration settings groups", () => {
   afterEach(() => resetSettingsRuntime());
 
-  it("Turnstile and Sentry are in use; social sign-in, push and AI say plainly that nothing reads them yet", async () => {
+  it("Turnstile, Sentry and social sign-in are in use; push and AI say plainly that nothing reads them yet", async () => {
     const env: Record<string, string | undefined> = { NODE_ENV: "test" };
     const payload = await settingsPayload(createMemorySettingsStore(), env);
     const by = Object.fromEntries(payload.groups.map((g) => [g.id, g]));
-    for (const id of ["turnstile", "sentry"]) expect(by[id].notInUse, id).toBeNull();
-    for (const id of ["social", "push", "ai"]) expect(by[id].notInUse, id).toMatch(/not built yet|no AI feature yet/);
+    for (const id of ["turnstile", "sentry", "social"]) expect(by[id].notInUse, id).toBeNull();
+    for (const id of ["push", "ai"]) expect(by[id].notInUse, id).toMatch(/not built yet|no AI feature yet/);
     // Every key that grants access is write-only.
     for (const f of SETTING_GROUPS.flatMap((g) => g.fields)) if (/SECRET|TOKEN|PRIVATE|API_KEY|DSN/.test(f.env)) expect(f.secret, f.env).toBe(true);
   });
@@ -156,9 +157,9 @@ describe("integration settings groups", () => {
     await reject("ai", { AI_PROVIDER: "http://evil" });
     await reject("ai", { ANTHROPIC_API_KEY: "sk-wrong" });
     // Saved secrets never come back.
-    await saveSettingsGroup(store, "ai", { fields: { AI_PROVIDER: "anthropic", ANTHROPIC_API_KEY: "sk-ant-abcdefghijklmnopqrstuvwxyz012345" } }, "stf", env);
+    await saveSettingsGroup(store, "ai", { fields: { AI_PROVIDER: "anthropic", ANTHROPIC_API_KEY: FAKE_ANTHROPIC } }, "stf", env);
     const blob = JSON.stringify(await settingsPayload(store, env));
-    for (const secret of [DSN, "sk-ant-abcdefghijklmnopqrstuvwxyz012345"]) expect(blob).not.toContain(secret);
+    for (const secret of [DSN, FAKE_ANTHROPIC]) expect(blob).not.toContain(secret);
     expect(settingGroup("social")?.fields.map((f) => f.env)).toEqual(["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET"]);
   });
 });

@@ -14,6 +14,12 @@ export async function register() {
   // The SMS provider made live in Admin → SMS providers (lib/providers/sms-runtime.ts).
   const { startSmsRuntime } = await import("./lib/providers/sms-runtime");
   await startSmsRuntime();
+  // The email provider made live in Admin → Email providers (lib/providers/email-runtime.ts).
+  const { startEmailRuntime } = await import("./lib/providers/email-runtime");
+  await startEmailRuntime();
+  // Where new uploads go (Admin → Storage) and how to reach older files (lib/storage/runtime.ts).
+  const { startStorageRuntime } = await import("./lib/storage/runtime");
+  await startStorageRuntime();
 }
 
 export async function onRequestError(error: unknown, request: { path: string; method: string }, context: { routePath: string; routeType: string }) {

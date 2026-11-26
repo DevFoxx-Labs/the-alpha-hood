@@ -2,6 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { acceptInvite, createOwner, createPasswordReset, passwordStep, totpStep } from "@/lib/admin/auth";
 import { totpAt } from "@/lib/admin/crypto";
 import { createAdminSession, createInvite, newStaff } from "@/lib/admin/staff";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { localBackend } from "@/lib/storage/backends";
+import { setStorageRuntime } from "@/lib/storage/runtime";
 import { getMongo } from "./mongo";
 import { createSecretBox } from "./secret-box";
 import { getSqlDb } from "./sql";
@@ -217,6 +222,47 @@ for (const target of testTargets()) {
       expect((await s.providers.list("sms")).some((r) => r.active)).toBe(false);
       for (const r of await s.providers.list("sms")) await s.providers.remove("sms", r.id);
       expect(await s.providers.list("sms")).toEqual([]);
+    });
+
+    it("product photos on object storage: the row keeps the storage key and no bytes; reads come back from the backend", async () => {
+      const dir = mkdtempSync(join(tmpdir(), "ah-contract-"));
+      try {
+        setStorageRuntime("local", { local: localBackend(dir) });
+        const id = `med_${"c".repeat(32)}`;
+        await s.media.save({ id, type: "image/png", width: 800, height: 800, bytes: new Uint8Array([0x89, 0x50, 7]), createdAt: "2026-11-29T00:00:00.000Z", createdBy: "stf_a" });
+        expect([...(await s.media.get(id))!.bytes]).toEqual([0x89, 0x50, 7]);
+        expect((await s.media.existing([id])).has(id)).toBe(true);
+        if (target.cfg) {
+          const raw =
+            target.cfg.driver === "mongodb"
+              ? await (await getMongo(target.cfg)).db.collection("product_media").findOne({ _id: id as never })
+              : await getSqlDb(target.cfg).selectFrom("product_media").select(["bytes", "storage_key"]).where("id", "=", id).executeTakeFirst();
+          const r = raw as unknown as { storage_key?: string; storageKey?: string; bytes: { length?: number; buffer?: { byteLength: number } } };
+          expect(r.storage_key ?? r.storageKey).toBe(`local:media/${id}.png`);
+          expect(r.bytes.length ?? r.bytes.buffer?.byteLength).toBe(0);
+        }
+        // Storage switched back to the database: the old photo is still read from the folder.
+        setStorageRuntime(null, { local: localBackend(dir) });
+        expect([...(await s.media.get(id))!.bytes]).toEqual([0x89, 0x50, 7]);
+      } finally {
+        setStorageRuntime(null, {});
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("social identities: one social account → one customer even when links race; unlink and erasure remove them", async () => {
+      const at = "2026-11-29T00:00:00.000Z";
+      const race = await Promise.all(["cus_s1", "cus_s2", "cus_s3"].map((customerId) => s.socialIdentities.link({ provider: "google", subject: "1098765", customerId, email: null, createdAt: at })));
+      expect(race.filter(Boolean)).toHaveLength(1);
+      const owner = (await s.socialIdentities.find("google", "1098765"))!.customerId;
+      expect(await s.socialIdentities.link({ provider: "facebook", subject: "1098765", customerId: "cus_s9", email: null, createdAt: at })).toBe(true); // same id, other provider
+      expect(await s.socialIdentities.find("google", "nope")).toBeNull();
+      expect((await s.socialIdentities.listFor(owner)).map((i) => i.provider)).toEqual(["google"]);
+      expect(await s.socialIdentities.unlink(owner, "facebook")).toBe(false);
+      expect(await s.socialIdentities.unlink(owner, "google")).toBe(true);
+      expect(await s.socialIdentities.find("google", "1098765")).toBeNull();
+      await s.socialIdentities.eraseCustomer("cus_s9");
+      expect(await s.socialIdentities.listFor("cus_s9")).toEqual([]);
     });
 
     it("audit log: newest first, filters, no update path", async () => {

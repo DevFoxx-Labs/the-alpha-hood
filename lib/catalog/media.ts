@@ -22,6 +22,8 @@ export interface MediaItem {
   bytes: Uint8Array;
   createdAt: string;
   createdBy: string;
+  /** Set when the bytes live in object storage (`<local|s3|r2>:<key>`, lib/storage/media.ts); then `bytes` is empty in the row. */
+  storageKey?: string | null;
 }
 
 export class MediaError extends Error {

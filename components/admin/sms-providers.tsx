@@ -2,6 +2,7 @@
 
 import { Add01Icon, Alert02Icon, CheckmarkCircle02Icon, Delete02Icon, Message01Icon, PencilEdit01Icon, SentIcon } from "@hugeicons/core-free-icons";
 import { useState } from "react";
+import { BADGE, call, CodeField, StepUpDialog, when } from "./provider-kit";
 import type { SmsProvidersPayload, SmsProviderView } from "@/lib/providers/sms-service";
 import { cn } from "@/lib/utils";
 import { notify } from "./admin-shell";
@@ -13,36 +14,8 @@ import { AButton, AIcon, AInput, ALabel, ASelect, Confirm, EmptyState, FormDialo
  * The list arrives with the page (server-rendered); every action returns the updated row.
  */
 type Driver = SmsProvidersPayload["catalog"]["drivers"][number];
-type ApiError = { error?: { code?: string; message?: string; fields?: Record<string, string> } };
-
-const BADGE = "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium";
-const when = (iso: string) => new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
-
-async function call<T>(url: string, method: string, body: unknown): Promise<{ ok: true; data: T } | { ok: false; message: string; fields: Record<string, string> }> {
-  try {
-    const res = await fetch(url, { method, cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) });
-    const data = (await res.json().catch(() => null)) as (T & ApiError) | null;
-    if (res.status === 401 && data?.error?.code === "unauthenticated") {
-      // Session ended: a full reload is deliberate, it drops every in-memory admin state.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.assign(`/admin/login?next=${encodeURIComponent("/admin/sms-providers")}`);
-    }
-    if (!res.ok || !data) return { ok: false, message: data?.error?.message ?? "Something went wrong.", fields: data?.error?.fields ?? {} };
-    return { ok: true, data };
-  } catch {
-    return { ok: false, message: "Couldn't reach the server. Check your connection and try again.", fields: {} };
-  }
-}
-
-function CodeField({ value, onChange, id }: { value: string; onChange: (v: string) => void; id: string }) {
-  return (
-    <div className="space-y-1.5">
-      <ALabel htmlFor={id}>Authenticator code</ALabel>
-      <AInput id={id} value={value} onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="6 digits" className="w-36 font-mono tracking-widest" />
-      <p className="text-xs text-muted-foreground">A new code from your authenticator app. This provider sends every sign-in code.</p>
-    </div>
-  );
-}
+const PAGE = "/admin/sms-providers";
+const WHY = "This provider sends every sign-in code.";
 
 interface Draft {
   name: string;
@@ -87,7 +60,7 @@ function ProviderForm({ payload, editing, open, onClose, onSaved }: { payload: S
       ...(spec.messageTemplates ? { templates: d.templates } : {}),
       ...(editing?.active ? { code: d.code, testTo: d.testTo } : {}),
     };
-    const r = editing ? await call<{ provider: SmsProviderView }>(`/api/admin/sms-providers/${editing.id}`, "PATCH", body) : await call<{ provider: SmsProviderView }>("/api/admin/sms-providers", "POST", body);
+    const r = editing ? await call<{ provider: SmsProviderView }>(`/api/admin/sms-providers/${editing.id}`, "PATCH", body, PAGE) : await call<{ provider: SmsProviderView }>("/api/admin/sms-providers", "POST", body, PAGE);
     setSaving(false);
     if (!r.ok) {
       setErrors(r.fields);
@@ -174,38 +147,9 @@ function ProviderForm({ payload, editing, open, onClose, onSaved }: { payload: S
             <AInput id="sp-test-to" value={d.testTo} onChange={(e) => setD({ ...d, testTo: e.target.value })} inputMode="tel" placeholder="10-digit mobile" className="w-48" />
             {err("to")}
           </div>
-          <CodeField id="sp-code" value={d.code} onChange={(v) => setD({ ...d, code: v })} />
+          <CodeField id="sp-code" value={d.code} onChange={(v) => setD({ ...d, code: v })} why={WHY} />
         </div>
       ) : null}
-    </FormDialog>
-  );
-}
-
-function StepUpDialog({ title, description, confirmLabel, open, onClose, onConfirm }: { title: string; description: string; confirmLabel: string; open: boolean; onClose: () => void; onConfirm: (code: string) => Promise<boolean> }) {
-  const [code, setCode] = useState("");
-  return (
-    <FormDialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) {
-          setCode("");
-          onClose();
-        }
-      }}
-      title={title}
-      description={description}
-      submitLabel={confirmLabel}
-      onSubmit={() => {
-        if (code.length !== 6) return notify("error", "Enter the 6-digit code from your authenticator app.");
-        void onConfirm(code).then((done) => {
-          if (done) {
-            setCode("");
-            onClose();
-          }
-        });
-      }}
-    >
-      <CodeField id="su-code" value={code} onChange={setCode} />
     </FormDialog>
   );
 }
@@ -223,7 +167,7 @@ function TestDialog({ provider, onClose, onDone }: { provider: SmsProviderView |
       onSubmit={() => {
         if (!provider || busy) return;
         setBusy(true);
-        void call<{ ok: boolean; message: string; provider: SmsProviderView }>(`/api/admin/sms-providers/${provider.id}/test`, "POST", { to }).then((r) => {
+        void call<{ ok: boolean; message: string; provider: SmsProviderView }>(`/api/admin/sms-providers/${provider.id}/test`, "POST", { to }, PAGE).then((r) => {
           setBusy(false);
           if (!r.ok) return notify("error", r.message);
           notify(r.data.ok ? "success" : "error", r.data.message);
@@ -354,7 +298,7 @@ export function SmsProvidersScreen({ initial }: { initial: SmsProvidersPayload |
                         confirmLabel="Delete"
                         destructive
                         onConfirm={async () => {
-                          const r = await call<{ ok: true }>(`/api/admin/sms-providers/${p.id}`, "DELETE", {});
+                          const r = await call<{ ok: true }>(`/api/admin/sms-providers/${p.id}`, "DELETE", {}, PAGE);
                           if (!r.ok) return notify("error", r.message);
                           setProviders((all) => all.filter((x) => x.id !== p.id));
                           notify("success", `${p.name} deleted.`);
@@ -381,9 +325,10 @@ export function SmsProvidersScreen({ initial }: { initial: SmsProvidersPayload |
         title={switching?.action === "activate" ? `Make ${switching.provider.name} live?` : `Deactivate ${switching?.provider.name ?? ""}?`}
         description={switching?.action === "activate" ? "Every sign-in code and order SMS will go through this provider from now on." : `Messages will then use ${fallback}.`}
         confirmLabel={switching?.action === "activate" ? "Make live" : "Deactivate"}
+        why={WHY}
         onConfirm={async (code) => {
           if (!switching) return false;
-          const r = await call<{ provider: SmsProviderView; summary: string }>(`/api/admin/sms-providers/${switching.provider.id}/${switching.action}`, "POST", { code });
+          const r = await call<{ provider: SmsProviderView; summary: string }>(`/api/admin/sms-providers/${switching.provider.id}/${switching.action}`, "POST", { code }, PAGE);
           if (!r.ok) {
             notify("error", r.message);
             return false;

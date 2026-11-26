@@ -4,6 +4,7 @@ import { SmsError, type SmsTemplate } from "@/lib/notify/sms";
 import { asObject, maskContact, normaliseIndianMobile, rejectUnknownFields } from "@/lib/validation";
 import { isSmsDriver, MESSAGE_TEMPLATES, SMS_DRIVERS, smsCatalogPayload, type SmsCatalogPayload, type SmsDriver } from "./sms-catalog";
 import { type Fetcher, gatewaySendOtp, type SmsProviderDoc } from "./sms-gateway";
+import { ProviderError } from "./errors";
 import { refreshActiveSms } from "./sms-runtime";
 import type { ProviderRow, ProviderStore } from "./store";
 
@@ -19,17 +20,7 @@ import type { ProviderRow, ProviderStore } from "./store";
  */
 export const MAX_SMS_PROVIDERS = 20;
 
-export class ProviderError extends Error {
-  constructor(
-    public status: number,
-    public code: string,
-    message: string,
-    public fields: Record<string, string> = {},
-  ) {
-    super(message);
-    this.name = "ProviderError";
-  }
-}
+export { ProviderError };
 
 export interface SmsProviderView {
   id: string;

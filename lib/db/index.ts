@@ -24,10 +24,13 @@ import type { MediaStore } from "@/lib/catalog/media";
 import type { Maintenance } from "./retention";
 import { createMongoMaintenance, createSqlMaintenance } from "./stores/maintenance";
 import { createMongoMediaStore, createSqlMediaStore } from "./stores/media";
+import { withObjectStorage } from "@/lib/storage/media";
 import type { SettingsStore } from "@/lib/settings/store";
 import { createMongoSettingsStore, createSqlSettingsStore } from "./stores/settings";
 import type { ProviderStore } from "@/lib/providers/store";
 import { createMongoProviderStore, createSqlProviderStore } from "./stores/providers";
+import type { SocialIdentityStore } from "@/lib/auth/social-identities";
+import { createMongoSocialIdentityStore, createSqlSocialIdentityStore } from "./stores/social-identities";
 import { createMongoAudit, createMongoRateCounters, createMongoStaffStore, createSqlAudit, createSqlRateCounters, createSqlStaffStore } from "./stores/admin";
 import {
   createMongoAlertStore,
@@ -112,6 +115,8 @@ export interface DbStores {
   settings: SettingsStore;
   /** Admin-managed providers (SMS): sealed documents, one active per kind. */
   providers: ProviderStore;
+  /** Google / Facebook sign-in links to phone-based customers. */
+  socialIdentities: SocialIdentityStore;
   maintenance: Maintenance;
   /** COMMERCE_PROVIDER=own: catalogue, bag and stock all on this database (built once, cached). */
   own(): OwnCommerce;
@@ -180,9 +185,10 @@ export function createDbStores(cfg: DbConfig): DbStores {
       ugc: createMongoUgcStore(conn),
       outbox: createMongoOutbox(conn),
       flows: createMongoFlowStore(conn, p),
-      media: createMongoMediaStore(conn),
+      media: withObjectStorage(createMongoMediaStore(conn)),
       settings: createMongoSettingsStore(conn, createSecretBox()),
       providers: createMongoProviderStore(conn, createSecretBox()),
+      socialIdentities: createMongoSocialIdentityStore(conn),
       maintenance: createMongoMaintenance(conn),
       ...catalogParts(createMongoCatalogStore(conn), createMongoReviewStore(conn), (catalog) => ({ repo: createMongoCartRepo(conn), inventory: createMongoInventory(conn, p, catalog) })),
     };
@@ -213,9 +219,10 @@ export function createDbStores(cfg: DbConfig): DbStores {
     ugc: createSqlUgcStore(db),
     outbox: createSqlOutbox(db),
     flows: createSqlFlowStore(db, p),
-    media: createSqlMediaStore(db),
+    media: withObjectStorage(createSqlMediaStore(db)),
     settings: createSqlSettingsStore(db, createSecretBox()),
     providers: createSqlProviderStore(db, createSecretBox()),
+    socialIdentities: createSqlSocialIdentityStore(db),
     maintenance: createSqlMaintenance(db),
     ...catalogParts(createSqlCatalogStore(db), createSqlReviewStore(db), (catalog) => ({ repo: createSqlCartRepo(db), inventory: createSqlInventory(db, p, catalog) })),
   };

@@ -32,6 +32,9 @@ shadcn/ui-style primitives on `radix-ui` in `components/ui` · store components 
 - **Admin providers (`lib/providers`):** SMS goes through the provider made live in Admin → SMS providers; drivers
   have fixed hosts (never an admin-typed URL), keys are sealed and write-only, a provider must pass a test before
   it can go live, and only DLT templates with allow-listed variables are sent (no free text).
+- **Providers & storage:** email goes through the provider live in Admin → Email providers (SMTP hosts must resolve
+  to public addresses; connect to the checked IP). Product photos go through `withObjectStorage` (`lib/storage`):
+  server-chosen keys, private buckets, fixed hosts. Social sign-in never matches a customer by email.
 - **Commerce only through `lib/commerce`** (adapter interface). The mock adapter and `/dev/*` pages fail closed in
   production (`resolveCommerce`, `devPagesEnabled`).
 - **Money:** integer paise everywhere (`lib/format.ts`); the server computes every price/total — client state is display only.

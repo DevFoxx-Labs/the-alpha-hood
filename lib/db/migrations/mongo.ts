@@ -238,4 +238,24 @@ export const MONGO_MIGRATIONS: MongoMigration[] = [
       if (await db.listCollections({ name: "providers" }, { nameOnly: true }).hasNext()) await db.collection("providers").drop();
     },
   },
+  {
+    name: "2026_11_29_011_media_storage_key",
+    async up() {
+      // Schemaless: `storageKey` is an optional field on product_media; documents without it keep their bytes.
+    },
+    async down() {
+      // additive only — nothing to undo
+    },
+  },
+  {
+    name: "2026_11_29_012_customer_identities",
+    async up(db) {
+      // Google / Facebook sign-in links; _id = "<provider>|<subject>" (one social account → one customer).
+      await ensureCollection(db, "customer_identities");
+      await db.collection("customer_identities").createIndexes([{ key: { customerId: 1 }, name: "customer_identities_customer_idx" }]);
+    },
+    async down(db) {
+      if (await db.listCollections({ name: "customer_identities" }, { nameOnly: true }).hasNext()) await db.collection("customer_identities").drop();
+    },
+  },
 ];

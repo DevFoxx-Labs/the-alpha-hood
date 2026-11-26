@@ -2,12 +2,12 @@ import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 
 /**
- * Admin-managed providers (SMS now; email and storage use the same table later). One row per saved provider,
+ * Admin-managed providers (SMS, email, storage). One row per saved provider,
  * grouped by `kind`; at most ONE row per kind is active (UNIQUE index in the database, not just a rule in code).
  * The whole document — credentials included — is sealed (AES-256-GCM) by the database stores before it is written.
  * `doc` is null when a row can't be opened with the configured SECRET_BOX_KEY.
  */
-export type ProviderKind = "sms";
+export type ProviderKind = "sms" | "email" | "storage";
 
 export interface ProviderRow<T> {
   id: string;

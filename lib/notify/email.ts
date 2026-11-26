@@ -69,7 +69,19 @@ const g = globalThis as unknown as { __alpha_hood_demo_email?: DemoEmail };
  */
 export const EMAIL_PROVIDERS: Record<string, (env: Env) => EmailAdapter | null> = {};
 
+/**
+ * The provider made live in Admin → Email providers (lib/providers/email-runtime.ts installs it). It wins over the
+ * environment's EMAIL_PROVIDER. Kept on globalThis so every route bundle of this process sees the same one.
+ */
+const live = globalThis as unknown as { __alpha_hood_active_email?: EmailAdapter | null };
+export function setActiveEmail(adapter: EmailAdapter | null): void {
+  live.__alpha_hood_active_email = adapter;
+}
+export const activeEmail = (): EmailAdapter | null => live.__alpha_hood_active_email ?? null;
+
 export function resolveEmail(env: Env = process.env): EmailAdapter {
+  // Only for the real process environment: tests and scripts that pass their own `env` get exactly what it says.
+  if (env === process.env && live.__alpha_hood_active_email) return live.__alpha_hood_active_email;
   const factory = env.EMAIL_PROVIDER ? EMAIL_PROVIDERS[env.EMAIL_PROVIDER] : undefined;
   const real = factory?.(env);
   if (real) return real;

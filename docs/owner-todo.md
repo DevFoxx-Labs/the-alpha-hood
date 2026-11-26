@@ -228,3 +228,14 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] Decide the order to build: social sign-in, push notifications, or the first AI feature. Each is listed in
   `docs/known-gaps.md` with what it needs; until built, the keys saved in Settings are not used.
 - [ ] Use separate keys for the live store and for testing; never reuse the AstroGaon project's keys here.
+
+## 2026-11-29 (email providers, storage, Google / Facebook sign-in)
+- [ ] Admin → Email providers: add your mailbox (e.g. Zoho), send a test email, make it live.
+- [ ] Decide the storage: Amazon S3 or Cloudflare R2 (create a private bucket and a key limited to that bucket),
+  or the server folder only if the server has a permanent disk with backups. Then Admin → Storage: save, test, use.
+- [ ] Google Cloud → OAuth client (Web): add `https://<live-site>/api/auth/social/google/callback`; consent screen
+  with your Privacy Notice and Terms links. Meta for Developers → Facebook Login: add
+  `https://<live-site>/api/auth/social/facebook/callback`; app in Live mode. Save the IDs and secrets in
+  Admin → Settings → Social Sign-in, then sign in once with each.
+- [ ] Lawyer: Privacy Notice rows for Google and Facebook sign-in (version 2026-11-29).
+- [ ] Production: run migrations `2026_11_29_011` and `2026_11_29_012` through the deploy pipeline.

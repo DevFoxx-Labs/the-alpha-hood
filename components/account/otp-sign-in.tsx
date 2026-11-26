@@ -6,6 +6,7 @@ import { api, ApiError } from "@/components/checkout/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useHumanCheck } from "@/components/security/human-check";
+import { SocialButtons, useSocialNotice } from "./social-sign-in";
 
 /**
  * ACC-01 phone OTP sign-in / sign-up (no passwords). `orderNumber` switches to ORD-03 track mode, where a code
@@ -21,6 +22,7 @@ export function OtpSignIn({ onSignedIn, orderNumber, submitLabel = "Continue" }:
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const human = useHumanCheck();
+  const social = useSocialNotice();
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -70,6 +72,16 @@ export function OtpSignIn({ onSignedIn, orderNumber, submitLabel = "Continue" }:
       }}
       className="flex flex-col gap-4"
     >
+      {!orderNumber && social.link ? (
+        <p role="status" className="border border-ink bg-white px-3 py-2.5 text-[13px] leading-[1.5]">
+          <b>Almost there.</b> Verify your mobile number once to finish signing in with {social.link === "google" ? "Google" : "Facebook"}. We&apos;ll link the two, so next time one tap is enough.
+        </p>
+      ) : null}
+      {!orderNumber && social.notice ? (
+        <p role="alert" className="text-[13px] font-semibold text-accent">
+          {social.notice}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-1.5">
         <label htmlFor={`${id}-phone`} className="text-[12px] font-bold uppercase tracking-[0.06em]">
           Mobile number
@@ -132,6 +144,7 @@ export function OtpSignIn({ onSignedIn, orderNumber, submitLabel = "Continue" }:
       <Button type="submit" loading={busy} disabled={challenge ? code.length !== 6 : phone.length !== 10} className="w-full">
         {challenge ? "Verify" : submitLabel}
       </Button>
+      {!orderNumber && !challenge && !social.link ? <SocialButtons /> : null}
       <p className="text-[12px] leading-[1.5] text-ink-2">
         By continuing you agree to our{" "}
         <Link href="/legal/terms" target="_blank" className="underline underline-offset-2">

@@ -326,6 +326,8 @@ export interface ProductMediaTable {
   bytes: Uint8Array;
   created_at: Date;
   created_by: string;
+  /** Null = the bytes are in this row; else `<local|s3|r2>:<key>` (Admin → Storage). */
+  storage_key: string | null;
 }
 
 export interface AppSettingsTable {
@@ -346,7 +348,16 @@ export interface ProvidersTable {
   updated_at: Date;
 }
 
+export interface CustomerIdentitiesTable {
+  provider: string;
+  subject: string;
+  customer_id: string;
+  email: string | null;
+  created_at: Date;
+}
+
 export interface Database {
+  customer_identities: CustomerIdentitiesTable;
   providers: ProvidersTable;
   app_settings: AppSettingsTable;
   product_media: ProductMediaTable;

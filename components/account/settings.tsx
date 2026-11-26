@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useMe } from "./account-frame";
 import { dateLabel } from "./labels";
+import { SignInMethods } from "./social-sign-in";
 
 interface Prefs {
   marketing_email: boolean;
@@ -108,6 +109,8 @@ export function SettingsView() {
           </Button>
         </form>
       </section>
+
+      <SignInMethods box={box} h2={h2} />
 
       <section className={box}>
         <h2 className={h2}>Notifications</h2>

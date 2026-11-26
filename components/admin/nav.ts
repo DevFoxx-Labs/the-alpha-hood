@@ -20,6 +20,7 @@ import {
   Mail01Icon,
   Message01Icon,
   Settings01Icon,
+  HardDriveIcon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import { can, type Permission, type Role, ROLES } from "@/lib/admin/permissions";
@@ -59,6 +60,8 @@ const ALL: NavItem[] = [
   { label: "Audit log", icon: FileValidationIcon, route: "/admin/audit", permission: "audit.read" },
   { label: "View store", icon: Store01Icon, route: "/", permission: "dashboard" },
   { label: "SMS providers", icon: Message01Icon, route: "/admin/sms-providers", permission: "settings.manage" },
+  { label: "Email providers", icon: Mail01Icon, route: "/admin/email-providers", permission: "settings.manage" },
+  { label: "Storage", icon: HardDriveIcon, route: "/admin/storage", permission: "settings.manage" },
   { label: "Settings", icon: Settings01Icon, route: "/admin/settings", permission: "settings.manage" },
 ];
 

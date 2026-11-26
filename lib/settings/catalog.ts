@@ -167,9 +167,10 @@ export const SETTING_GROUPS: readonly SettingGroup[] = [
   {
     id: "social",
     label: "Social Sign-in",
-    description: "Google and Facebook app credentials for \"Continue with Google / Facebook\".",
-    notInUse:
-      "Customers sign in with a mobile number and a one-time code today. Social sign-in is not built yet: it needs an account-linking rule (which account does a Google email belong to?), the Terms and Privacy consent line next to each button, and both providers listed in the Privacy Notice. Keys saved here are kept ready for that work.",
+    description:
+      "\"Continue with Google / Facebook\" on the sign-in page. A button appears as soon as that provider's ID and secret are saved. The first time, the customer also verifies their mobile number once; after that one tap signs them in. Customers can unlink in Account → Settings.",
+    warning:
+      "Register these exact redirect URIs (with your live site address): Google Cloud → Credentials → OAuth client (Web) → Authorised redirect URIs: https://<your-site>/api/auth/social/google/callback — Meta for Developers → Facebook Login → Valid OAuth Redirect URIs: https://<your-site>/api/auth/social/facebook/callback",
     fields: [
       { env: "GOOGLE_CLIENT_ID", label: "Google client ID", type: "string", max: 120, pattern: /^[0-9]{6,20}-[0-9a-z]{20,40}\.apps\.googleusercontent\.com$/, patternHint: "Ends with .apps.googleusercontent.com." },
       { env: "GOOGLE_CLIENT_SECRET", label: "Google client secret", type: "string", secret: true, max: 120, pattern: /^[0-9A-Za-z_-]{20,120}$/, patternHint: "Copy it from Google Cloud → Credentials." },

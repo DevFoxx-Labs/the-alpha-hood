@@ -30,6 +30,7 @@
     "mongodb": "^7.9.1",
     "mysql2": "^3.24.6",
     "next": "16.4.6",
+    "nodemailer": "^10.6.1",
     "pg": "^8.23.1",
     "qrcode.react": "^4.2.0",
     "radix-ui": "^1.8.1",
@@ -41,6 +42,7 @@
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",

@@ -26,15 +26,17 @@
 - 🔴 **SMS provider not proven with a real send.** Admin → SMS providers is built and tested against a fake HTTP
   layer; request shapes come from the AstroGaon gateway. Before launch: add the real provider, send a test SMS,
   make it live, and place one test order to confirm the order templates' variables match the DLT text.
-- 🟠 **Email providers page not built.** AstroGaon offers SMTP and Amazon SES. Here the email seam
-  (`lib/notify/email.ts`) has no real adapter. Needs the owner's choice: (a) SMTP via `nodemailer` (new package,
-  no dependencies of its own) or (b) HTTPS-only providers (SES / Resend / ZeptoMail) with no package. The store,
-  table and step-up from SMS providers are reusable (`kind: "email"`). Until then owner alerts and staff
-  "Forgot password?" emails don't send on the live store.
-- 🟠 **Storage page not built.** AstroGaon offers local / S3 / Cloudflare R2 with a connection test. Here product
-  and return photos are stored in the database (`product_media`, `return_photos`). Needs the owner's choice of
-  bucket provider; S3 and R2 can be done with request signing in `node:crypto` (no package). Moving existing
-  photos is a data migration: copy first, switch reads, delete later.
+- 🔴 **Email, storage and social sign-in not proven against the real services.** All three are unit- and
+  contract-tested with fake providers. Before launch: send a test email from Admin → Email providers; run the
+  connection test on the real bucket, upload a product photo and open it; sign in with Google and Facebook once
+  each from a phone. Run `/security-review` on this change (High tier: auth, uploads, email route).
+- 🟠 **Existing photos are not moved when storage changes.** New uploads go to the active backend; older photos
+  stay where they were written. A "move to the active storage" job (copy, verify, switch the row, delete later) is
+  not built. Return photos (`return_photos`) always stay in the database.
+- 🟡 Storage: photos are served through the store (private buckets). Serving straight from a CDN-backed public
+  bucket would take load off the server; it needs a public base URL setting and `images.remotePatterns`.
+- 🟡 Storage: an object written to S3 / R2 / the folder is left behind if the database row then fails to save
+  (no clean-up of orphans).
 - 🔴 **Turnstile and Sentry not proven against the real services.** Both are built and unit-tested with a fake
   HTTP layer. Before relying on them: save real Turnstile keys and request a sign-in code in a browser (the widget
   code in `components/security/human-check.tsx` has not run against Cloudflare's script); save a real DSN and
@@ -43,10 +45,10 @@
   Cloudflare's current statement on what Turnstile stores in the browser and add it to `COOKIE_INVENTORY` as
   strictly necessary if it stores anything. Lawyer to confirm the new Privacy Notice rows (Cloudflare, Sentry) and
   the cross-border transfer wording.
-- 🟠 **Social sign-in keys are saved but unused** (Admin → Settings → Social Sign-in). To build: OAuth code flow
-  with state + PKCE and an exact redirect URI; verified-email only; a linking rule between a Google / Facebook
-  email and the phone-based customer account; `terms_privacy` ledger row at that sign-up path; both providers in
-  the Privacy Notice. High tier (auth): threat model + `/security-review`.
+- 🟠 **Social sign-in: checkout has no social buttons.** They are on the account sign-in form only; the checkout
+  contact step still uses the mobile code.
+- 🟡 Social sign-in: Facebook's Graph API is called without a version (the app's default version). Pin one in
+  `lib/auth/social.ts` if Meta's app dashboard asks for it.
 - 🟠 **Push keys are saved but unused** (Settings → Push Notifications). To build: subscriptions store (3 engines),
   just-in-time permission prompt, service worker push handler, Web Push encryption (RFC 8291) for sending, a
   marketing consent purpose for offers, delete on sign-out / account deletion.
@@ -57,7 +59,7 @@
 - 🟡 Turnstile protects sign-in code requests only; coupon apply and place order are still rate-limit only.
 - 🟡 Apple sign-in and Firebase push (FCM) have no settings: there is no iOS / Android app yet.
 - 🟡 Twilio is not an SMS driver here: it sends free text, and this store sends DLT templates only.
-- 🟡 Owner alert on an SMS provider change is audit + security log until an email provider exists.
+- 🟡 Owner alerts on provider changes are sent by email once an email provider is live; until then audit + security log.
 
 ## Admin settings (2026-11-26)
 - 🟠 **Commercial settings are still constants.** Free-shipping threshold, shipping fee, COD fee and limit, max
