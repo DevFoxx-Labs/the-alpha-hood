@@ -46,6 +46,8 @@ export interface GroupState {
   description: string;
   warning: string | null;
   stepUp: boolean;
+  /** Set when the store does not read these values yet (the feature is not built). */
+  notInUse: string | null;
   fields: FieldState[];
   missingRequired: string[];
 }
@@ -86,6 +88,7 @@ function groupState(g: SettingGroup, env: Env): GroupState {
     description: g.description,
     warning: g.warning ?? null,
     stepUp: !!g.stepUp,
+    notInUse: g.notInUse ?? null,
     fields,
     missingRequired: fields.filter((f) => f.required && !f.isSet).map((f) => f.label),
   };

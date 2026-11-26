@@ -219,3 +219,12 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] Production: run migration `2026_11_28_010_providers` through the deploy pipeline.
 - [ ] Decide the email provider (SMTP with `nodemailer`, or an HTTPS provider without a new package) and the
   storage bucket (S3 or Cloudflare R2), so those two admin pages can be built.
+
+## 2026-11-26 (Turnstile, Sentry, social sign-in, push, AI keys)
+- [ ] Cloudflare → Turnstile → add a widget (mode Managed) for the store's domain; save both keys in
+  Admin → Settings → Bot Protection; then request a sign-in code in a browser to confirm it still works.
+- [ ] Sentry → create a project (MFA on the account); save its DSN in Admin → Settings → Error Tracking.
+- [ ] Lawyer: confirm the new Privacy Notice rows for Cloudflare Turnstile and Sentry (version 2026-11-29).
+- [ ] Decide the order to build: social sign-in, push notifications, or the first AI feature. Each is listed in
+  `docs/known-gaps.md` with what it needs; until built, the keys saved in Settings are not used.
+- [ ] Use separate keys for the live store and for testing; never reuse the AstroGaon project's keys here.

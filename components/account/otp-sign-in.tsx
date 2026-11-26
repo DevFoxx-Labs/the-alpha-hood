@@ -5,6 +5,7 @@ import { useEffect, useId, useState } from "react";
 import { api, ApiError } from "@/components/checkout/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useHumanCheck } from "@/components/security/human-check";
 
 /**
  * ACC-01 phone OTP sign-in / sign-up (no passwords). `orderNumber` switches to ORD-03 track mode, where a code
@@ -19,6 +20,7 @@ export function OtpSignIn({ onSignedIn, orderNumber, submitLabel = "Continue" }:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  const human = useHumanCheck();
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -30,9 +32,11 @@ export function OtpSignIn({ onSignedIn, orderNumber, submitLabel = "Continue" }:
     setBusy(true);
     setError(null);
     try {
+      // A fresh bot-check token per request (null when the check is off).
+      const turnstile = (await human.token()) ?? undefined;
       const r = orderNumber
-        ? await api<{ challengeId: string; demoCode?: string; message: string }>("/api/track/send", { method: "POST", body: { orderNumber, phone } })
-        : await api<{ challengeId: string; demoCode?: string }>("/api/otp/send", { method: "POST", body: { phone } });
+        ? await api<{ challengeId: string; demoCode?: string; message: string }>("/api/track/send", { method: "POST", body: { orderNumber, phone, turnstile } })
+        : await api<{ challengeId: string; demoCode?: string }>("/api/otp/send", { method: "POST", body: { phone, turnstile } });
       setChallenge({ id: r.challengeId, demoCode: r.demoCode, message: "message" in r && typeof r.message === "string" ? r.message : undefined });
       setCode("");
       setCooldown(30);
@@ -118,6 +122,7 @@ export function OtpSignIn({ onSignedIn, orderNumber, submitLabel = "Continue" }:
         </div>
       ) : null}
 
+      {human.slot}
       {error ? (
         <p role="alert" className="text-[13px] font-semibold text-accent">
           {error}

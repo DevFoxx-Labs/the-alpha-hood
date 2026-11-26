@@ -3,6 +3,9 @@
  * Admin → Settings over their environment variables (lib/settings/runtime.ts), so every reader of
  * `process.env` — kill switches, payment gateway, trackers, legal details — sees them from the first request.
  * Never blocks start-up on a missing or unreachable database: the store then runs from the environment alone.
+ *
+ * `onRequestError` reports server errors to Sentry when a DSN is configured (lib/ops/sentry.ts): no SDK, no
+ * personal data, never throws.
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -11,4 +14,10 @@ export async function register() {
   // The SMS provider made live in Admin → SMS providers (lib/providers/sms-runtime.ts).
   const { startSmsRuntime } = await import("./lib/providers/sms-runtime");
   await startSmsRuntime();
+}
+
+export async function onRequestError(error: unknown, request: { path: string; method: string }, context: { routePath: string; routeType: string }) {
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  const { reportError } = await import("./lib/ops/sentry");
+  await reportError(error, { path: request.path, method: request.method, routePath: context.routePath, routeType: context.routeType });
 }

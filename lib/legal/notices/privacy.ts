@@ -7,8 +7,8 @@ import type { Notice } from "../types";
  */
 export const PRIVACY_NOTICE: Notice = {
   slug: "privacy",
-  version: "2026-11-28",
-  lastUpdated: "2026-11-28",
+  version: "2026-11-29",
+  lastUpdated: "2026-11-29",
   text: {
     en: {
       title: "Privacy Notice",
@@ -83,7 +83,8 @@ export const PRIVACY_NOTICE: Notice = {
                 ["Payment gateway", "Take payments and refunds (UPI, cards, netbanking, wallets). We send only the order number and amount; you enter payment details on the gateway's own page", "Razorpay Software Private Limited, India (when online payment is switched on)"],
                 ["Courier and logistics partners", "Deliver orders, pick up returns, show tracking", "To be confirmed before launch"],
                 ["SMS, email and WhatsApp providers", "OTPs and order updates; offers only if you opted in", "To be confirmed before launch"],
-                ["Error monitoring", "Find and fix technical faults (no payment data)", "To be confirmed before launch"],
+                ["Error monitoring", "Find and fix technical faults: the error text, the page path and the release. No payment data, cookies, IP addresses or phone numbers", "Sentry (used once switched on)"],
+                ["Bot protection", "Confirm that a request for a sign-in code comes from a person, not a script. The provider sees your IP address and browser details", "Cloudflare Turnstile (used once switched on)"],
                 ["Google Analytics 4", "Site analytics — only if you accept Analytics cookies", "Google LLC (used once switched on; listed in the Cookie Policy as \"In use\")"],
                 ["Google Ads", "Ad measurement — only if you accept Advertising cookies", "Google LLC (used once switched on)"],
                 ["Meta Pixel and Conversions API", "Ad measurement and audiences on Facebook and Instagram — only if you accept Advertising cookies", "Meta Platforms Ireland Ltd (used once switched on)"],
@@ -319,7 +320,8 @@ export const PRIVACY_NOTICE: Notice = {
                 ["पेमेंट गेटवे", "भुगतान और रिफ़ंड (UPI, कार्ड, नेटबैंकिंग, वॉलेट)। हम केवल ऑर्डर नंबर और राशि भेजते हैं; भुगतान विवरण आप गेटवे के अपने पेज पर भरते हैं", "Razorpay Software Private Limited, भारत (ऑनलाइन भुगतान चालू होने पर)"],
                 ["कूरियर और लॉजिस्टिक्स साझेदार", "ऑर्डर पहुँचाना, रिटर्न उठाना, ट्रैकिंग दिखाना", "लॉन्च से पहले तय किया जाएगा"],
                 ["SMS, ईमेल और WhatsApp प्रदाता", "OTP और ऑर्डर अपडेट; ऑफ़र केवल तब जब आपने सहमति दी हो", "लॉन्च से पहले तय किया जाएगा"],
-                ["एरर मॉनिटरिंग", "तकनीकी खराबियाँ ढूँढना और ठीक करना (भुगतान डेटा नहीं)", "लॉन्च से पहले तय किया जाएगा"],
+                ["एरर मॉनिटरिंग", "तकनीकी खराबियाँ ढूँढना और ठीक करना: एरर का टेक्स्ट, पेज का पाथ और रिलीज़। भुगतान डेटा, कुकीज़, IP पता या फ़ोन नंबर नहीं", "Sentry (चालू होने पर उपयोग)"],
+                ["बॉट से सुरक्षा", "यह पक्का करना कि साइन-इन कोड का अनुरोध किसी व्यक्ति ने किया है, स्क्रिप्ट ने नहीं। प्रदाता को आपका IP पता और ब्राउज़र की जानकारी दिखती है", "Cloudflare Turnstile (चालू होने पर उपयोग)"],
                 ["Google Analytics 4", "साइट एनालिटिक्स — केवल तब जब आप एनालिटिक्स कुकीज़ स्वीकार करें", "Google LLC (चालू होने पर उपयोग; कुकी नीति में \"उपयोग में\" दिखेगा)"],
                 ["Google Ads", "विज्ञापन मापन — केवल तब जब आप विज्ञापन कुकीज़ स्वीकार करें", "Google LLC (चालू होने पर उपयोग)"],
                 ["Meta Pixel और Conversions API", "Facebook और Instagram पर विज्ञापन मापन और ऑडियंस — केवल तब जब आप विज्ञापन कुकीज़ स्वीकार करें", "Meta Platforms Ireland Ltd (चालू होने पर उपयोग)"],

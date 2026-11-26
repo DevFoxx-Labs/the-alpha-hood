@@ -6,6 +6,7 @@ import { resolveCustomers } from "@/lib/customers/store";
 import { guardPublicWrite, jsonError } from "@/lib/http/guard";
 import { commerceErrorResponse, privateJson } from "@/lib/http/commerce-http";
 import { rateLimiter } from "@/lib/http/rate-limit";
+import { checkHuman } from "@/lib/security/turnstile";
 import { resolveOrders } from "@/lib/orders/store";
 import { asObject, normaliseIndianMobile, rejectUnknownFields } from "@/lib/validation";
 
@@ -16,13 +17,15 @@ import { asObject, normaliseIndianMobile, rejectUnknownFields } from "@/lib/vali
  */
 export async function POST(request: Request) {
   if (!signInEnabled()) return jsonError(503, "sign_in_disabled", "Tracking is temporarily unavailable.");
-  const guard = await guardPublicWrite(request, { name: "track-send", limit: 5, windowMs: 10 * 60_000, maxBytes: 128 });
+  const guard = await guardPublicWrite(request, { name: "track-send", limit: 5, windowMs: 10 * 60_000, maxBytes: 2_560 });
   if (!guard.ok) return guard.response;
   const daily = await rateLimiter.hit(`track-day:ip:${guard.ip}`, 20, 86_400_000);
   if (!daily.ok) return jsonError(429, "rate_limited", "Too many attempts today.");
   try {
     const input = asObject(guard.body);
-    rejectUnknownFields(input, ["orderNumber", "phone"]);
+    rejectUnknownFields(input, ["orderNumber", "phone", "turnstile"]);
+    const human = await checkHuman(input.turnstile, guard.ip);
+    if (human === "failed") return jsonError(403, "human_check_failed", "We couldn't confirm you're not a robot. Reload the page and try again.");
     const number = typeof input.orderNumber === "string" ? input.orderNumber.trim().toUpperCase() : "";
     const phone = normaliseIndianMobile(input.phone);
     if (!ORDER_NUMBER_RE.test(number) || !phone) return jsonError(422, "invalid_input", "Enter your order number and the mobile number used for it.");

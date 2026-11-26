@@ -5,6 +5,7 @@ import { useEffect, useId, useState } from "react";
 import { CheckoutStep, DoneLine } from "@/components/store/checkout-blocks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useHumanCheck } from "@/components/security/human-check";
 import { api, ApiError } from "./api";
 
 /**
@@ -20,6 +21,7 @@ export function ContactStep({ customer, onVerified }: { customer: { phone: strin
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  const human = useHumanCheck();
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -41,7 +43,9 @@ export function ContactStep({ customer, onVerified }: { customer: { phone: strin
     setBusy(true);
     setError(null);
     try {
-      const r = await api<{ challengeId: string; demoCode?: string }>("/api/otp/send", { method: "POST", body: { phone } });
+      // A fresh bot-check token per request (undefined when the check is off).
+      const turnstile = (await human.token()) ?? undefined;
+      const r = await api<{ challengeId: string; demoCode?: string }>("/api/otp/send", { method: "POST", body: { phone, turnstile } });
       setChallenge({ id: r.challengeId, demoCode: r.demoCode });
       setCode("");
       setCooldown(30);
@@ -136,6 +140,7 @@ export function ContactStep({ customer, onVerified }: { customer: { phone: strin
           </div>
         ) : null}
 
+        {human.slot}
         {error ? (
           <p role="alert" className="text-[13px] font-semibold text-accent">
             {error}

@@ -42,6 +42,11 @@ export interface SettingGroup {
   warning?: string;
   /** Saving needs a fresh authenticator code, even inside a signed-in session (money and credentials). */
   stepUp?: boolean;
+  /**
+   * Set when the store does not use these values yet: the keys can be saved now, and the page says plainly that
+   * nothing reads them until the feature is built. Remove it in the change that builds the feature.
+   */
+  notInUse?: string;
   fields: readonly SettingField[];
 }
 
@@ -127,6 +132,75 @@ export const SETTING_GROUPS: readonly SettingGroup[] = [
     description: "Whether search engines may index the store. Off = robots.txt disallows everything and every page is noindex.",
     warning: "Switch this on at launch only. It also needs a production build with the real site address and no demo data.",
     fields: [{ env: "ALLOW_INDEXING", label: "Allow indexing", type: "bool", help: "Search engines may crawl and list the store." }],
+  },
+  {
+    id: "turnstile",
+    label: "Bot Protection",
+    description:
+      "Cloudflare Turnstile: the \"verify you are human\" check before a sign-in code is sent (account sign-in, checkout and order tracking). On as soon as both keys are saved; remove either key to switch it off.",
+    warning: "Create a Turnstile widget in the Cloudflare dashboard (mode: Managed) for this site's domain, then paste both keys. With a wrong key pair nobody can request a sign-in code — test sign-in right after saving.",
+    fields: [
+      { env: "TURNSTILE_SITE_KEY", label: "Site key", type: "string", required: true, max: 80, pattern: /^[0-9A-Za-z_-]{10,80}$/, patternHint: "Copy it from the Cloudflare dashboard.", help: "Public; shown to browsers." },
+      { env: "TURNSTILE_SECRET_KEY", label: "Secret key", type: "string", secret: true, required: true, max: 120, pattern: /^[0-9A-Za-z_-]{20,120}$/, patternHint: "Copy it from the Cloudflare dashboard." },
+    ],
+  },
+  {
+    id: "sentry",
+    label: "Error Tracking",
+    description:
+      "Sentry: server errors are reported with the error text, the page path and the release — never cookies, headers, IP addresses, phone numbers or request bodies. On as soon as the DSN is saved.",
+    fields: [
+      {
+        env: "SENTRY_DSN",
+        label: "DSN",
+        type: "string",
+        secret: true,
+        required: true,
+        max: 200,
+        // Sentry's own ingest hosts only: the server posts to this address, so it must never be an arbitrary URL.
+        pattern: /^https:\/\/[0-9a-f]{32}@o\d{1,12}\.ingest(\.[a-z]{2})?\.sentry\.io\/\d{1,12}$/,
+        patternHint: "Looks like https://<key>@o123456.ingest.sentry.io/1234567 (Sentry → Project settings → Client keys).",
+      },
+      { env: "SENTRY_ENVIRONMENT", label: "Environment name", type: "string", max: 40, pattern: /^[a-z0-9_-]{2,40}$/, patternHint: "Lower-case letters, digits, - and _ only.", placeholder: "production" },
+    ],
+  },
+  {
+    id: "social",
+    label: "Social Sign-in",
+    description: "Google and Facebook app credentials for \"Continue with Google / Facebook\".",
+    notInUse:
+      "Customers sign in with a mobile number and a one-time code today. Social sign-in is not built yet: it needs an account-linking rule (which account does a Google email belong to?), the Terms and Privacy consent line next to each button, and both providers listed in the Privacy Notice. Keys saved here are kept ready for that work.",
+    fields: [
+      { env: "GOOGLE_CLIENT_ID", label: "Google client ID", type: "string", max: 120, pattern: /^[0-9]{6,20}-[0-9a-z]{20,40}\.apps\.googleusercontent\.com$/, patternHint: "Ends with .apps.googleusercontent.com." },
+      { env: "GOOGLE_CLIENT_SECRET", label: "Google client secret", type: "string", secret: true, max: 120, pattern: /^[0-9A-Za-z_-]{20,120}$/, patternHint: "Copy it from Google Cloud → Credentials." },
+      { env: "FACEBOOK_APP_ID", label: "Facebook app ID", type: "string", max: 20, pattern: /^\d{10,20}$/, patternHint: "Digits only." },
+      { env: "FACEBOOK_APP_SECRET", label: "Facebook app secret", type: "string", secret: true, max: 64, pattern: /^[0-9a-f]{32}$/, patternHint: "32 characters, from Meta for Developers → App settings → Basic." },
+    ],
+  },
+  {
+    id: "push",
+    label: "Push Notifications",
+    description: "Web Push (VAPID) keys for order updates and offers sent to the browser or the installed app.",
+    notInUse:
+      "Push is not built yet: it needs a just-in-time permission prompt, a subscriptions table, the service worker's push handler, and a marketing consent switch for offers. Keys saved here are kept ready for that work.",
+    fields: [
+      { env: "WEB_PUSH_PUBLIC_KEY", label: "VAPID public key", type: "string", max: 100, pattern: /^[0-9A-Za-z_-]{80,100}$/, patternHint: "The base64url public key (about 87 characters).", help: "Public; shown to browsers." },
+      { env: "WEB_PUSH_PRIVATE_KEY", label: "VAPID private key", type: "string", secret: true, max: 60, pattern: /^[0-9A-Za-z_-]{40,60}$/, patternHint: "The base64url private key (about 43 characters)." },
+      { env: "WEB_PUSH_SUBJECT", label: "Contact (subject)", type: "string", max: 120, pattern: /^(mailto:[^\s@]+@[^\s@]+\.[a-z]{2,}|https:\/\/[^\s]+)$/i, patternHint: "mailto:you@example.com or an https:// address.", help: "Push services use it to reach you about problems." },
+    ],
+  },
+  {
+    id: "ai",
+    label: "AI Providers",
+    description: "API keys for AI features. Keys stay on the server; they are never sent to a browser.",
+    notInUse:
+      "The store has no AI feature yet (for example product descriptions in the admin). Before one is built it needs a daily spend cap and a rule that the model's output is reviewed, never published directly. Keys saved here are kept ready for that work.",
+    fields: [
+      { env: "AI_PROVIDER", label: "Preferred provider", type: "select", options: [{ value: "anthropic", label: "Anthropic (Claude)" }, { value: "openai", label: "OpenAI" }, { value: "gemini", label: "Google Gemini" }] },
+      { env: "ANTHROPIC_API_KEY", label: "Anthropic API key", type: "string", secret: true, max: 200, pattern: /^sk-ant-[0-9A-Za-z_-]{20,180}$/, patternHint: "Starts with sk-ant-." },
+      { env: "OPENAI_API_KEY", label: "OpenAI API key", type: "string", secret: true, max: 200, pattern: /^sk-[0-9A-Za-z_-]{20,190}$/, patternHint: "Starts with sk-." },
+      { env: "GEMINI_API_KEY", label: "Gemini API key", type: "string", secret: true, max: 100, pattern: /^[0-9A-Za-z_-]{30,100}$/, patternHint: "Copy it from Google AI Studio." },
+    ],
   },
 ];
 

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AiBrain01Icon,
   Alert02Icon,
   Analytics01Icon,
   ArrowRight01Icon,
@@ -10,10 +11,12 @@ import {
   Database01Icon,
   FileScriptIcon,
   JusticeScale01Icon,
+  Notification03Icon,
   Search01Icon,
   SecurityCheckIcon,
   Settings01Icon,
   ShoppingCart01Icon,
+  UserIcon,
   ViewIcon,
   ViewOffIcon,
 } from "@hugeicons/core-free-icons";
@@ -32,6 +35,11 @@ import { AButton, AIcon, AInput, ALabel, ASelect, ATextarea, EmptyState, PageHea
  * A secret is never present in the payload: the form can replace one, not read it.
  */
 const ICONS: Record<string, IconSvgElement> = {
+  turnstile: SecurityCheckIcon,
+  sentry: Alert02Icon,
+  social: UserIcon,
+  push: Notification03Icon,
+  ai: AiBrain01Icon,
   general: Settings01Icon,
   legal: JusticeScale01Icon,
   checkout: ShoppingCart01Icon,
@@ -58,7 +66,7 @@ function SourceBadge({ field }: { field: FieldState }) {
   );
 }
 
-function Notice({ tone, children }: { tone: "amber" | "red"; children: React.ReactNode }) {
+function Notice({ tone, children }: { tone: "amber" | "red" | "slate"; children: React.ReactNode }) {
   return (
     <div
       role={tone === "red" ? "alert" : "note"}
@@ -66,7 +74,9 @@ function Notice({ tone, children }: { tone: "amber" | "red"; children: React.Rea
         "flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm",
         tone === "amber"
           ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300"
-          : "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300",
+          : tone === "slate"
+            ? "border-border bg-muted/40 text-foreground"
+            : "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300",
       )}
     >
       <AIcon icon={Alert02Icon} className="mt-0.5" />
@@ -283,7 +293,9 @@ function GroupForm({ group, onSaved, onDirty }: { group: GroupState; onSaved: (g
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-base font-semibold text-foreground">{group.label}</h2>
-          {group.fields.some((f) => f.required) ? (
+          {group.notInUse ? (
+            <span className={cn(BADGE, "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400")}>Not in use yet</span>
+          ) : group.fields.some((f) => f.required) ? (
             group.missingRequired.length === 0 ? (
               <span className={cn(BADGE, "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400")}>
                 <AIcon icon={CheckmarkCircle02Icon} className="h-3 w-3" /> Configured
@@ -298,6 +310,12 @@ function GroupForm({ group, onSaved, onDirty }: { group: GroupState; onSaved: (g
         <p className="mt-1 text-sm text-muted-foreground">{group.description}</p>
       </div>
 
+      {group.notInUse ? (
+        <Notice tone="slate">
+          <p className="font-medium">Not used by the store yet</p>
+          <p className="mt-1 text-muted-foreground">{group.notInUse}</p>
+        </Notice>
+      ) : null}
       {group.warning ? <Notice tone="amber">{group.warning}</Notice> : null}
 
       {toggles.length ? (

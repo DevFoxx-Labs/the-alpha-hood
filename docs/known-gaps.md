@@ -35,8 +35,27 @@
   and return photos are stored in the database (`product_media`, `return_photos`). Needs the owner's choice of
   bucket provider; S3 and R2 can be done with request signing in `node:crypto` (no package). Moving existing
   photos is a data migration: copy first, switch reads, delete later.
-- 🟡 Integrations not offered because the feature doesn't exist here yet: Turnstile, Sentry, Google / Facebook /
-  Apple sign-in, push (FCM), AI providers. Add each as a group in `lib/settings/catalog.ts` with its feature.
+- 🔴 **Turnstile and Sentry not proven against the real services.** Both are built and unit-tested with a fake
+  HTTP layer. Before relying on them: save real Turnstile keys and request a sign-in code in a browser (the widget
+  code in `components/security/human-check.tsx` has not run against Cloudflare's script); save a real DSN and
+  confirm a test error appears in Sentry.
+- 🟠 **Turnstile: cookie / storage use not confirmed.** The Cookie Policy inventory was not changed. Check
+  Cloudflare's current statement on what Turnstile stores in the browser and add it to `COOKIE_INVENTORY` as
+  strictly necessary if it stores anything. Lawyer to confirm the new Privacy Notice rows (Cloudflare, Sentry) and
+  the cross-border transfer wording.
+- 🟠 **Social sign-in keys are saved but unused** (Admin → Settings → Social Sign-in). To build: OAuth code flow
+  with state + PKCE and an exact redirect URI; verified-email only; a linking rule between a Google / Facebook
+  email and the phone-based customer account; `terms_privacy` ledger row at that sign-up path; both providers in
+  the Privacy Notice. High tier (auth): threat model + `/security-review`.
+- 🟠 **Push keys are saved but unused** (Settings → Push Notifications). To build: subscriptions store (3 engines),
+  just-in-time permission prompt, service worker push handler, Web Push encryption (RFC 8291) for sending, a
+  marketing consent purpose for offers, delete on sign-out / account deletion.
+- 🟠 **AI keys are saved but unused** (Settings → AI Providers). To build with the first AI feature: daily spend
+  cap, per-staff rate limit, output treated as untrusted and reviewed before publishing, provider in the Privacy
+  Notice if customer data is ever sent.
+- 🟡 Sentry reports server errors only; browser errors are not captured (would need the SDK or a small client hook).
+- 🟡 Turnstile protects sign-in code requests only; coupon apply and place order are still rate-limit only.
+- 🟡 Apple sign-in and Firebase push (FCM) have no settings: there is no iOS / Android app yet.
 - 🟡 Twilio is not an SMS driver here: it sends free text, and this store sends DLT templates only.
 - 🟡 Owner alert on an SMS provider change is audit + security log until an email provider exists.
 
@@ -77,12 +96,13 @@
 - 🔴 Pentest of the High-risk flows (OTP, checkout/payments, wallet/gift cards, refunds, admin/MFA, uploads, webhooks)
   before launch. `/security-review` of M5–M9 done 2026-11-25: no high-confidence findings
   (`docs/security/2026-11-25-security-review-m5-m9.md`); repeat it once the DB, gateway and providers are wired in.
-- 🟠 No bot protection (Turnstile) on OTP send, coupon apply and place order (PRD §7) — rate limits only.
+- 🟠 Bot protection (Turnstile) covers OTP send and order tracking once its keys are saved; coupon apply and place
+  order (PRD §7) are still rate limits only.
 
 - 🟠 Guest cart is not merged into a signed-in customer's earlier cart (CART-04 merge on login — M6).
 - 🟠 Paid-but-out-of-stock and duplicate payments go to `needs_review` — refunds need the gateway + admin (M7).
 - 🟠 Real gateway redirect will be an external URL — extend `safeRedirect` with the gateway host allow-list.
-- 🟡 Sentry not set up (needs owner account / DSN).
+- 🟡 Sentry reporting is built (server errors); it starts once the owner saves a DSN in Admin → Settings.
 
 - 🔴 **GST invoice number too long:** `lib/orders/store.ts` `nextInvoiceNumber` issues `INV/2026-27/000001`
   (18 characters); CGST Rule 46(b) allows a consecutive serial of at most 16. Fix: a shorter format such as

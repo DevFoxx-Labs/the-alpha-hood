@@ -1,5 +1,70 @@
 # Change log
 
+## 2026-11-26 — Settings: Bot Protection, Error Tracking, Social Sign-in, Push, AI Providers
+
+**Asked for:** Turnstile, Sentry, Google / Facebook sign-in, push notifications and AI providers in Admin → Settings.
+
+**Five new sections in Admin → Settings** (`lib/settings/catalog.ts`; same rules as the others: owner only,
+encrypted, secrets write-only, saved value wins over the environment):
+
+| Section | Keys | Used by the store? |
+| --- | --- | --- |
+| Bot Protection | Turnstile site key, secret key | **Yes** — on as soon as both are saved |
+| Error Tracking | Sentry DSN, environment name | **Yes** — on as soon as the DSN is saved |
+| Social Sign-in | Google client ID + secret, Facebook app ID + secret | No — keys kept ready |
+| Push Notifications | VAPID public + private key, contact | No — keys kept ready |
+| AI Providers | preferred provider; Anthropic, OpenAI, Gemini keys | No — keys kept ready |
+
+The three unused sections show a "Not in use yet" badge and say on the page what has to be built first, so a saved
+key is never mistaken for a working feature (`notInUse` in the catalogue; remove it in the change that builds the
+feature).
+
+**Built with the settings**
+- **Turnstile** (`lib/security/turnstile.ts`, `components/security/human-check.tsx`, `GET /api/human-check`):
+  `POST /api/otp/send` and `POST /api/track/send` — the two routes that send a paid sign-in SMS — require a valid
+  token when both keys are set. The account sign-in form, the checkout contact step and order tracking fetch a
+  fresh token per request; Cloudflare's script loads only on those forms and only when Turnstile is on. Closes the
+  known gap "no bot protection on OTP send" (coupon apply and place order are still rate-limit only).
+- **Sentry** (`lib/ops/sentry.ts`, `onRequestError` in `instrumentation.ts`): server errors are posted to Sentry's
+  envelope endpoint. No SDK, no new package. Server side only — browser errors are not reported.
+- **Privacy Notice** (EN + HI, version 2026-11-29): the "Error monitoring" row now names Sentry and what is sent;
+  new "Bot protection" row for Cloudflare Turnstile. Both "used once switched on".
+
+**Decisions**
+- Turnstile: a missing or rejected token is refused (403). If Cloudflare can't be reached the request is allowed,
+  because sign-in must not go down with a third party; the per-IP and per-phone SMS limits still apply and the
+  event is logged.
+- Sentry events carry the error type, scrubbed message, stack, route and path without the query string. Never
+  headers, cookies, IP addresses or bodies. At most 20 events a minute per server.
+- Push uses standard Web Push (VAPID) keys, because this is a web store with a service worker. AstroGaon uses
+  Firebase (FCM) for its mobile apps; FCM keys can be added when an app exists.
+- No model name is stored for AI: a feature picks its model when it is built.
+
+**Threat model**
+- Assets: SMS spend and sign-in availability (Turnstile), error data (Sentry), OAuth secrets, push private key,
+  paid AI keys. Actors: bot, guest, stolen owner session, someone who can save settings.
+- Bot requests sign-in codes in bulk → Turnstile token required and verified on the server with the secret key
+  (prevent, tested 403); rate limits stay behind it.
+- Token forged, replayed or malformed → shape check, then Cloudflare's verdict; tokens are single use on their
+  side (prevent, tested).
+- Saved setting makes the server call an internal address (SSRF) → Turnstile verify address is fixed in code; the
+  Sentry DSN must match Sentry's own ingest hosts, in the catalogue and again when read (prevent, tested).
+- Personal data or secrets leak to Sentry → allow-listed fields, scrubbed message, no query string (prevent, tested).
+- Error storm becomes a request storm → 20 a minute cap, 3 s timeout, never throws (prevent, tested).
+- Wrong Turnstile keys lock everyone out of sign-in → warning on the form; removing either key switches it off at
+  once (recover). Not prevented automatically.
+- Secrets read back → never in the payload (prevent, tested).
+
+**Verification**
+- `pnpm typecheck` ✓ · `pnpm lint` ✓ · `pnpm test` 501/501 ✓ (memory + local MySQL). New:
+  `lib/security/integrations.test.ts` (8 tests).
+- A bug found by the tests and fixed: the Sentry scrubber cut a long key in two instead of removing it.
+- **Not verified against the real services:** no Turnstile widget was rendered and no event reached Sentry (no
+  accounts or keys on this machine). The Turnstile widget calls (`render` / `execute` / `reset`) are written from
+  Cloudflare's documented API from memory, not checked against the live script.
+- **Not seen in a browser:** the five sections and the two sign-in forms. `pnpm build` not re-run.
+- Not run: PostgreSQL and MongoDB.
+
 ## 2026-11-26 — Admin → SMS providers (from the AstroGaon panel)
 
 **Asked for:** the AstroGaon admin's Integrations, Providers and Storage settings in this admin. This entry is the

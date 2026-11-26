@@ -17,6 +17,8 @@ export type SecurityEvent =
   | "rate_limit_store_error"
   | "admin_reset_code_requested"
   | "admin_password_reset"
+  | "human_check_failed"
+  | "human_check_unavailable"
   | "sms_provider_changed"
   | "sms_provider_test";
 
