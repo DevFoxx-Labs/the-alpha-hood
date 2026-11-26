@@ -22,6 +22,20 @@
   If added, ask for geolocation just-in-time and never send coordinates without consent.
 - 🟡 Hindi only for the Privacy Notice; Terms/Refund/Cookie and the banner are English.
 
+## Customer dashboard (2026-11-30)
+- 🟠 **OpenStreetMap is for light use.** Public OSM tiles and Nominatim allow modest traffic (Nominatim: 1 request
+  a second per app, enforced on our server). Before launch traffic, add a MapTiler key and switch suggestions to
+  Google in Settings → Maps (or a paid Nominatim host). Check the OSM tile usage policy for your volume.
+- 🟠 **No CSP yet** — once a Content-Security-Policy is added, allow `tile.openstreetmap.org` /
+  `api.maptiler.com` in `img-src`.
+- 🟡 Review photos are not supported (text, stars and fit only). The upload pipeline from return photos could be
+  reused with moderation.
+- 🟡 Customers aren't notified when their review is published / rejected or their feedback answered (they see it
+  in the account). Add `review_decided` / `feedback_answered` to the notification catalogue.
+- 🟡 Couriers don't receive the map pin yet: no shipping provider adapter exists (labels show the address text).
+- 🟡 Addresses saved before this change have no pin, no alternate number and no default until the customer
+  edits them; the first one becomes default only when another is added or set.
+
 ## Notifications & security settings (2026-11-30)
 - 🟠 **Existing customer emails are unverified.** With "Send emails only to verified addresses" on (default),
   customers who typed an email before this change get no order emails until they confirm it in

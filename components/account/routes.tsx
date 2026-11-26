@@ -10,6 +10,8 @@ import { ReturnForm } from "./return-form";
 import { SettingsView } from "./settings";
 import { AlertsView, ClubView } from "./club-views";
 import { WearTheHoodView } from "./wear-the-hood";
+import { HelpView } from "./help-view";
+import { ReviewsView } from "./reviews-view";
 
 /** Client entry points for the /account routes (dynamic params read on the client). */
 export function AccountHome() {
@@ -91,6 +93,22 @@ export function AccountWearTheHood() {
   return (
     <AccountFrame title="#WearTheHood">
       <WearTheHoodView />
+    </AccountFrame>
+  );
+}
+
+export function AccountReviews() {
+  return (
+    <AccountFrame title="My reviews">
+      <ReviewsView />
+    </AccountFrame>
+  );
+}
+
+export function AccountHelp() {
+  return (
+    <AccountFrame title="Help & feedback">
+      <HelpView />
     </AccountFrame>
   );
 }

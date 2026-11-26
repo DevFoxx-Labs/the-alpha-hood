@@ -30,6 +30,7 @@ export const PERMISSIONS = [
   "giftcards.issue",
   "subscribers.read", // newsletter list (masked) + full-contact CSV export (audited)
   "settings.manage", // store settings, kill switches, integration keys and SMS providers — owner only
+  "feedback.manage", // read and answer customers' help & feedback messages
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -41,12 +42,12 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   store_manager: [
     "dashboard", "orders.read", "orders.write", "orders.ship", "returns.read", "returns.qc", "refunds.issue",
     "customers.read", "customers.write", "inventory.read", "inventory.write", "catalog.read", "catalog.write", "promotions.read",
-    "reports.read", "privacy.read", "ugc.moderate",
+    "reports.read", "privacy.read", "ugc.moderate", "feedback.manage",
   ],
   catalog_editor: ["dashboard", "catalog.read", "catalog.write", "inventory.read", "promotions.read"],
-  support: ["dashboard", "orders.read", "orders.write", "returns.read", "refunds.issue", "customers.read", "privacy.read", "privacy.write"],
+  support: ["dashboard", "orders.read", "orders.write", "returns.read", "refunds.issue", "customers.read", "privacy.read", "privacy.write", "feedback.manage"],
   warehouse: ["dashboard", "orders.read", "orders.ship", "returns.read", "returns.qc", "inventory.read", "inventory.write"],
-  marketing: ["dashboard", "catalog.read", "promotions.read", "reports.read", "ugc.moderate", "subscribers.read"],
+  marketing: ["dashboard", "catalog.read", "promotions.read", "reports.read", "ugc.moderate", "subscribers.read", "feedback.manage"],
   finance: ["dashboard", "orders.read", "returns.read", "refunds.issue", "customers.read", "reports.read", "giftcards.issue"],
 };
 

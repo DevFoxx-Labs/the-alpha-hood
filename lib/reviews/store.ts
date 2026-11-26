@@ -13,6 +13,8 @@ export interface ReviewStore {
   /** Average + count per style (product cards and the product page header). */
   ratings(): Promise<Map<string, { average: number; count: number }>>;
   insertMany(reviews: Review[]): Promise<void>;
+  /** Removes one review and its helpful votes (a customer deleted or edited it, or erased their account). */
+  remove(id: string): Promise<boolean>;
   /** How many reviews have an id starting with `prefix` (go-live check: demo reviews are `rv_style_…`). */
   countByIdPrefix(prefix: string): Promise<number>;
 }
@@ -69,6 +71,13 @@ export function createMemoryReviewStore(initial: Review[] = []): ReviewStore {
     async insertMany(list) {
       const have = new Set(reviews.map((r) => r.id));
       for (const r of list) if (!have.has(r.id)) reviews.push({ ...r });
+    },
+    async remove(id) {
+      const i = reviews.findIndex((r) => r.id === id);
+      if (i < 0) return false;
+      reviews.splice(i, 1);
+      votes.delete(id);
+      return true;
     },
     async countByIdPrefix(prefix) {
       return reviews.filter((r) => r.id.startsWith(prefix)).length;

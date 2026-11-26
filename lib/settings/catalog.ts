@@ -152,6 +152,18 @@ export const SETTING_GROUPS: readonly SettingGroup[] = [
     ],
   },
   {
+    id: "maps",
+    label: "Maps",
+    description:
+      "The map in the address form: customers drop a pin or use their current location, and the address fields are suggested from it. Works with no keys (OpenStreetMap). For more traffic, add your own map tiles key or switch suggestions to Google.",
+    warning: "OpenStreetMap's free servers are for light use. Before heavy traffic, add a MapTiler key (map tiles) and switch suggestions to Google (or a paid geocoder).",
+    fields: [
+      { env: "MAP_GEOCODER", label: "Address suggestions from", type: "select", options: [{ value: "osm", label: "OpenStreetMap (free, light use)" }, { value: "google", label: "Google Geocoding (needs a key)" }], help: "Called from our server: the customer's IP address is not shared." },
+      { env: "GOOGLE_MAPS_API_KEY", label: "Google Maps API key", type: "string", secret: true, max: 60, pattern: /^[A-Za-z0-9_-]{30,60}$/, patternHint: "Copy it from Google Cloud → Credentials. Restrict it to the Geocoding API." },
+      { env: "MAPTILER_KEY", label: "MapTiler key (map tiles)", type: "string", max: 40, pattern: /^[A-Za-z0-9]{16,40}$/, patternHint: "Copy it from MapTiler Cloud → API keys.", help: "Public (shown to browsers). Restrict it to your domain in MapTiler. Empty = OpenStreetMap tiles." },
+    ],
+  },
+  {
     id: "turnstile",
     label: "Bot Protection",
     description:

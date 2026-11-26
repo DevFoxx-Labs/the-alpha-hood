@@ -1,7 +1,7 @@
 import { MOCK_REVIEWS } from "@/lib/commerce/mock/data";
 import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
-import { createMemoryReviewStore, reviewsFromStore } from "./store";
+import { createMemoryReviewStore, type ReviewStore, reviewsFromStore } from "./store";
 import type { Review, ReviewsAdapter } from "./types";
 
 /**
@@ -22,10 +22,16 @@ function refusingReviews(): ReviewsAdapter {
   return { summary: fail, list: fail, voteHelpful: fail };
 }
 
-export function resolveReviews(env: Env = process.env): ReviewsAdapter {
+/** The store the product pages read reviews from — also where approved customer reviews are published. */
+export function resolveReviewStore(env: Env = process.env): ReviewStore | null {
   const db = env.COMMERCE_PROVIDER === "own" ? dbStores(env) : null;
-  if (db) return db.reviews;
-  return mockDataAllowed(env) ? devSingleton("reviews", () => createMockReviews()) : refusingReviews();
+  if (db) return db.reviewStore;
+  return mockDataAllowed(env) ? devSingleton("review_store", () => createMemoryReviewStore(MOCK_REVIEWS)) : null;
+}
+
+export function resolveReviews(env: Env = process.env): ReviewsAdapter {
+  const store = resolveReviewStore(env);
+  return store ? reviewsFromStore(store) : refusingReviews();
 }
 
 /** Resolved on each call so it follows the current environment (like `commerce`). */

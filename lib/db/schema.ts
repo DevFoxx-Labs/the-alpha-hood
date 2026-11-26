@@ -49,6 +49,13 @@ export interface CustomerAddressesTable {
   city: string;
   state: string;
   type: string;
+  alt_phone: string;
+  instructions: string;
+  for_other: boolean | number;
+  is_default: boolean | number;
+  /** Map pin in micro-degrees (integers, exact on every engine); NULL = no pin. */
+  lat_e6: number | null;
+  lng_e6: number | null;
 }
 
 export interface SessionsTable {
@@ -358,7 +365,20 @@ export interface CustomerIdentitiesTable {
   created_at: Date;
 }
 
+export interface CustomerSubmissionsTable {
+  id: string;
+  kind: string;
+  customer_id: string;
+  status: string;
+  /** UNIQUE when set (one review per customer per product); NULL for feedback. */
+  unique_key: string | null;
+  doc: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
 export interface Database {
+  customer_submissions: CustomerSubmissionsTable;
   customer_identities: CustomerIdentitiesTable;
   providers: ProvidersTable;
   app_settings: AppSettingsTable;

@@ -34,6 +34,10 @@ export interface CustomerStore {
   setName(id: string, name: string | null): Promise<void>;
   addAddress(id: string, address: AddressInput): Promise<Address>;
   removeAddress(id: string, addressId: string): Promise<boolean>;
+  /** Replaces one of the customer's own addresses (owner-scoped: someone else's id behaves like a missing one). */
+  updateAddress(id: string, addressId: string, address: AddressInput): Promise<Address | null>;
+  /** Makes one address the default (and no other). False when it isn't this customer's. */
+  setDefaultAddress(id: string, addressId: string): Promise<boolean>;
   /** DPDP erasure: removes contact details and addresses; the phone can sign up again as a new account. */
   erase(id: string, now?: Date): Promise<void>;
   /** Called once an order is confirmed (counts, coupon usage). */
@@ -90,9 +94,27 @@ export function createMemoryCustomerStore(): CustomerStore {
     async removeAddress(id, addressId) {
       const c = byId.get(id);
       if (!c) return false;
-      const before = c.addresses.length;
+      const gone = c.addresses.find((a) => a.id === addressId);
+      if (!gone) return false;
       c.addresses = c.addresses.filter((a) => a.id !== addressId);
-      return c.addresses.length < before;
+      if (gone.isDefault && c.addresses[0]) c.addresses[0] = { ...c.addresses[0], isDefault: true };
+      return true;
+    },
+    async updateAddress(id, addressId, input) {
+      const c = byId.get(id);
+      const i = c ? c.addresses.findIndex((a) => a.id === addressId) : -1;
+      if (!c || i < 0) return null;
+      const wasDefault = !!c.addresses[i].isDefault;
+      const next: Address = { ...input, id: addressId, isDefault: input.isDefault || wasDefault };
+      if (next.isDefault) c.addresses = c.addresses.map((a) => ({ ...a, isDefault: false }));
+      c.addresses[i] = next;
+      return { ...next };
+    },
+    async setDefaultAddress(id, addressId) {
+      const c = byId.get(id);
+      if (!c || !c.addresses.some((a) => a.id === addressId)) return false;
+      c.addresses = c.addresses.map((a) => ({ ...a, isDefault: a.id === addressId }));
+      return true;
     },
     async erase(id, now = new Date()) {
       const c = byId.get(id);
@@ -108,9 +130,11 @@ export function createMemoryCustomerStore(): CustomerStore {
       const c = byId.get(id);
       if (!c) throw new Error("Customer not found");
       if (c.addresses.length >= MAX_ADDRESSES) throw new Error("Too many addresses");
-      const saved: Address = { ...address, id: `adr_${randomToken(9)}` };
+      // The first address is the default; a new default replaces the old one.
+      const saved: Address = { ...address, id: `adr_${randomToken(9)}`, isDefault: !!address.isDefault || c.addresses.length === 0 };
+      if (saved.isDefault) c.addresses = c.addresses.map((a) => ({ ...a, isDefault: false }));
       c.addresses.push(saved);
-      return saved;
+      return { ...saved };
     },
     async search(query, limit = 50) {
       const q = query.trim().toLowerCase().slice(0, 80);
@@ -159,6 +183,8 @@ export function resolveCustomers(env: Env = process.env): CustomerStore {
     setName: fail,
     addAddress: fail,
     removeAddress: fail,
+    updateAddress: fail,
+    setDefaultAddress: fail,
     erase: fail,
     recordOrder: fail,
     search: fail,

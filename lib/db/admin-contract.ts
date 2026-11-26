@@ -265,6 +265,43 @@ for (const target of testTargets()) {
       expect(await s.socialIdentities.listFor("cus_s9")).toEqual([]);
     });
 
+    it("address book: extra fields and the map pin round-trip; one default even when changed in parallel; owner-scoped edit", async () => {
+      const { customer } = await s.customers.findOrCreateByPhone("+919000070001");
+      const other = (await s.customers.findOrCreateByPhone("+919000070002")).customer;
+      const base = { name: "Asha K", phone: "+919000070001", pincode: "411045", line1: "Flat 302, Shanti Apartments", line2: "Baner Road", landmark: "", city: "Pune", state: "Maharashtra" as const, type: "home" as const };
+      const a = await s.customers.addAddress(customer.id, { ...base, alternatePhone: "+919123456780", instructions: "Call first", forSomeoneElse: false, isDefault: false, location: { lat: 18.559612, lng: 73.779912 } });
+      const b = await s.customers.addAddress(customer.id, { ...base, name: "Mom", forSomeoneElse: true, isDefault: false, alternatePhone: "", instructions: "", location: null });
+      const got = (await s.customers.get(customer.id))!.addresses;
+      expect(got.find((x) => x.id === a.id)).toMatchObject({ isDefault: true, alternatePhone: "+919123456780", instructions: "Call first", location: { lat: 18.559612, lng: 73.779912 } });
+      expect(got.find((x) => x.id === b.id)).toMatchObject({ isDefault: false, forSomeoneElse: true, location: null });
+      await Promise.allSettled([s.customers.setDefaultAddress(customer.id, a.id), s.customers.setDefaultAddress(customer.id, b.id), s.customers.setDefaultAddress(customer.id, a.id)]);
+      expect((await s.customers.get(customer.id))!.addresses.filter((x) => x.isDefault)).toHaveLength(1);
+      expect(await s.customers.updateAddress(other.id, a.id, { ...base, city: "Mumbai" })).toBeNull();
+      expect((await s.customers.updateAddress(customer.id, a.id, { ...base, city: "Mumbai", location: { lat: 19.07609, lng: 72.877426 } }))!.city).toBe("Mumbai");
+      expect((await s.customers.get(customer.id))!.addresses.find((x) => x.id === a.id)!.location).toEqual({ lat: 19.07609, lng: 72.877426 });
+      await s.customers.setDefaultAddress(customer.id, a.id);
+      expect(await s.customers.removeAddress(customer.id, a.id)).toBe(true);
+      expect((await s.customers.get(customer.id))!.addresses.map((x) => [x.id, x.isDefault])).toEqual([[b.id, true]]);
+    });
+
+    it("submissions: one review per customer per product even under parallel submits; conditional status; owner-scoped delete", async () => {
+      const make = () => s.submissions.create({ kind: "review", customerId: "cus_sb", status: "pending", uniqueKey: "review:cus_sb:prd_1", doc: { rating: 5 } });
+      const race = await Promise.allSettled([make(), make(), make()]);
+      expect(race.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      const id = (race.find((r) => r.status === "fulfilled") as PromiseFulfilledResult<{ id: string }>).value.id;
+      const fb = await s.submissions.create({ kind: "feedback", customerId: "cus_sb", status: "open", uniqueKey: null, doc: { message: "hi" } });
+      await s.submissions.create({ kind: "feedback", customerId: "cus_sb", status: "open", uniqueKey: null, doc: { message: "two" } }); // NULL keys never collide
+      expect((await s.submissions.listByStatus("review", "pending")).map((r) => r.id)).toContain(id);
+      const decisions = await Promise.all([s.submissions.update(id, ["pending"], "published", { rating: 5 }), s.submissions.update(id, ["pending"], "rejected", { rating: 5 })]);
+      expect(decisions.filter(Boolean)).toHaveLength(1);
+      expect((await s.submissions.get(id))!.status).not.toBe("pending");
+      expect(await s.submissions.remove(fb.id, "cus_other")).toBe(false);
+      expect(await s.submissions.remove(fb.id, "cus_sb")).toBe(true);
+      expect((await s.submissions.listByCustomer("feedback", "cus_sb")).length).toBe(1);
+      await s.submissions.eraseCustomer("cus_sb");
+      expect(await s.submissions.listByCustomer("review", "cus_sb")).toEqual([]);
+    });
+
     it("audit log: newest first, filters, no update path", async () => {
       for (const i of [1, 2, 3]) await s.audit.append({ actorId: "stf_a", actorEmail: "a@x", action: `test.${i}`, target: i === 2 ? "T2" : "T", details: { i }, ip: "10.0.0.1" }, new Date(Date.parse("2026-11-26T00:00:00Z") + i));
       const all = await s.audit.list({ actorId: "stf_a" });

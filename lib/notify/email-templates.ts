@@ -25,7 +25,7 @@ const T: Record<Template, { needs: string[]; subject: (r: Refs) => string; lines
   return_pickup_scheduled: { needs: ["orderNumber", "returnNumber"], subject: (r) => `Pickup scheduled for return ${r.returnNumber}`, lines: (r) => [`The courier will collect return ${r.returnNumber}. Keep the item packed with its tags.`], link: order },
   return_completed: { needs: ["orderNumber", "returnNumber"], subject: (r) => `Return ${r.returnNumber} completed`, lines: (r) => [`Your return ${r.returnNumber} passed our check and has been settled.`], link: order },
   return_rejected: { needs: ["orderNumber", "returnNumber"], subject: (r) => `Return ${r.returnNumber} update`, lines: (r) => [`Your return ${r.returnNumber} didn't pass our check. The reason is on your order page.`], link: order },
-  review_request: { needs: ["orderNumber"], subject: () => "How did it fit?", lines: (r) => [`Tell other shoppers how your order ${r.orderNumber} fits — it takes a minute.`], link: order },
+  review_request: { needs: ["orderNumber"], subject: () => "How did it fit?", lines: (r) => [`Tell other shoppers how your order ${r.orderNumber} fits — it takes a minute.`], link: (r) => `/account/reviews?order=${encodeURIComponent(r.orderNumber ?? "")}` },
   back_in_stock: { needs: ["handle"], subject: () => "It's back in stock", lines: (r) => [`Something you asked about is back${r.size ? ` in size ${r.size}` : ""}. Sizes go fast.`], link: product },
   price_drop: { needs: ["handle"], subject: () => "A price dropped", lines: () => ["Something you're watching just got cheaper."], link: product },
   abandoned_checkout_1h: { needs: [], subject: () => "Your bag is waiting", lines: () => ["You left something in your bag. It's saved for you."], link: () => "/bag" },

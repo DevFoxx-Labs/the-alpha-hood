@@ -715,5 +715,55 @@ export function sqlMigrations(d: Driver): Record<string, Migration> {
         if (await hasColumn(db, d, "customers", "email_verified_at")) await db.schema.alterTable("customers").dropColumn("email_verified_at").execute();
       },
     },
+
+    "2026_11_30_014_address_details": {
+      async up(db: AnyDb) {
+        // Additive, every column defaulted: existing addresses read as before (no pin, not default).
+        // Idempotent per column (MySQL DDL is not transactional: a re-run skips what a failed run already added).
+        const add = async (name: string, type: "varchar(16)" | "varchar(240)" | "integer" | ReturnType<typeof sql>, def?: ReturnType<typeof sql>) => {
+          if (await hasColumn(db, d, "customer_addresses", name)) return;
+          await db.schema
+            .alterTable("customer_addresses")
+            .addColumn(name, type as "integer", (col) => (def === undefined ? col : col.notNull().defaultTo(def)))
+            .execute();
+        };
+        await add("alt_phone", "varchar(16)", sql`''`);
+        await add("instructions", "varchar(240)", sql`''`);
+        await add("for_other", c.bool, c.falseDefault);
+        await add("is_default", c.bool, c.falseDefault);
+        await add("lat_e6", "integer");
+        await add("lng_e6", "integer");
+      },
+      async down(db: AnyDb) {
+        for (const name of ["lng_e6", "lat_e6", "is_default", "for_other", "instructions", "alt_phone"]) {
+          if (await hasColumn(db, d, "customer_addresses", name)) await db.schema.alterTable("customer_addresses").dropColumn(name).execute();
+        }
+      },
+    },
+
+    "2026_11_30_015_customer_submissions": {
+      async up(db: AnyDb) {
+        // Product reviews (moderated) and feedback / help requests. unique_key: one review per customer per product.
+        await db.schema
+          .createTable("customer_submissions")
+          .ifNotExists()
+          .addColumn("id", "varchar(40)", (col) => col.primaryKey())
+          .addColumn("kind", "varchar(16)", (col) => col.notNull())
+          .addColumn("customer_id", "varchar(64)", (col) => col.notNull())
+          .addColumn("status", "varchar(16)", (col) => col.notNull())
+          .addColumn("unique_key", "varchar(160)")
+          .addColumn("doc", "text", (col) => col.notNull())
+          .addColumn("created_at", c.ts, (col) => col.notNull())
+          .addColumn("updated_at", c.ts, (col) => col.notNull())
+          .modifyEnd(mysqlTable(d))
+          .execute();
+        await createIndex(db, d, "customer_submissions_unique_uq", "customer_submissions", ["unique_key"], true);
+        await createIndex(db, d, "customer_submissions_queue_idx", "customer_submissions", ["kind", "status", "created_at"]);
+        await createIndex(db, d, "customer_submissions_customer_idx", "customer_submissions", ["customer_id", "kind"]);
+      },
+      async down(db: AnyDb) {
+        await db.schema.dropTable("customer_submissions").ifExists().execute();
+      },
+    },
   };
 }

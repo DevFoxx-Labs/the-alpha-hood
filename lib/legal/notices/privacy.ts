@@ -7,8 +7,8 @@ import type { Notice } from "../types";
  */
 export const PRIVACY_NOTICE: Notice = {
   slug: "privacy",
-  version: "2026-11-29",
-  lastUpdated: "2026-11-29",
+  version: "2026-11-30",
+  lastUpdated: "2026-11-30",
   text: {
     en: {
       title: "Privacy Notice",
@@ -42,7 +42,10 @@ export const PRIVACY_NOTICE: Notice = {
               head: ["Personal data", "Purpose", "Basis"],
               rows: [
                 ["Mobile number (verified by OTP), name, email (optional)", "Create and secure your account, sign you in, place and update orders", "Your consent when you sign up or check out"],
-                ["Delivery addresses and pincode", "Deliver orders, check serviceability, delivery dates and Cash on Delivery eligibility", "Your consent when you check out"],
+                ["Delivery addresses: receiver's name and mobile (yours or someone you order for), alternate mobile, address, pincode, delivery instructions and, if you place one, a map pin", "Deliver orders, help the courier find the door, check serviceability, delivery dates and Cash on Delivery eligibility. If you save an address for someone else, please tell them", "Your consent when you save an address or check out"],
+                ["Your location — only when you tap “Use my current location” or place a pin on the map", "Suggest the address fields and pin the delivery spot. Your browser asks you first; we never track your location", "Your consent (the browser prompt and your tap)"],
+                ["Product reviews you write (rating, title, text, fit, size bought)", "Shown on the product page after a check, with your first name and last initial and a “Verified buyer” badge. You can edit or delete them any time", "Your consent when you submit a review"],
+                ["Messages you send us (Help & feedback) and our replies", "Answer your question and improve the store", "Our legitimate use: answering you"],
                 ["Order details: items, sizes, amounts, coupons, payment status and payment reference", "Fulfil orders, issue GST invoices, handle cancellations, returns and refunds", "Your consent; and keeping records required by tax and consumer law"],
                 ["Order, return and delivery history; address quality signals", "Prevent fraud and Cash on Delivery misuse (for example, limiting COD for repeated refused deliveries)", "Your consent when you check out; preventing fraud"],
                 ["Return and exchange requests, including photos you upload", "Assess and complete returns and exchanges", "Your consent when you raise the request"],
@@ -87,6 +90,8 @@ export const PRIVACY_NOTICE: Notice = {
                 ["Bot protection", "Confirm that a request for a sign-in code comes from a person, not a script. The provider sees your IP address and browser details", "Cloudflare Turnstile (used once switched on)"],
                 ["Google sign-in", "Only if you choose \"Continue with Google\": we receive your Google account ID, name and verified email to sign you in. You can unlink it in Account → Settings", "Google LLC (used once switched on)"],
                 ["Facebook sign-in", "Only if you choose \"Continue with Facebook\": we receive your Facebook account ID and name to sign you in. You can unlink it in Account → Settings", "Meta Platforms Ireland Ltd (used once switched on)"],
+                ["Maps (OpenStreetMap / MapTiler)", "Show the map in the address form. Your browser loads map images from them (they see your IP address); only when you open the map", "OpenStreetMap Foundation; MapTiler AG (if switched on)"],
+                ["Address suggestions (OpenStreetMap Nominatim / Google Geocoding)", "Turn a map pin into area, city, state and pincode. Sent from our server with only the pin — never your name, phone or IP address", "OpenStreetMap Foundation; Google LLC (if switched on)"],
                 ["Google Analytics 4", "Site analytics — only if you accept Analytics cookies", "Google LLC (used once switched on; listed in the Cookie Policy as \"In use\")"],
                 ["Google Ads", "Ad measurement — only if you accept Advertising cookies", "Google LLC (used once switched on)"],
                 ["Meta Pixel and Conversions API", "Ad measurement and audiences on Facebook and Instagram — only if you accept Advertising cookies", "Meta Platforms Ireland Ltd (used once switched on)"],
@@ -281,7 +286,10 @@ export const PRIVACY_NOTICE: Notice = {
               head: ["व्यक्तिगत डेटा", "उद्देश्य", "आधार"],
               rows: [
                 ["मोबाइल नंबर (OTP से सत्यापित), नाम, ईमेल (वैकल्पिक)", "आपका खाता बनाना और सुरक्षित रखना, साइन-इन, ऑर्डर देना और अपडेट भेजना", "साइन-अप या चेकआउट के समय आपकी सहमति"],
-                ["डिलीवरी पते और पिनकोड", "ऑर्डर पहुँचाना, सेवा-क्षेत्र, डिलीवरी की तारीख और कैश ऑन डिलीवरी की पात्रता जाँचना", "चेकआउट के समय आपकी सहमति"],
+                ["डिलीवरी पते: पाने वाले का नाम और मोबाइल (आपका या जिसके लिए आप ऑर्डर करते हैं), दूसरा मोबाइल, पता, पिनकोड, डिलीवरी निर्देश और, अगर आप लगाएँ, मैप पिन", "ऑर्डर पहुँचाना, कूरियर को दरवाज़ा ढूँढने में मदद, सेवा-क्षेत्र, डिलीवरी की तारीख और कैश ऑन डिलीवरी की पात्रता जाँचना। किसी और का पता सहेजें तो कृपया उन्हें बताएँ", "पता सहेजते या चेकआउट करते समय आपकी सहमति"],
+                ["आपकी लोकेशन — केवल तब जब आप “मेरी मौजूदा लोकेशन” दबाएँ या मैप पर पिन लगाएँ", "पते के खाने सुझाना और डिलीवरी की जगह पिन करना। पहले आपका ब्राउज़र पूछता है; हम आपकी लोकेशन कभी ट्रैक नहीं करते", "आपकी सहमति (ब्राउज़र की अनुमति और आपका टैप)"],
+                ["आपके लिखे प्रोडक्ट रिव्यू (रेटिंग, शीर्षक, टेक्स्ट, फ़िट, खरीदा गया साइज़)", "जाँच के बाद प्रोडक्ट पेज पर, आपके पहले नाम और उपनाम के पहले अक्षर और “Verified buyer” के साथ दिखाए जाते हैं। आप इन्हें कभी भी बदल या हटा सकते हैं", "रिव्यू भेजते समय आपकी सहमति"],
+                ["आपके भेजे संदेश (मदद और फ़ीडबैक) और हमारे जवाब", "आपके सवाल का जवाब देना और स्टोर बेहतर बनाना", "हमारा वैध उपयोग: आपको जवाब देना"],
                 ["ऑर्डर का विवरण: सामान, साइज़, राशि, कूपन, भुगतान की स्थिति और भुगतान संदर्भ", "ऑर्डर पूरा करना, GST चालान देना, रद्दीकरण, रिटर्न और रिफ़ंड", "आपकी सहमति; और कर व उपभोक्ता कानून के तहत आवश्यक रिकॉर्ड"],
                 ["ऑर्डर, रिटर्न और डिलीवरी का इतिहास; पते की गुणवत्ता के संकेत", "धोखाधड़ी और कैश ऑन डिलीवरी के दुरुपयोग को रोकना", "चेकआउट के समय आपकी सहमति; धोखाधड़ी की रोकथाम"],
                 ["रिटर्न/एक्सचेंज अनुरोध, आपके द्वारा अपलोड की गई तस्वीरों सहित", "रिटर्न और एक्सचेंज की जाँच और उन्हें पूरा करना", "अनुरोध करते समय आपकी सहमति"],
@@ -326,6 +334,8 @@ export const PRIVACY_NOTICE: Notice = {
                 ["बॉट से सुरक्षा", "यह पक्का करना कि साइन-इन कोड का अनुरोध किसी व्यक्ति ने किया है, स्क्रिप्ट ने नहीं। प्रदाता को आपका IP पता और ब्राउज़र की जानकारी दिखती है", "Cloudflare Turnstile (चालू होने पर उपयोग)"],
                 ["Google साइन-इन", "केवल तब जब आप \"Google से जारी रखें\" चुनें: आपको साइन-इन करने के लिए हमें आपका Google खाता ID, नाम और सत्यापित ईमेल मिलता है। आप इसे खाता → सेटिंग्स में हटा सकते हैं", "Google LLC (चालू होने पर उपयोग)"],
                 ["Facebook साइन-इन", "केवल तब जब आप \"Facebook से जारी रखें\" चुनें: आपको साइन-इन करने के लिए हमें आपका Facebook खाता ID और नाम मिलता है। आप इसे खाता → सेटिंग्स में हटा सकते हैं", "Meta Platforms Ireland Ltd (चालू होने पर उपयोग)"],
+                ["मैप (OpenStreetMap / MapTiler)", "पते के फ़ॉर्म में मैप दिखाना। आपका ब्राउज़र उनसे मैप की तस्वीरें लेता है (उन्हें आपका IP पता दिखता है); केवल जब आप मैप खोलें", "OpenStreetMap Foundation; MapTiler AG (चालू होने पर)"],
+                ["पते के सुझाव (OpenStreetMap Nominatim / Google Geocoding)", "मैप पिन से इलाका, शहर, राज्य और पिनकोड बनाना। हमारे सर्वर से केवल पिन भेजा जाता है — आपका नाम, फ़ोन या IP पता कभी नहीं", "OpenStreetMap Foundation; Google LLC (चालू होने पर)"],
                 ["Google Analytics 4", "साइट एनालिटिक्स — केवल तब जब आप एनालिटिक्स कुकीज़ स्वीकार करें", "Google LLC (चालू होने पर उपयोग; कुकी नीति में \"उपयोग में\" दिखेगा)"],
                 ["Google Ads", "विज्ञापन मापन — केवल तब जब आप विज्ञापन कुकीज़ स्वीकार करें", "Google LLC (चालू होने पर उपयोग)"],
                 ["Meta Pixel और Conversions API", "Facebook और Instagram पर विज्ञापन मापन और ऑडियंस — केवल तब जब आप विज्ञापन कुकीज़ स्वीकार करें", "Meta Platforms Ireland Ltd (चालू होने पर उपयोग)"],

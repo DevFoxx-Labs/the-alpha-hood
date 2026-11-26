@@ -64,10 +64,45 @@ export function OrdersList({ limit }: { limit?: number }) {
   );
 }
 
+const SHORTCUTS = [
+  { href: "/account/orders", label: "Orders & returns", hint: "Track, cancel, return or exchange" },
+  { href: "/account/reviews", label: "My reviews", hint: "Review what you received" },
+  { href: "/account/addresses", label: "Addresses", hint: "Yours and people you order for" },
+  { href: "/wishlist", label: "Wishlist", hint: "Saved for later" },
+  { href: "/account/alerts", label: "Alerts", hint: "Back in stock and price drops" },
+  { href: "/account/club", label: "Alpha Club", hint: "Hood Coins and rewards" },
+  { href: "/account/wear-the-hood", label: "#WearTheHood", hint: "Share your fit" },
+  { href: "/account/help", label: "Help & feedback", hint: "Write to us, read our replies" },
+  { href: "/account/settings", label: "Settings & privacy", hint: "Profile, sign-in, notifications, your data" },
+] as const;
+
 export function AccountOverview() {
   const { me } = useMe();
+  const [toReview, setToReview] = useState<number | null>(null);
+  useEffect(() => {
+    api<{ toReview: unknown[] }>("/api/account/reviews")
+      .then((r) => setToReview(r.toReview.length))
+      .catch(() => setToReview(null));
+  }, []);
+  const defaultAddress = me.customer.addresses.find((a) => a.isDefault) ?? me.customer.addresses[0];
   return (
     <div className="space-y-8">
+      {me.customer.email && !me.customer.emailVerified ? (
+        <p className="border border-black px-3 py-2.5 text-[13px]">
+          <b>Confirm your email</b> so we can send your order updates to {me.customer.email}.{" "}
+          <Link href="/account/settings" className="font-semibold underline underline-offset-2">
+            Verify now
+          </Link>
+        </p>
+      ) : null}
+      {toReview ? (
+        <p className="border border-line bg-soft px-3 py-2.5 text-[13px]">
+          {toReview} {toReview === 1 ? "item is" : "items are"} waiting for your review.{" "}
+          <Link href="/account/reviews" className="font-semibold underline underline-offset-2">
+            Write a review
+          </Link>
+        </p>
+      ) : null}
       <section className="grid gap-3 sm:grid-cols-3">
         <div className="border border-line p-4">
           <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-2">Signed in as</p>
@@ -79,10 +114,30 @@ export function AccountOverview() {
           <p className="tabular mt-1 text-[18px] font-bold">{formatINR(me.storeCredit.balance)}</p>
         </div>
         <div className="border border-line p-4">
-          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-2">Saved addresses</p>
-          <p className="mt-1 text-[18px] font-bold">{me.customer.addresses.length}</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-2">Default address</p>
+          {defaultAddress ? (
+            <p className="mt-1 truncate text-[13px]">
+              <b>{defaultAddress.name}</b>, {defaultAddress.city} {defaultAddress.pincode}
+            </p>
+          ) : (
+            <Link href="/account/addresses" className="mt-1 inline-block text-[13px] font-semibold underline underline-offset-2">
+              Add an address
+            </Link>
+          )}
         </div>
       </section>
+      <nav aria-label="Your account">
+        <ul className="grid gap-2 sm:grid-cols-3">
+          {SHORTCUTS.map((s) => (
+            <li key={s.href}>
+              <Link href={s.href} className="block h-full border border-line p-3 hover:border-black">
+                <span className="block text-[13px] font-bold uppercase tracking-[0.08em]">{s.label}</span>
+                <span className="mt-0.5 block text-[12px] text-ink-2">{s.hint}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[13px] font-bold uppercase tracking-[0.12em]">Recent orders</h2>

@@ -1,5 +1,72 @@
 # Change log
 
+## 2026-11-30 — Customer dashboard: address book with a map, reviews, help & feedback, every section linked
+
+**Asked for:** start with addresses — professional e-commerce fields, several addresses (own or someone else's),
+location from a map with a "current location" button, no latitude / longitude fields — then every dashboard option
+working, including writing reviews and giving feedback.
+
+### Address book (`/account/addresses`, and the same form at checkout)
+- Fields: this address is for **me / someone else**, receiver's name, mobile, **alternate mobile**, pincode,
+  flat / house / building, area / street / sector / village, landmark, town / city, state, country (India),
+  home / work / other, **delivery instructions**, **make default**.
+- **Map** (Leaflet): tap the map or drag the pin; **"Use my current location"** asks the browser only when tapped.
+  The pin fills in area, city, state and pincode (editable). No latitude / longitude fields anywhere; the pin is
+  saved with the address for the courier.
+- Add, **edit**, **make default**, remove. Up to 10 addresses. Checkout uses the same form and pre-selects the
+  default address.
+- "For me" with the mobile left empty uses the customer's own verified number on the server — the browser never
+  receives the full number (it stays masked).
+- New: `components/address/address-form.tsx`, `address-map.tsx`; `lib/geo/geocode.ts`; routes
+  `POST /api/account/addresses`, `PATCH /api/account/addresses/[id]`, `POST …/[id]/default`,
+  `GET /api/geo/reverse`, `GET /api/geo/pincode`, `GET /api/geo/tiles`. Migration `014_address_details`.
+- **Maps** settings group: OpenStreetMap by default (no key); optional MapTiler key (tiles) and Google Geocoding
+  key. Geocoding runs on our server, so the customer's IP isn't sent to the geocoder.
+- `Permissions-Policy` now allows `geolocation=(self)` (it was blocked for the whole site).
+- New package: **leaflet 1.9.4** (+ `@types/leaflet`) — ~42 KB gzip, no dependencies, loaded only when the address
+  form opens (dynamic import), so no other page carries it.
+
+### Reviews (`/account/reviews`, admin `/admin/reviews`)
+- "Waiting for your review": products from delivered orders. Write: stars, fit (small / true / large), title, text.
+  One review per product per customer (UNIQUE key). Edit or delete any time.
+- Checked by staff (`ugc.moderate`) before it shows on the product page with a "Verified buyer" badge and
+  "First name L." — reject needs a reason the customer sees. Edit = back to the check, off the page meanwhile.
+- "Write a review" on delivered orders; the review-request email now opens the form.
+
+### Help & feedback (`/account/help`, admin `/admin/feedback`)
+- Topic, optional order (own orders only), optional 1–5 experience rating, message. Staff (`feedback.manage`:
+  owner, store manager, support, marketing) reply; the reply shows in the customer's account. "Get help" on orders.
+- Storage: one new table `customer_submissions` (reviews + feedback), migration `015`. Erased with the account.
+
+### Dashboard
+- Overview: shortcut tiles to every section (orders, reviews, addresses, wishlist, alerts, Alpha Club,
+  #WearTheHood, help, settings), default address, "confirm your email" and "items waiting for your review"
+  prompts. Navigation gains My reviews and Help & feedback.
+
+### Privacy Notice (EN + HI, version 2026-11-30)
+Delivery address details (incl. someone else's and the map pin), location (only on tap), reviews, feedback,
+and processors OpenStreetMap / MapTiler / Nominatim / Google Geocoding.
+
+### Threat model
+- Another customer's address, review or order touched → owner-scoped stores and routes, 404 (prevent, tested).
+- Review fraud: reviewing something not bought, reviewing twice, publishing unchecked → delivered-order check,
+  UNIQUE key (raced on MySQL), moderation; parallel staff decisions decide once (prevent, tested).
+- Location misuse: geolocation only on tap; pin bounded to India and rounded; geocoding server-side, signed-in,
+  rate-limited (30/min/IP, 200/day/customer) so it can't be used as a free proxy (prevent, tested).
+- SSRF via map settings → fixed hosts only (Nominatim, Google, OSM / MapTiler tiles) (prevent).
+- Full phone number exposed to the browser → "for me" phone filled on the server (prevent, tested).
+- Feedback spam → 5 / 10 min per IP, 10 / day and 10 open per customer (prevent, tested).
+- Stored XSS through review / feedback text → validated text, rendered as React text (no HTML) (prevent).
+
+### Verification
+- `pnpm typecheck` ✓ · `pnpm lint` ✓ · `pnpm test` **554/554** ✓ (memory + local MySQL). New: `lib/submissions/dashboard.test.ts` (10, incl. the route flows) and MySQL contract tests for the address book (parallel default changes) and submissions (parallel review submits and decisions).
+- Local MySQL dev database (`mysql://127.0.0.1:3306/alpha_hood_dev`, environment: local): migrations 014 and 015
+  applied. A first run of 014 failed on a column-type bug (`tinyint(1)` as a string) after adding two columns; the
+  migration is idempotent, the fix re-ran it cleanly.
+- `pnpm build` ✓, no warnings. Leaflet is one 42 KB (gzip) chunk that no page loads up front — only the address form fetches it. `pnpm audit --prod`: no known vulnerabilities.
+- **Not seen in a browser:** the map, current-location button, address book, reviews, help and admin screens.
+  OpenStreetMap / Nominatim were not called for real (tests use a fake HTTP layer).
+
 ## 2026-11-30 — Settings: Notifications and Security (from AstroGaon), with every flow wired end to end
 
 **Asked for:** AstroGaon's Notification settings and Security settings, "the whole flow, not one part".

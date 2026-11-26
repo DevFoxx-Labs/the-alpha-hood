@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const customer = await customers.get(auth.customerId);
     if (!customer) return jsonError(401, "unauthenticated", "Please verify your phone number again.");
     if (customer.addresses.length >= MAX_ADDRESSES) return jsonError(422, "too_many", "You can save up to 10 addresses.");
-    const saved = await customers.addAddress(customer.id, parseAddress(guard.body));
+    const saved = await customers.addAddress(customer.id, parseAddress(guard.body, customer.phone));
     return privateJson({ address: saved }, { status: 201 });
   } catch (error) {
     return commerceErrorResponse(error);

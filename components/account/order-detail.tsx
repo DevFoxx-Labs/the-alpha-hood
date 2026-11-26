@@ -137,6 +137,14 @@ export function OrderDetailView({ number }: { number: string }) {
                 <Link href={`/account/orders/${order.number}/return`}>Return / exchange</Link>
               </Button>
             ) : null}
+            {order.fulfilment === "delivered" ? (
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/account/reviews?order=${order.number}`}>Write a review</Link>
+              </Button>
+            ) : null}
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/account/help?order=${order.number}`}>Get help</Link>
+            </Button>
           </div>
         </div>
 

@@ -31,6 +31,8 @@ import type { ProviderStore } from "@/lib/providers/store";
 import { createMongoProviderStore, createSqlProviderStore } from "./stores/providers";
 import type { SocialIdentityStore } from "@/lib/auth/social-identities";
 import { createMongoSocialIdentityStore, createSqlSocialIdentityStore } from "./stores/social-identities";
+import type { SubmissionStore } from "@/lib/submissions/store";
+import { createMongoSubmissionStore, createSqlSubmissionStore } from "./stores/submissions";
 import { createMongoAudit, createMongoRateCounters, createMongoStaffStore, createSqlAudit, createSqlRateCounters, createSqlStaffStore } from "./stores/admin";
 import {
   createMongoAlertStore,
@@ -117,6 +119,8 @@ export interface DbStores {
   providers: ProviderStore;
   /** Google / Facebook sign-in links to phone-based customers. */
   socialIdentities: SocialIdentityStore;
+  /** Customer reviews (moderated) and feedback / help requests. */
+  submissions: SubmissionStore;
   maintenance: Maintenance;
   /** COMMERCE_PROVIDER=own: catalogue, bag and stock all on this database (built once, cached). */
   own(): OwnCommerce;
@@ -189,6 +193,7 @@ export function createDbStores(cfg: DbConfig): DbStores {
       settings: createMongoSettingsStore(conn, createSecretBox()),
       providers: createMongoProviderStore(conn, createSecretBox()),
       socialIdentities: createMongoSocialIdentityStore(conn),
+      submissions: createMongoSubmissionStore(conn),
       maintenance: createMongoMaintenance(conn),
       ...catalogParts(createMongoCatalogStore(conn), createMongoReviewStore(conn), (catalog) => ({ repo: createMongoCartRepo(conn), inventory: createMongoInventory(conn, p, catalog) })),
     };
@@ -223,6 +228,7 @@ export function createDbStores(cfg: DbConfig): DbStores {
     settings: createSqlSettingsStore(db, createSecretBox()),
     providers: createSqlProviderStore(db, createSecretBox()),
     socialIdentities: createSqlSocialIdentityStore(db),
+    submissions: createSqlSubmissionStore(db),
     maintenance: createSqlMaintenance(db),
     ...catalogParts(createSqlCatalogStore(db), createSqlReviewStore(db), (catalog) => ({ repo: createSqlCartRepo(db), inventory: createSqlInventory(db, p, catalog) })),
   };

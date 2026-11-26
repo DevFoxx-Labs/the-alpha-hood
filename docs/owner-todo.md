@@ -248,3 +248,10 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] Decide how to get existing customers to verify their email (see docs/known-gaps.md).
 - [ ] Lawyer: Cookie Policy version 2026-11-30 (`ah_device`, `ah_oauth`, `ah_social_link`).
 - [ ] Production: run migration `2026_11_30_013` through the deploy pipeline.
+
+## 2026-11-30 (customer dashboard)
+- [ ] Before launch traffic: MapTiler key (map tiles) and Google Geocoding key (address suggestions) in
+  Admin → Settings → Maps. Restrict both keys (MapTiler: your domains; Google: Geocoding API + server IP).
+- [ ] Decide who moderates reviews (`/admin/reviews`) and answers feedback (`/admin/feedback`), and how fast.
+- [ ] Lawyer: Privacy Notice 2026-11-30 (addresses for someone else, location, reviews, feedback, map providers).
+- [ ] Production: run migrations `2026_11_30_014` and `2026_11_30_015` through the deploy pipeline.

@@ -164,6 +164,13 @@ export function createSqlReviewStore(db: SqlDb): ReviewStore {
         }
       }
     },
+    async remove(id) {
+      return sqlTx(db, async (trx) => {
+        await trx.deleteFrom("review_votes").where("review_id", "=", id).execute();
+        const r = await trx.deleteFrom("reviews").where("id", "=", id).executeTakeFirst();
+        return Number(r.numDeletedRows) === 1;
+      });
+    },
     async countByIdPrefix(prefix) {
       const safe = prefix.replace(/[^A-Za-z0-9_]/g, "");
       const r = await db.selectFrom("reviews").select((eb) => eb.fn.countAll<number>().as("c")).where("id", "like", `${safe.replace(/_/g, "\\_")}%`).executeTakeFirst();
@@ -305,6 +312,11 @@ export function createMongoReviewStore(conn: Promise<MongoConn>): ReviewStore {
       if (!list.length) return;
       const ops = list.map((r) => ({ updateOne: { filter: { _id: r.id }, update: { $setOnInsert: { ...r } }, upsert: true } }));
       await (await col()).bulkWrite(ops, { ordered: false, ignoreUndefined: true });
+    },
+    async remove(id) {
+      const c = await conn;
+      await c.db.collection<{ _id: string }>("review_votes").deleteMany({ _id: { $regex: `^${id.replace(/[^A-Za-z0-9_]/g, "")}\|` } });
+      return (await (await col()).deleteOne({ _id: id })).deletedCount === 1;
     },
     async countByIdPrefix(prefix) {
       const safe = prefix.replace(/[^A-Za-z0-9_]/g, "");

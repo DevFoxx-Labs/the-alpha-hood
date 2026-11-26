@@ -28,7 +28,7 @@ import { ContactStep } from "./contact-step";
 interface State {
   enabled: boolean;
   codEnabled: boolean;
-  customer: { phone: string; email: string | null; addresses: Address[] } | null;
+  customer: { phone: string; name?: string | null; email: string | null; addresses: Address[] } | null;
   cart: PublicCartView;
 }
 
@@ -71,7 +71,7 @@ export function CheckoutApp() {
       const s = await api<State>("/api/checkout/state");
       setState(s);
       setLoadError(false);
-      if (s.customer?.addresses.length) setAddressId((cur) => cur ?? s.customer!.addresses.at(-1)!.id);
+      if (s.customer?.addresses.length) setAddressId((cur) => cur ?? (s.customer!.addresses.find((x) => x.isDefault) ?? s.customer!.addresses.at(-1)!).id);
     } catch {
       setLoadError(true);
     }
@@ -83,7 +83,7 @@ export function CheckoutApp() {
       .then((s) => {
         if (cancelled) return;
         setState(s);
-        if (s.customer?.addresses.length) setAddressId((cur) => cur ?? s.customer!.addresses.at(-1)!.id);
+        if (s.customer?.addresses.length) setAddressId((cur) => cur ?? (s.customer!.addresses.find((x) => x.isDefault) ?? s.customer!.addresses.at(-1)!).id);
       })
       .catch(() => {
         if (!cancelled) setLoadError(true);
@@ -276,6 +276,7 @@ export function CheckoutApp() {
         <div className="space-y-5">
           <ContactStep customer={state.customer} onVerified={load} />
           <AddressStep
+            self={{ name: state.customer?.name ?? "", phone: state.customer?.phone ?? "" }}
             addresses={state.customer?.addresses ?? []}
             selected={addressId}
             onSelect={setAddressId}

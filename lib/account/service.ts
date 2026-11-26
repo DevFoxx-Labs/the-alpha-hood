@@ -1,3 +1,4 @@
+import { resolveSubmissions } from "@/lib/submissions/store";
 import { resolveSocialIdentities } from "@/lib/auth/social-identities";
 import { resolveOutbox } from "@/lib/notify/outbox";
 import { revokeAllSessions } from "@/lib/auth/session";
@@ -220,6 +221,7 @@ export async function deleteAccount(customerId: string, ctx: RequestContext, now
   await resolveUgc().erase(customerId);
   await resolveOutbox()?.erase(customerId); // queued messages for this person go too
   await resolveSocialIdentities().eraseCustomer(customerId); // Google / Facebook sign-in links
+  await resolveSubmissions().eraseCustomer(customerId); // feedback and unpublished reviews (published ones are anonymised below)
   await revokeAllSessions(customerId);
   return { erased: true, keptOrderRecords: orders.length };
 }

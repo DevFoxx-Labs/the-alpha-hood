@@ -267,4 +267,27 @@ export const MONGO_MIGRATIONS: MongoMigration[] = [
       // additive only — nothing to undo
     },
   },
+  {
+    name: "2026_11_30_014_address_details",
+    async up() {
+      // Schemaless: addresses are embedded; the new fields are optional and read as empty / false / no pin.
+    },
+    async down() {
+      // additive only — nothing to undo
+    },
+  },
+  {
+    name: "2026_11_30_015_customer_submissions",
+    async up(db) {
+      await ensureCollection(db, "customer_submissions");
+      await db.collection("customer_submissions").createIndexes([
+        { key: { uniqueKey: 1 }, name: "customer_submissions_unique_uq", unique: true, partialFilterExpression: { uniqueKey: { $type: "string" } } },
+        { key: { kind: 1, status: 1, createdAt: -1 }, name: "customer_submissions_queue_idx" },
+        { key: { customerId: 1, kind: 1 }, name: "customer_submissions_customer_idx" },
+      ]);
+    },
+    async down(db) {
+      if (await db.listCollections({ name: "customer_submissions" }, { nameOnly: true }).hasNext()) await db.collection("customer_submissions").drop();
+    },
+  },
 ];

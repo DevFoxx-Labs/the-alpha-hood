@@ -32,8 +32,54 @@ const likeEscape = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 type CustomerRow = { id: string; phone: string; name: string | null; email: string | null; email_verified_at: Date | null; created_at: Date; order_count: number; coupon_uses: unknown; cod_blocked: boolean | number; rto_count: number };
 type AddressRow = Address & { customer_id: string; position: number };
 
-function toAddress(r: AddressRow): Address {
-  return { id: r.id, name: r.name, phone: r.phone, pincode: r.pincode, line1: r.line1, line2: r.line2, landmark: r.landmark, city: r.city, state: r.state as Address["state"], type: r.type as Address["type"] };
+type AddressDbRow = Omit<AddressRow, "location" | "isDefault" | "forSomeoneElse" | "alternatePhone" | "instructions"> & {
+  alt_phone?: string | null;
+  instructions?: string | null;
+  for_other?: boolean | number | null;
+  is_default?: boolean | number | null;
+  lat_e6?: number | null;
+  lng_e6?: number | null;
+};
+
+function toAddress(r: AddressDbRow): Address {
+  return {
+    id: r.id,
+    name: r.name,
+    phone: r.phone,
+    pincode: r.pincode,
+    line1: r.line1,
+    line2: r.line2,
+    landmark: r.landmark,
+    city: r.city,
+    state: r.state as Address["state"],
+    type: r.type as Address["type"],
+    alternatePhone: r.alt_phone ?? "",
+    instructions: r.instructions ?? "",
+    forSomeoneElse: toBool(r.for_other ?? false),
+    isDefault: toBool(r.is_default ?? false),
+    location: r.lat_e6 === null || r.lat_e6 === undefined || r.lng_e6 === null || r.lng_e6 === undefined ? null : { lat: Number(r.lat_e6) / 1e6, lng: Number(r.lng_e6) / 1e6 },
+  };
+}
+
+/** Address fields → columns (the pin as integer micro-degrees). */
+function addressColumns(a: Omit<Address, "id">) {
+  return {
+    name: a.name,
+    phone: a.phone,
+    pincode: a.pincode,
+    line1: a.line1,
+    line2: a.line2,
+    landmark: a.landmark,
+    city: a.city,
+    state: a.state,
+    type: a.type,
+    alt_phone: a.alternatePhone ?? "",
+    instructions: a.instructions ?? "",
+    for_other: !!a.forSomeoneElse,
+    is_default: !!a.isDefault,
+    lat_e6: a.location ? Math.round(a.location.lat * 1e6) : null,
+    lng_e6: a.location ? Math.round(a.location.lng * 1e6) : null,
+  };
 }
 
 export function createSqlCustomerStore(db: SqlDb): CustomerStore {
@@ -44,7 +90,7 @@ export function createSqlCustomerStore(db: SqlDb): CustomerStore {
       .selectAll()
       .where("customer_id", "in", rows.map((r) => r.id))
       .orderBy("position")
-      .execute()) as AddressRow[];
+      .execute()) as unknown as AddressDbRow[];
     return rows.map((r) => ({
       id: r.id,
       phone: r.phone,
@@ -95,17 +141,52 @@ export function createSqlCustomerStore(db: SqlDb): CustomerStore {
         const { n } = (await trx.selectFrom("customer_addresses").select((eb) => eb.fn.countAll<number>().as("n")).where("customer_id", "=", id).executeTakeFirstOrThrow()) as { n: number | string };
         if (Number(n) >= MAX_ADDRESSES) throw new Error("Too many addresses");
         const max = (await trx.selectFrom("customer_addresses").select((eb) => eb.fn.max("position").as("p")).where("customer_id", "=", id).executeTakeFirst()) as { p: number | null } | undefined;
-        const saved: Address = { ...address, id: `adr_${randomToken(9)}` };
+        // The first address is the default; a new default replaces the old one (under the customer row lock).
+        const saved: Address = { ...address, id: `adr_${randomToken(9)}`, isDefault: !!address.isDefault || Number(n) === 0 };
+        if (saved.isDefault) await trx.updateTable("customer_addresses").set({ is_default: false }).where("customer_id", "=", id).execute();
         await trx
           .insertInto("customer_addresses")
-          .values({ ...saved, customer_id: id, position: Number(max?.p ?? -1) + 1 })
+          .values({ id: saved.id, ...addressColumns(saved), customer_id: id, position: Number(max?.p ?? -1) + 1 })
           .execute();
         return saved;
       });
     },
     async removeAddress(id, addressId) {
-      const r = await db.deleteFrom("customer_addresses").where("id", "=", addressId).where("customer_id", "=", id).executeTakeFirst();
-      return Number(r.numDeletedRows) > 0;
+      return sqlTx(db, async (trx) => {
+        const owner = await trx.selectFrom("customers").select("id").where("id", "=", id).forUpdate().executeTakeFirst();
+        if (!owner) return false;
+        const gone = await trx.selectFrom("customer_addresses").select(["is_default"]).where("id", "=", addressId).where("customer_id", "=", id).executeTakeFirst();
+        if (!gone) return false;
+        await trx.deleteFrom("customer_addresses").where("id", "=", addressId).where("customer_id", "=", id).execute();
+        if (toBool(gone.is_default)) {
+          const next = await trx.selectFrom("customer_addresses").select("id").where("customer_id", "=", id).orderBy("position").executeTakeFirst();
+          if (next) await trx.updateTable("customer_addresses").set({ is_default: true }).where("id", "=", next.id).execute();
+        }
+        return true;
+      });
+    },
+    async updateAddress(id, addressId, input) {
+      return sqlTx(db, async (trx) => {
+        const owner = await trx.selectFrom("customers").select("id").where("id", "=", id).forUpdate().executeTakeFirst();
+        if (!owner) return null;
+        const row = await trx.selectFrom("customer_addresses").select(["is_default"]).where("id", "=", addressId).where("customer_id", "=", id).executeTakeFirst();
+        if (!row) return null;
+        const next: Address = { ...input, id: addressId, isDefault: !!input.isDefault || toBool(row.is_default) };
+        if (next.isDefault) await trx.updateTable("customer_addresses").set({ is_default: false }).where("customer_id", "=", id).execute();
+        await trx.updateTable("customer_addresses").set(addressColumns(next)).where("id", "=", addressId).where("customer_id", "=", id).execute();
+        return next;
+      });
+    },
+    async setDefaultAddress(id, addressId) {
+      return sqlTx(db, async (trx) => {
+        const owner = await trx.selectFrom("customers").select("id").where("id", "=", id).forUpdate().executeTakeFirst();
+        if (!owner) return false;
+        const row = await trx.selectFrom("customer_addresses").select("id").where("id", "=", addressId).where("customer_id", "=", id).executeTakeFirst();
+        if (!row) return false;
+        await trx.updateTable("customer_addresses").set({ is_default: false }).where("customer_id", "=", id).execute();
+        await trx.updateTable("customer_addresses").set({ is_default: true }).where("id", "=", addressId).execute();
+        return true;
+      });
     },
     async erase(id, now = new Date()) {
       await sqlTx(db, async (trx) => {
@@ -171,6 +252,20 @@ const fromDoc = (d: CustomerDoc): Customer => ({
 
 export function createMongoCustomerStore(conn: Promise<MongoConn>): CustomerStore {
   const col = async () => (await conn).db.collection<CustomerDoc>("customers");
+  /** Compare-and-set on the embedded list: a concurrent change makes the write miss, and it is retried on fresh data. */
+  async function rewriteAddresses<T>(id: string, change: (list: Address[]) => { list: Address[]; result: T } | null, missing: T): Promise<T> {
+    const c = await col();
+    for (let i = 0; i < 5; i++) {
+      const d = await c.findOne({ _id: id }, { projection: { addresses: 1 } });
+      if (!d) return missing;
+      const list = d.addresses ?? [];
+      const out = change(list);
+      if (!out) return missing;
+      const r = await c.updateOne({ _id: id, addresses: list }, { $set: { addresses: out.list } });
+      if (r.modifiedCount === 1) return out.result;
+    }
+    throw new Error("Address book busy — try again");
+  }
   const set = async (id: string, patch: Partial<CustomerDoc>) => {
     await (await col()).updateOne({ _id: id }, { $set: patch });
   };
@@ -211,18 +306,41 @@ export function createMongoCustomerStore(conn: Promise<MongoConn>): CustomerStor
     setEmail: (id, email, verified = false) => set(id, { email, emailVerifiedAt: email && verified ? new Date() : null }),
     setName: (id, name) => set(id, { name }),
     async addAddress(id, address) {
-      const saved: Address = { ...address, id: `adr_${randomToken(9)}` };
-      // Atomic single-document update: push only while under the cap (no lost update, no transaction needed).
-      const r = await (await col()).updateOne({ _id: id, [`addresses.${MAX_ADDRESSES - 1}`]: { $exists: false } }, { $push: { addresses: saved } });
-      if (r.matchedCount === 0) {
-        const exists = await (await col()).countDocuments({ _id: id });
-        throw new Error(exists ? "Too many addresses" : "Customer not found");
+      const c = await col();
+      // Optimistic: read the list, write it back only if nobody changed it meanwhile (`addresses` matched as read).
+      for (let i = 0; i < 5; i++) {
+        const d = await c.findOne({ _id: id }, { projection: { addresses: 1 } });
+        if (!d) throw new Error("Customer not found");
+        const list = d.addresses ?? [];
+        if (list.length >= MAX_ADDRESSES) throw new Error("Too many addresses");
+        const saved: Address = { ...address, id: `adr_${randomToken(9)}`, isDefault: !!address.isDefault || list.length === 0 };
+        const next = [...(saved.isDefault ? list.map((a) => ({ ...a, isDefault: false })) : list), saved];
+        const r = await c.updateOne({ _id: id, addresses: list }, { $set: { addresses: next } });
+        if (r.modifiedCount === 1) return saved;
       }
-      return saved;
+      throw new Error("Address book busy — try again");
     },
     async removeAddress(id, addressId) {
-      const r = await (await col()).updateOne({ _id: id, "addresses.id": addressId }, { $pull: { addresses: { id: addressId } } });
-      return r.modifiedCount > 0;
+      return rewriteAddresses(id, (list) => {
+        const gone = list.find((a) => a.id === addressId);
+        if (!gone) return null;
+        const rest = list.filter((a) => a.id !== addressId);
+        if (gone.isDefault && rest[0]) rest[0] = { ...rest[0], isDefault: true };
+        return { list: rest, result: true };
+      }, false);
+    },
+    async updateAddress(id, addressId, input) {
+      return rewriteAddresses(id, (list) => {
+        const i = list.findIndex((a) => a.id === addressId);
+        if (i < 0) return null;
+        const next: Address = { ...input, id: addressId, isDefault: !!input.isDefault || !!list[i].isDefault };
+        const out = next.isDefault ? list.map((a) => ({ ...a, isDefault: false })) : [...list];
+        out[i] = next;
+        return { list: out, result: next };
+      }, null);
+    },
+    async setDefaultAddress(id, addressId) {
+      return rewriteAddresses(id, (list) => (list.some((a) => a.id === addressId) ? { list: list.map((a) => ({ ...a, isDefault: a.id === addressId })), result: true } : null), false);
     },
     async erase(id, now = new Date()) {
       await set(id, { phone: `erased:${id}`, name: null, email: null, emailVerifiedAt: null, addresses: [], erased_at: now });

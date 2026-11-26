@@ -302,3 +302,21 @@
     }
   }
 }
+
+/* Address map pin (components/address/address-map.tsx): a CSS shape, no image assets. */
+.ah-pin-wrap {
+  background: transparent;
+  border: 0;
+}
+.ah-pin {
+  position: absolute;
+  left: 3px;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--color-accent, #e4002b);
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  transform: rotate(-45deg);
+}
