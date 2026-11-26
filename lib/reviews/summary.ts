@@ -1,3 +1,4 @@
+import { sizeRank } from "@/lib/catalog/attributes";
 import type { Review, ReviewPage, ReviewQuery, ReviewSummary } from "./types";
 
 /** Pure review maths shared by every adapter (summary, filters, sort, paging). */
@@ -25,7 +26,7 @@ export function summarise(reviews: Review[]): ReviewSummary | null {
     fit: fitN ? Math.round((fitSum / fitN) * 100) / 100 : null,
     trueToSizePct: fitN ? Math.round((trueN / fitN) * 100) : null,
     withPhotos: reviews.filter((r) => r.photos.length > 0).length,
-    sizes: [...new Set(reviews.map((r) => r.size))],
+    sizes: [...new Set(reviews.map((r) => r.size))].sort((a, b) => sizeRank(a) - sizeRank(b) || a.localeCompare(b)),
   };
 }
 

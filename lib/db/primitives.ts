@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { sql } from "kysely";
 import type { KeyedLock } from "@/lib/concurrency/lock";
 import { isMongoDuplicate, type MongoConn, mongoTx } from "./mongo";
-import { fromJson, isUniqueViolation, type SqlDb, sqlTx, toIso } from "./sql";
+import { isDeadlock, fromJson, isUniqueViolation, type SqlDb, sqlTx, toIso } from "./sql";
 
 /**
  * Engine-neutral building blocks every money store uses (SQL and MongoDB implementations of the same contract):
@@ -78,10 +78,17 @@ export function createSqlPrimitives(db: SqlDb): Primitives {
         await db.insertInto("app_locks").values({ lock_key: key, owner, expires_at: new Date(now + LOCK_TTL_MS) }).execute();
         return true;
       } catch (e) {
+        // InnoDB reports a deadlock when several sessions insert the same key at once: nothing was taken — try again.
+        if (isDeadlock(e)) return false;
         if (!isUniqueViolation(e)) throw e;
         // Held by someone: take it over only if their lease expired (conditional update).
-        const r = await db.updateTable("app_locks").set({ owner, expires_at: new Date(now + LOCK_TTL_MS) }).where("lock_key", "=", key).where("expires_at", "<", new Date(now)).executeTakeFirst();
-        return Number(r.numUpdatedRows) === 1;
+        try {
+          const r = await db.updateTable("app_locks").set({ owner, expires_at: new Date(now + LOCK_TTL_MS) }).where("lock_key", "=", key).where("expires_at", "<", new Date(now)).executeTakeFirst();
+          return Number(r.numUpdatedRows) === 1;
+        } catch (e2) {
+          if (isDeadlock(e2)) return false;
+          throw e2;
+        }
       }
     },
     async (key, owner) => {

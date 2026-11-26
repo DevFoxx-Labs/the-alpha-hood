@@ -1,5 +1,41 @@
 # Change log
 
+## 2026-11-26 — Local development moved to MySQL (primary database) + four bugs MySQL exposed
+
+**Why:** MySQL is the primary database. Local dev and tests were pointed at MongoDB, which hid MySQL-only faults.
+
+**Local setup (this machine only — env files are not in git)**
+- `.env.local` → `DATABASE_DRIVER=mysql`, local `MySQL80` (`127.0.0.1:3306`, `alpha_hood_dev`). Owner made this edit.
+- `.env.test.local` → `TEST_MYSQL_URL` (same local credentials, `alpha_hood_test`); the MongoDB test URL is commented out.
+- Environment checked before each command: `pnpm db:status` → `mysql://127.0.0.1:3306/alpha_hood_dev · environment: local`.
+- `alpha_hood_dev`: 9 migrations applied on an empty database (42 tables), then `pnpm db:seed` (69 demo products,
+  686 reviews). `alpha_hood_test`: created empty; the contract tests migrate and wipe it themselves.
+- The old MongoDB dev data (staff account, edited products) was not copied. Create the admin owner again at `/admin/setup`.
+
+**Fixed (all found by running the contract tests on MySQL)**
+- **Rate-limit counters returned wrong counts under parallel requests** (`lib/db/stores/admin.ts`). The counter
+  was bumped in one statement and read in another, so two requests could both read "3" and none "2". Totals were
+  right, but a request could be told it was under the limit when it was the one that crossed it. Now bump + read
+  run in one transaction (row lock held until commit), with deadlock retry. Security-relevant: every rate limit.
+- **Locks could throw "Deadlock found"** (`lib/db/primitives.ts`). InnoDB reports a deadlock when several sessions
+  insert the same lock key at once. That now counts as "not acquired yet" and the existing retry loop tries again.
+  New helper `isDeadlock` in `lib/db/sql.ts`.
+- **Review size chips came out in database row order** (`lib/reviews/summary.ts`): now XS → 3XL order on every
+  engine (also the order a shopper expects).
+- **CSV import refused a new product without a `placeholder_art` cell** ("choose a valid placeholder drawing").
+  New products now start with their category's usual drawing (`defaultArt`, `lib/catalog/product-options.ts`).
+  This was the known gap logged as a MongoDB failure; it was engine-independent.
+
+**Threat model:** no new endpoint, data or tracker. The rate-limit fix closes an under-count that let a parallel
+burst slip one extra request past a limit (prevent, covered by the existing raced contract test, now green on MySQL).
+
+**Verification**
+- `pnpm typecheck` ✓ · `pnpm lint` ✓ · `pnpm test` 477/477 ✓, run twice in a row (memory + local MySQL).
+  Before the fixes on MySQL: 3–4 failures, different ones per run (concurrency).
+- Admin → Settings store (`app_settings`) passes its contract on MySQL (sealed at rest, atomic set + clear).
+- Not run: PostgreSQL and MongoDB after these fixes (next step, after MySQL — owner's stated order).
+- Not re-run: `pnpm build` and the browser check after these fixes.
+
 ## 2026-11-26 — Admin → Settings (from the AstroGaon panel) + faster, steadier admin shell
 
 **Asked for:** bring the AstroGaon admin's settings to this admin, keep that panel's look, stop the layout moving

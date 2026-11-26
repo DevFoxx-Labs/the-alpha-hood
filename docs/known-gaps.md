@@ -13,9 +13,6 @@
 - 🟠 Newsletter subscribers can't be messaged from the admin yet (no email / WhatsApp provider). Today: export CSV
   from `/admin/subscribers` and send from the provider. Statuses stay `pending_confirmation` ("Subscribed" in the
   admin) until double opt-in exists.
-- 🟡 `lib/db/contract.test.ts` › "own-backend store end to end · mongodb" › "style editor, CSV export -> import and
-  bulk actions" fails on local MongoDB (2026-11-25): it expected `['E2E Overshirt']` and got `[]`. This is the
-  uncommitted catalog CSV / bulk work; not caused by the newsletter change. Investigate before committing that work.
 - 🟠 Newsletter double opt-in (confirmation message before any offer) when the email/WhatsApp provider is added;
   unsubscribe link in every message.
 - 🟠 Account paths (M6): `terms_privacy` ledger row at every sign-up path, "Your consents" per user across devices,
@@ -32,8 +29,9 @@
   so a server-only override would make the bag show one threshold while the server charges another. Fix: pass the
   values from the store layout into `StoreUIProvider`, then add a "Store" group to `lib/settings/catalog.ts`. A
   change also alters the Refund notice text, so the notice version must be bumped with it.
-- 🟠 **Settings store not run on MySQL / PostgreSQL here.** `lib/db/stores/settings.ts` passed the contract on
-  memory and MongoDB only. Run `pnpm test` with `TEST_MYSQL_URL` / `TEST_POSTGRES_URL` before using those engines.
+- 🟠 **PostgreSQL and MongoDB not re-verified since the move to MySQL (2026-11-26).** The settings store and the
+  MySQL fixes (rate counters in a transaction, deadlock handling on locks) pass on memory + MySQL. Run `pnpm test`
+  with `TEST_POSTGRES_URL` / `TEST_MONGODB_URL` set before using those engines.
 - 🟡 Pages prerendered at build don't hold saved settings until their first revalidation (storefront pages
   revalidate every minute; a save refreshes them at once).
 - 🟡 A save reaches other server instances within 60 s (`REFRESH_MS`), not instantly. For a kill switch across many

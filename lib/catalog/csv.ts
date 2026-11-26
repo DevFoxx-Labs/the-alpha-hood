@@ -2,6 +2,7 @@ import { ValidationError } from "@/lib/http/guard";
 import { csvCell, uncsvCell } from "@/lib/security/csv-cell";
 import { assertUniqueCodes, type CatalogAdminDeps, CatalogAdminError, photosFromImages } from "./admin";
 import { ATTRIBUTE_VALUES } from "./attributes";
+import { defaultArt } from "./product-options";
 import { CatalogConflictError, type ProductRecord, skuKey } from "./store";
 import { baseTitleOf, saveStyle, STYLE_ID_RE } from "./style";
 
@@ -300,6 +301,9 @@ function buildBody(rows: Row[], has: Set<Column>, existing: ProductRecord[]): Re
   set("tags", "tags", (v) => v.split("|").map((t) => t.trim()).filter(Boolean));
   set("sizeChart", "size_chart");
   set("art", "placeholder_art");
+  // A new product from a sheet without a `placeholder_art` cell still needs a drawing until photos are uploaded:
+  // start from the category's usual one. An existing product keeps what it has.
+  if (body.art === undefined) body.art = defaultArt(body.category, body.subcategory);
   set("gstClass", "gst_class");
   set("hsn", "hsn");
   set("weightGrams", "weight_grams", (v) => wholeNumber(v, "weight_grams"));

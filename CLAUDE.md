@@ -25,6 +25,7 @@ shadcn/ui-style primitives on `radix-ui` in `components/ui` · store components 
 - **Own backend (`docs/backend/README.md`):** data lives behind store interfaces; `lib/db` implements them for MySQL,
   PostgreSQL and MongoDB (`DATABASE_DRIVER`). Every new store needs all three + memory, passing `lib/db/contract.test.ts`.
   Never import `lib/db` from client code (guard test). Destructive DB ops only on local `_dev`/`_test` databases.
+  **MySQL is the primary database:** develop and verify on local MySQL first; PostgreSQL and MongoDB are checked after.
 - **Admin settings (`lib/settings`):** a setting is declared once in `lib/settings/catalog.ts` and overrides one
   environment variable; read config through the existing `env = process.env` readers, never from the settings table.
   Database URL, `SECRET_BOX_KEY`, auth secrets and the preview switches must never be added to the catalogue.

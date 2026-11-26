@@ -5,7 +5,7 @@ import { type AdminSession, type Invite, type LoginTicket, type Staff, StaffConf
 import type { RateCounterStore } from "@/lib/http/rate-limit";
 import { isMongoDuplicate, type MongoConn } from "../mongo";
 import type { SecretBox } from "../secret-box";
-import { fromJson, isUniqueViolation, type SqlDb, sqlTx, toBool, toIso } from "../sql";
+import { fromJson, isUniqueViolation, type SqlDb, sqlTx, toBool, toIso, isDeadlock } from "../sql";
 
 /**
  * Phase 5 — staff + MFA, audit log, shared rate limits on the own backend.
@@ -201,27 +201,30 @@ export function createSqlAudit(db: SqlDb): AuditLog {
 export function createSqlRateCounters(db: SqlDb): RateCounterStore {
   return {
     async hit(key, windowMs, now) {
-      for (let i = 0; i < 3; i++) {
-        // Atomic per row: a new window when the old one ended, else +1.
-        const r = await db
-          .updateTable("rate_limits")
-          .set((eb) => ({
-            count: eb.case().when("reset_at", "<=", now).then(1).else(eb("count", "+", 1)).end(),
-            reset_at: eb.case().when("reset_at", "<=", now).then(now + windowMs).else(eb.ref("reset_at")).end(),
-          }))
-          .where("key_hash", "=", key)
-          .executeTakeFirst();
-        if (Number(r.numUpdatedRows) === 0) {
-          try {
-            await db.insertInto("rate_limits").values({ key_hash: key, count: 1, reset_at: now + windowMs }).execute();
-            return { count: 1, resetAt: now + windowMs };
-          } catch (e) {
-            if (!isUniqueViolation(e)) throw e;
-            continue; // created by a parallel request → count on it
-          }
-        }
-        const row = await db.selectFrom("rate_limits").select(["count", "reset_at"]).where("key_hash", "=", key).executeTakeFirst();
+      for (let i = 0; i < 4; i++) {
+        // Bump and read inside ONE transaction: the UPDATE holds the row lock until commit, so the SELECT returns
+        // this request's own count. (Read after an auto-committed UPDATE and a parallel request's increment can be
+        // returned instead — two requests then both see "3" and none sees "2". MySQL has no UPDATE … RETURNING.)
+        const row = await sqlTx(db, async (trx) => {
+          const r = await trx
+            .updateTable("rate_limits")
+            .set((eb) => ({
+              count: eb.case().when("reset_at", "<=", now).then(1).else(eb("count", "+", 1)).end(),
+              reset_at: eb.case().when("reset_at", "<=", now).then(now + windowMs).else(eb.ref("reset_at")).end(),
+            }))
+            .where("key_hash", "=", key)
+            .executeTakeFirst();
+          if (Number(r.numUpdatedRows) === 0) return null;
+          return (await trx.selectFrom("rate_limits").select(["count", "reset_at"]).where("key_hash", "=", key).executeTakeFirst()) ?? null;
+        }, 5);
         if (row) return { count: n(row.count), resetAt: n(row.reset_at) };
+        try {
+          await db.insertInto("rate_limits").values({ key_hash: key, count: 1, reset_at: now + windowMs }).execute();
+          return { count: 1, resetAt: now + windowMs };
+        } catch (e) {
+          // Created by a parallel request (duplicate key, or InnoDB's deadlock on simultaneous inserts) → count on it.
+          if (!isUniqueViolation(e) && !isDeadlock(e)) throw e;
+        }
       }
       throw new Error("rate limit counter busy");
     },

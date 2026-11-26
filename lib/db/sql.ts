@@ -65,11 +65,15 @@ export async function sqlTx<T>(db: SqlDb, fn: (trx: SqlDb) => Promise<T>, attemp
     try {
       return await db.transaction().execute(async (trx) => fn(trx as unknown as SqlDb));
     } catch (e) {
-      const code = (e as { code?: string }).code ?? "";
-      if (i >= attempts || !DEADLOCK.has(code)) throw e;
+      if (i >= attempts || !isDeadlock(e)) throw e;
       await new Promise((r) => setTimeout(r, 20 * i));
     }
   }
+}
+
+/** Deadlock / lock-wait / serialization failure: the statement did nothing and is safe to retry. */
+export function isDeadlock(e: unknown): boolean {
+  return DEADLOCK.has((e as { code?: string }).code ?? "");
 }
 
 /** Duplicate-key error from either engine (UNIQUE / PRIMARY KEY). */
