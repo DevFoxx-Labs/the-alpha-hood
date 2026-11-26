@@ -18,6 +18,7 @@ import {
   Image01Icon,
   Layers01Icon,
   Mail01Icon,
+  Message01Icon,
   Settings01Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
@@ -57,6 +58,7 @@ const ALL: NavItem[] = [
   { label: "Staff", icon: UserLock01Icon, route: "/admin/staff", permission: "staff.manage" },
   { label: "Audit log", icon: FileValidationIcon, route: "/admin/audit", permission: "audit.read" },
   { label: "View store", icon: Store01Icon, route: "/", permission: "dashboard" },
+  { label: "SMS providers", icon: Message01Icon, route: "/admin/sms-providers", permission: "settings.manage" },
   { label: "Settings", icon: Settings01Icon, route: "/admin/settings", permission: "settings.manage" },
 ];
 

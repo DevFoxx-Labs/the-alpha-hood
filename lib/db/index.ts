@@ -26,6 +26,8 @@ import { createMongoMaintenance, createSqlMaintenance } from "./stores/maintenan
 import { createMongoMediaStore, createSqlMediaStore } from "./stores/media";
 import type { SettingsStore } from "@/lib/settings/store";
 import { createMongoSettingsStore, createSqlSettingsStore } from "./stores/settings";
+import type { ProviderStore } from "@/lib/providers/store";
+import { createMongoProviderStore, createSqlProviderStore } from "./stores/providers";
 import { createMongoAudit, createMongoRateCounters, createMongoStaffStore, createSqlAudit, createSqlRateCounters, createSqlStaffStore } from "./stores/admin";
 import {
   createMongoAlertStore,
@@ -108,6 +110,8 @@ export interface DbStores {
   media: MediaStore;
   /** Admin → Settings: sealed overrides of environment variables. */
   settings: SettingsStore;
+  /** Admin-managed providers (SMS): sealed documents, one active per kind. */
+  providers: ProviderStore;
   maintenance: Maintenance;
   /** COMMERCE_PROVIDER=own: catalogue, bag and stock all on this database (built once, cached). */
   own(): OwnCommerce;
@@ -178,6 +182,7 @@ export function createDbStores(cfg: DbConfig): DbStores {
       flows: createMongoFlowStore(conn, p),
       media: createMongoMediaStore(conn),
       settings: createMongoSettingsStore(conn, createSecretBox()),
+      providers: createMongoProviderStore(conn, createSecretBox()),
       maintenance: createMongoMaintenance(conn),
       ...catalogParts(createMongoCatalogStore(conn), createMongoReviewStore(conn), (catalog) => ({ repo: createMongoCartRepo(conn), inventory: createMongoInventory(conn, p, catalog) })),
     };
@@ -210,6 +215,7 @@ export function createDbStores(cfg: DbConfig): DbStores {
     flows: createSqlFlowStore(db, p),
     media: createSqlMediaStore(db),
     settings: createSqlSettingsStore(db, createSecretBox()),
+    providers: createSqlProviderStore(db, createSecretBox()),
     maintenance: createSqlMaintenance(db),
     ...catalogParts(createSqlCatalogStore(db), createSqlReviewStore(db), (catalog) => ({ repo: createSqlCartRepo(db), inventory: createSqlInventory(db, p, catalog) })),
   };

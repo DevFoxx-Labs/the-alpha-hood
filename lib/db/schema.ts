@@ -336,7 +336,18 @@ export interface AppSettingsTable {
   updated_at: Date;
 }
 
+export interface ProvidersTable {
+  id: string;
+  kind: string;
+  /** TRUE for the one live row of a kind; NULL otherwise (so the UNIQUE (kind, is_active) index allows many). */
+  is_active: boolean | number | null;
+  /** Sealed JSON document (lib/db/secret-box.ts). */
+  doc: string;
+  updated_at: Date;
+}
+
 export interface Database {
+  providers: ProvidersTable;
   app_settings: AppSettingsTable;
   product_media: ProductMediaTable;
   staff: StaffTable;

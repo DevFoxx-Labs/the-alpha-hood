@@ -24,6 +24,7 @@ import { createMemoryOutbox } from "@/lib/notify/outbox";
 import { createMemoryUgcStore } from "@/lib/ugc/service";
 import { createMemoryMediaStore } from "@/lib/catalog/media";
 import { createMemorySettingsStore } from "@/lib/settings/store";
+import { createMemoryProviderStore } from "@/lib/providers/store";
 import { noMaintenance } from "./stores/maintenance";
 import { createMemoryCreditLedger } from "@/lib/wallet/store-credit";
 import { assertDestructiveAllowed, type DbConfig } from "./config";
@@ -91,6 +92,7 @@ export function testTargets(): Target[] {
           flows: createMemoryFlowStore(),
           media: createMemoryMediaStore(),
           settings: createMemorySettingsStore(),
+          providers: createMemoryProviderStore(),
           maintenance: noMaintenance,
         };
       },
@@ -134,6 +136,7 @@ export function testTargets(): Target[] {
           flows: s.flows,
           media: s.media,
           settings: s.settings,
+          providers: s.providers,
           maintenance: s.maintenance,
         };
       },

@@ -29,7 +29,7 @@ export const PERMISSIONS = [
   "ugc.moderate",
   "giftcards.issue",
   "subscribers.read", // newsletter list (masked) + full-contact CSV export (audited)
-  "settings.manage", // store settings, kill switches and integration keys — owner only
+  "settings.manage", // store settings, kill switches, integration keys and SMS providers — owner only
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 

@@ -19,7 +19,8 @@ if (existsSync(envFile)) {
   }
 }
 
-const checks: Check[] = configChecks(process.env);
+const checks: Check[] = [];
+let liveSmsProvider = false;
 let cfg = null;
 try {
   cfg = readDbConfig();
@@ -32,6 +33,8 @@ if (cfg) {
     const s = createDbStores(cfg);
     const [status, records, staff] = await Promise.all([migrationStatus(cfg), s.catalog.listRecords().catch(() => []), s.staff.list().catch(() => [])]);
     const demoReviews = await s.reviewStore.countByIdPrefix("rv_style_");
+    // A provider made live in Admin → SMS providers satisfies the SMS check (it passed a test SMS to go live).
+    liveSmsProvider = (await s.providers.list("sms").catch(() => [])).some((r) => r.active && r.doc !== null);
     checks.push(
       ...dataChecks({
         pendingMigrations: status.pending,
@@ -49,6 +52,7 @@ if (cfg) {
     else await closeSqlDb(cfg);
   }
 }
+checks.unshift(...configChecks(process.env, { liveSmsProvider }));
 
 for (const c of checks) console.log(`${c.ok ? "  ok " : c.level === "blocker" ? "  ✗  " : "  !  "} ${c.message}`);
 const b = blockers(checks);

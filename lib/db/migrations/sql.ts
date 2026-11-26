@@ -649,5 +649,26 @@ export function sqlMigrations(d: Driver): Record<string, Migration> {
         await db.schema.dropTable("app_settings").ifExists().execute();
       },
     },
+
+    "2026_11_28_010_providers": {
+      async up(db: AnyDb) {
+        // Admin-managed providers (SMS first). `doc` is sealed; one active row per kind is a UNIQUE index:
+        // inactive rows hold NULL in is_active, and NULLs never collide in MySQL or PostgreSQL.
+        await db.schema
+          .createTable("providers")
+          .ifNotExists()
+          .addColumn("id", "varchar(40)", (col) => col.primaryKey())
+          .addColumn("kind", "varchar(16)", (col) => col.notNull())
+          .addColumn("is_active", c.bool)
+          .addColumn("doc", "text", (col) => col.notNull())
+          .addColumn("updated_at", c.ts, (col) => col.notNull())
+          .modifyEnd(mysqlTable(d))
+          .execute();
+        await createIndex(db, d, "providers_one_active_uq", "providers", ["kind", "is_active"], true);
+      },
+      async down(db: AnyDb) {
+        await db.schema.dropTable("providers").ifExists().execute();
+      },
+    },
   };
 }

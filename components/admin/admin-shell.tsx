@@ -91,6 +91,7 @@ const PAGE_TITLES: [RegExp, string][] = [
   [/^\/admin\/audit$/, "Audit log"],
   [/^\/admin\/staff$/, "Staff"],
   [/^\/admin\/settings$/, "Settings"],
+  [/^\/admin\/sms-providers$/, "SMS providers"],
   [/^\/admin\/ugc$/, "#WearTheHood"],
   [/^\/admin$/, "Dashboard"],
 ];

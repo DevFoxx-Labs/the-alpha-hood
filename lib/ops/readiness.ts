@@ -28,7 +28,7 @@ export function urlUsesTls(cfg: DbConfig): boolean {
   return /[?&]ssl(-mode)?=|[?&]ssl=\{|[?&]sslmode=/.test(u);
 }
 
-export function configChecks(env: Env): Check[] {
+export function configChecks(env: Env, opts: { liveSmsProvider?: boolean } = {}): Check[] {
   const checks: Check[] = [];
   const add = (id: string, level: Check["level"], ok: boolean, message: string) => checks.push({ id, level, ok, message });
   let cfg: DbConfig | null = null;
@@ -56,8 +56,10 @@ export function configChecks(env: Env): Check[] {
   for (const k of ["LEGAL_ENTITY_NAME", "LEGAL_REGISTERED_ADDRESS", "GRIEVANCE_OFFICER_NAME", "GRIEVANCE_OFFICER_EMAIL", "SUPPORT_EMAIL"]) {
     add(`legal_${k.toLowerCase()}`, "blocker", !!env[k] && !/TO BE PROVIDED|example/i.test(env[k]!), `${k} set (notices need real contact details — DPDP)`);
   }
-  const smsReady = !!env.SMS_PROVIDER && env.SMS_PROVIDER in SMS_PROVIDERS && !!SMS_PROVIDERS[env.SMS_PROVIDER](env) && !!readTemplateIds(env).otp;
-  add("sms_provider", "blocker", smsReady, smsReady ? `SMS provider ${env.SMS_PROVIDER} configured with an OTP template` : "SMS provider configured (SMS_PROVIDER + DLT OTP template in SMS_TEMPLATES) — OTP sign-in can't send codes without it");
+  const envSms = !!env.SMS_PROVIDER && env.SMS_PROVIDER in SMS_PROVIDERS && !!SMS_PROVIDERS[env.SMS_PROVIDER](env) && !!readTemplateIds(env).otp;
+  // A provider made live in Admin → SMS providers counts too (it had to pass a test SMS to go live).
+  const smsReady = envSms || opts.liveSmsProvider === true;
+  add("sms_provider", "blocker", smsReady, smsReady ? (envSms ? `SMS provider ${env.SMS_PROVIDER} configured with an OTP template` : "SMS provider live in Admin → SMS providers") : "SMS provider live (Admin → SMS providers, tested and activated) — OTP sign-in can't send codes without it");
   add("checkout_enabled", "warning", env.CHECKOUT_ENABLED === "true", "CHECKOUT_ENABLED is \"true\" (store sells)");
   const rzp = env.PAYMENT_GATEWAY === "razorpay";
   add("payment_gateway", "warning", rzp, rzp ? "PAYMENT_GATEWAY is razorpay (online payments on)" : "No payment gateway — only COD can take orders");

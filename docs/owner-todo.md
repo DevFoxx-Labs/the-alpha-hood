@@ -211,3 +211,11 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
   admin wins). Suggested: keep live Razorpay keys in one place only.
 - [ ] Before adding a tracker ID in Admin → Settings → Analytics & Ads, confirm it is listed in the Cookie Policy
   and Privacy Notice.
+
+## 2026-11-26 (SMS providers)
+- [ ] Open the SMS provider account (MSG91 or Fast2SMS; 2Factor for sign-in codes only) and get the sender ID and
+  templates approved for DLT. Template variables must be named / ordered as shown in Admin → SMS providers → Add.
+- [ ] Admin → SMS providers: add the provider, send a test SMS to your phone, make it live.
+- [ ] Production: run migration `2026_11_28_010_providers` through the deploy pipeline.
+- [ ] Decide the email provider (SMTP with `nodemailer`, or an HTTPS provider without a new package) and the
+  storage bucket (S3 or Cloudflare R2), so those two admin pages can be built.

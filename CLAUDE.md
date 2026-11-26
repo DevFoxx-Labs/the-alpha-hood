@@ -29,6 +29,9 @@ shadcn/ui-style primitives on `radix-ui` in `components/ui` · store components 
 - **Admin settings (`lib/settings`):** a setting is declared once in `lib/settings/catalog.ts` and overrides one
   environment variable; read config through the existing `env = process.env` readers, never from the settings table.
   Database URL, `SECRET_BOX_KEY`, auth secrets and the preview switches must never be added to the catalogue.
+- **Admin providers (`lib/providers`):** SMS goes through the provider made live in Admin → SMS providers; drivers
+  have fixed hosts (never an admin-typed URL), keys are sealed and write-only, a provider must pass a test before
+  it can go live, and only DLT templates with allow-listed variables are sent (no free text).
 - **Commerce only through `lib/commerce`** (adapter interface). The mock adapter and `/dev/*` pages fail closed in
   production (`resolveCommerce`, `devPagesEnabled`).
 - **Money:** integer paise everywhere (`lib/format.ts`); the server computes every price/total — client state is display only.

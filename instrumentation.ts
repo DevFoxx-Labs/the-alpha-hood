@@ -8,4 +8,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   const { startSettingsRuntime } = await import("./lib/settings/runtime");
   await startSettingsRuntime();
+  // The SMS provider made live in Admin → SMS providers (lib/providers/sms-runtime.ts).
+  const { startSmsRuntime } = await import("./lib/providers/sms-runtime");
+  await startSmsRuntime();
 }

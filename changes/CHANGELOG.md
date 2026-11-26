@@ -1,5 +1,70 @@
 # Change log
 
+## 2026-11-26 — Admin → SMS providers (from the AstroGaon panel)
+
+**Asked for:** the AstroGaon admin's Integrations, Providers and Storage settings in this admin. This entry is the
+first part: SMS providers. Email providers and Storage are scoped in `docs/known-gaps.md` (they need decisions).
+
+**What it does (same model as AstroGaon → SMS Providers)**
+- Owner adds one or more providers (MSG91, Fast2SMS, 2Factor.in), sends a test SMS, then makes exactly one live.
+- The live provider sends every sign-in code and order SMS from the next request on. No provider live = the
+  environment's SMS settings, as before.
+- Keys are encrypted and write-only: the page shows a masked hint (`abcD••••cd`), never the key.
+
+**Differences from AstroGaon, on purpose**
+- No free-text messages. AstroGaon sends one "message" variable through a generic template; this store keeps its
+  rule of one DLT template per message type with fixed variables. The form has a template ID per message type and
+  shows the variables each template must carry. A type left blank is not sent by SMS.
+- Twilio is not offered: it would need fixed message texts registered for DLT, which this store doesn't have yet.
+- Step-up is a fresh authenticator code (AstroGaon re-confirms the password).
+
+**Added**
+- `lib/providers`: `store.ts` (generic provider rows, one active per kind), `sms-catalog.ts` (drivers + field
+  rules), `sms-gateway.ts` (fixed HTTPS hosts, timeouts, no redirects, keys scrubbed from errors),
+  `sms-service.ts` (rules below), `sms-runtime.ts` (live provider in memory; boot + 60 s refresh), `http.ts`.
+- `lib/db/stores/providers.ts` for MySQL / PostgreSQL / MongoDB; migration `2026_11_28_010_providers` (additive,
+  reversible). The whole document is sealed (AES-256-GCM). One active per kind is a UNIQUE index.
+- `GET/POST /api/admin/sms-providers`, `PATCH/DELETE /api/admin/sms-providers/[id]`,
+  `POST /api/admin/sms-providers/[id]/(test|activate|deactivate)`; permission `settings.manage` (owner only).
+- `/admin/sms-providers` + `components/admin/sms-providers.tsx`; sidebar item under Admin, before Settings.
+- `resolveSms()` returns the live provider first. `pnpm ops:check` accepts a live provider for the SMS blocker.
+
+**Changed**
+- Step-up attempts: 10 per 10 minutes per staff member (was 5). Activating, deactivating and editing a live
+  provider each use one; 5 blocked an ordinary session. Applies to Settings → Payments too.
+
+**Request shapes** follow the working gateway in the owner's AstroGaon app (`app/Support/Sms/SmsGateway.php`).
+They are covered by tests with a fake HTTP layer, not by a real send from this machine.
+
+**Threat model (High tier: whoever controls the live SMS provider can read every sign-in code)**
+- Assets: customer sign-in codes (account takeover), provider keys (paid API), SMS spend.
+- Actors: guest, non-owner staff, stolen owner session, cross-site attacker, database dump, a tampered form.
+- Non-owner or no session → 401 / 403 on every route (prevent, tested). Cross-site → 403 (prevent, tested).
+- Stolen session switches the live provider to the attacker's account → activate, deactivate and editing the live
+  provider need a fresh TOTP, single use, 10 tries per 10 minutes (prevent, tested); every owner is emailed when an
+  email provider exists; audit log + security log always (detect).
+- Broken keys saved on the live provider lock every customer out → a live edit must pass a test SMS before it is
+  saved (prevent, tested). A provider can't go live untested (prevent, tested).
+- Admin-typed URL makes the server call an internal address (SSRF) → no URL field exists; each driver has one
+  fixed https host, redirects refused, 10 s timeout (prevent, tested).
+- Key read back through the page, API, audit log or an error message → masked hint only; provider errors are
+  scrubbed of keys (prevent, tested).
+- Database dump → sealed document (prevent, tested on MySQL).
+- Free text or extra variables smuggled into an SMS → only a template's allow-listed variables, short safe values
+  (prevent, tested). Unknown fields, drivers and template names → 422 (prevent, tested).
+- Test SMS used to burn credit or spam a number → Indian mobiles only, 5 per 10 minutes per staff (prevent, tested).
+- Two owners activating at once → row locks + UNIQUE index, exactly one live (prevent, raced contract test).
+
+**Verification**
+- `pnpm typecheck` ✓ · `pnpm lint` ✓ · `pnpm test` 493/493 ✓ (memory + local MySQL). New: `lib/providers/sms.test.ts`
+  (11), provider store contract (raced activation, sealed at rest), 3 API tests.
+- Local MySQL dev database (`mysql://127.0.0.1:3306/alpha_hood_dev`, environment: local): migration `010` applied.
+- Page compiles and answers on the owner's running dev server (MySQL): `/admin/sms-providers` 200,
+  `/api/admin/sms-providers` 401 without a session. **Not seen in a browser**: that server was in use and a second
+  dev server can't run beside it, so the screen has not been checked at 1440 / 390 / 360 or in dark mode.
+- Not done: a real SMS through MSG91 / Fast2SMS / 2Factor (needs the owner's account and DLT templates).
+- Not run: PostgreSQL and MongoDB (after MySQL, per the owner's order). `pnpm build` not re-run.
+
 ## 2026-11-26 — Local development moved to MySQL (primary database) + four bugs MySQL exposed
 
 **Why:** MySQL is the primary database. Local dev and tests were pointed at MongoDB, which hid MySQL-only faults.

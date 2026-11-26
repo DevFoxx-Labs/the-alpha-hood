@@ -115,7 +115,19 @@ const g = globalThis as unknown as { __alpha_hood_demo_sms?: DemoSms };
  */
 export const SMS_PROVIDERS: Record<string, (env: Env) => SmsAdapter | null> = {};
 
+/**
+ * The provider made live in Admin → SMS providers (lib/providers/sms-runtime.ts installs it). It wins over the
+ * environment's SMS_PROVIDER. Kept on globalThis so every route bundle of this process sees the same one.
+ */
+const live = globalThis as unknown as { __alpha_hood_active_sms?: SmsAdapter | null };
+export function setActiveSms(adapter: SmsAdapter | null): void {
+  live.__alpha_hood_active_sms = adapter;
+}
+export const activeSms = (): SmsAdapter | null => live.__alpha_hood_active_sms ?? null;
+
 export function resolveSms(env: Env = process.env): SmsAdapter {
+  // Only for the real process environment: tests and scripts that pass their own `env` get exactly what it says.
+  if (env === process.env && live.__alpha_hood_active_sms) return live.__alpha_hood_active_sms;
   const factory = env.SMS_PROVIDER ? SMS_PROVIDERS[env.SMS_PROVIDER] : undefined;
   const real = factory?.(env);
   if (real) return real;

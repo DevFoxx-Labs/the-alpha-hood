@@ -16,7 +16,9 @@ export type SecurityEvent =
   | "referral_refused"
   | "rate_limit_store_error"
   | "admin_reset_code_requested"
-  | "admin_password_reset";
+  | "admin_password_reset"
+  | "sms_provider_changed"
+  | "sms_provider_test";
 
 export function maskPhone(phone: string): string {
   return phone.length > 4 ? `${"*".repeat(Math.max(0, phone.length - 4))}${phone.slice(-4)}` : "****";

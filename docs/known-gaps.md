@@ -22,6 +22,24 @@
   If added, ask for geolocation just-in-time and never send coordinates without consent.
 - 🟡 Hindi only for the Privacy Notice; Terms/Refund/Cookie and the banner are English.
 
+## Admin providers, integrations, storage (2026-11-26 — asked for, from the AstroGaon panel)
+- 🔴 **SMS provider not proven with a real send.** Admin → SMS providers is built and tested against a fake HTTP
+  layer; request shapes come from the AstroGaon gateway. Before launch: add the real provider, send a test SMS,
+  make it live, and place one test order to confirm the order templates' variables match the DLT text.
+- 🟠 **Email providers page not built.** AstroGaon offers SMTP and Amazon SES. Here the email seam
+  (`lib/notify/email.ts`) has no real adapter. Needs the owner's choice: (a) SMTP via `nodemailer` (new package,
+  no dependencies of its own) or (b) HTTPS-only providers (SES / Resend / ZeptoMail) with no package. The store,
+  table and step-up from SMS providers are reusable (`kind: "email"`). Until then owner alerts and staff
+  "Forgot password?" emails don't send on the live store.
+- 🟠 **Storage page not built.** AstroGaon offers local / S3 / Cloudflare R2 with a connection test. Here product
+  and return photos are stored in the database (`product_media`, `return_photos`). Needs the owner's choice of
+  bucket provider; S3 and R2 can be done with request signing in `node:crypto` (no package). Moving existing
+  photos is a data migration: copy first, switch reads, delete later.
+- 🟡 Integrations not offered because the feature doesn't exist here yet: Turnstile, Sentry, Google / Facebook /
+  Apple sign-in, push (FCM), AI providers. Add each as a group in `lib/settings/catalog.ts` with its feature.
+- 🟡 Twilio is not an SMS driver here: it sends free text, and this store sends DLT templates only.
+- 🟡 Owner alert on an SMS provider change is audit + security log until an email provider exists.
+
 ## Admin settings (2026-11-26)
 - 🟠 **Commercial settings are still constants.** Free-shipping threshold, shipping fee, COD fee and limit, max
   quantity, return window, damage-report hours (`lib/config/store.ts` `STORE_CONFIG`) can't be edited in

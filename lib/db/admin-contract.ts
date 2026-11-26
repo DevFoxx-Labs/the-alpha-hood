@@ -182,6 +182,43 @@ for (const target of testTargets()) {
       expect(await s.settings.all()).toEqual([]);
     });
 
+    it("providers: sealed at rest, one active per kind even when activations race, the live row can't be removed", async () => {
+      const doc = (name: string) => ({ name, driver: "msg91", credentials: { auth_key: `plain-key-${name}-ABCDEFGH` } });
+      const t = new Date("2026-11-28T09:00:00.000Z");
+      for (const id of ["prv_a", "prv_b", "prv_c"]) await s.providers.put("sms", id, doc(id), t);
+      await s.providers.put("sms", "prv_a", doc("renamed"), t); // replace in place
+      expect((await s.providers.list<{ name: string }>("sms")).map((r) => [r.id, r.active, r.doc?.name, r.updatedAt])).toEqual([
+        ["prv_a", false, "renamed", t.toISOString()],
+        ["prv_b", false, "prv_b", t.toISOString()],
+        ["prv_c", false, "prv_c", t.toISOString()],
+      ]);
+      expect(await s.providers.get("sms", "prv_nope")).toBeNull();
+      if (target.cfg) {
+        const raw: unknown =
+          target.cfg.driver === "mongodb"
+            ? await (await getMongo(target.cfg)).db.collection("providers").find({}).toArray()
+            : await getSqlDb(target.cfg).selectFrom("providers").selectAll().execute();
+        expect(JSON.stringify(raw)).not.toContain("plain-key");
+      }
+      expect(await s.providers.setActive("sms", "prv_nope")).toBe(false);
+      // Three owners activate three providers at the same moment: exactly one ends up live.
+      const race = await Promise.allSettled(["prv_a", "prv_b", "prv_c"].map((id) => s.providers.setActive("sms", id)));
+      expect(race.some((r) => r.status === "fulfilled")).toBe(true);
+      const live = (await s.providers.list("sms")).filter((r) => r.active);
+      expect(live).toHaveLength(1);
+      // Editing the live row keeps it live; it can't be removed; the others can.
+      await s.providers.put("sms", live[0].id, doc("edited"), t);
+      expect((await s.providers.get("sms", live[0].id))!.active).toBe(true);
+      expect(await s.providers.remove("sms", live[0].id)).toBe(false);
+      const other = ["prv_a", "prv_b", "prv_c"].find((id) => id !== live[0].id)!;
+      expect(await s.providers.remove("sms", other)).toBe(true);
+      expect(await s.providers.remove("sms", other)).toBe(false);
+      expect(await s.providers.setActive("sms", null)).toBe(true);
+      expect((await s.providers.list("sms")).some((r) => r.active)).toBe(false);
+      for (const r of await s.providers.list("sms")) await s.providers.remove("sms", r.id);
+      expect(await s.providers.list("sms")).toEqual([]);
+    });
+
     it("audit log: newest first, filters, no update path", async () => {
       for (const i of [1, 2, 3]) await s.audit.append({ actorId: "stf_a", actorEmail: "a@x", action: `test.${i}`, target: i === 2 ? "T2" : "T", details: { i }, ip: "10.0.0.1" }, new Date(Date.parse("2026-11-26T00:00:00Z") + i));
       const all = await s.audit.list({ actorId: "stf_a" });

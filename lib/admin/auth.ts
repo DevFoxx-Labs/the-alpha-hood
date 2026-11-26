@@ -133,7 +133,8 @@ export async function totpStep(store: StaffStore, ticket: string, code: unknown,
  * staff member; a code is accepted once (same replay rule as sign-in).
  */
 export async function confirmTotp(staff: Staff, code: unknown, store: StaffStore = resolveStaffStore(), now = Date.now()): Promise<void> {
-  const rl = await rateLimiter.hit(`admin:stepup:${staff.id}`, 5, 10 * 60_000);
+  // 10 per 10 minutes: enough for a session of provider changes, far too few to guess a 6-digit code.
+  const rl = await rateLimiter.hit(`admin:stepup:${staff.id}`, 10, 10 * 60_000);
   if (!rl.ok) throw new AdminAuthError(429, "rate_limited", "Too many attempts. Try again in a few minutes.");
   const fresh = await store.get(staff.id);
   const step = fresh?.totpSecret && typeof code === "string" ? verifyTotp(fresh.totpSecret, code.trim(), now, fresh.lastTotpStep) : null;

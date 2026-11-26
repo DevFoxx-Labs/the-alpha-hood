@@ -35,6 +35,11 @@ import { POST as resetLinkPOST } from "./admin/staff/[id]/reset-link/route";
 import { POST as forgotPOST } from "./admin/password/forgot/route";
 import { GET as subscribersGET } from "./admin/subscribers/route";
 import { GET as settingsGET } from "./admin/settings/route";
+import { GET as smsGET, POST as smsPOST } from "./admin/sms-providers/route";
+import { DELETE as smsDELETE, PATCH as smsPATCH } from "./admin/sms-providers/[id]/route";
+import { POST as smsACTION } from "./admin/sms-providers/[id]/[action]/route";
+import { resolveSms, setActiveSms } from "@/lib/notify/sms";
+import { resolveProviderStore } from "@/lib/providers/store";
 import { PUT as settingsPUT } from "./admin/settings/[group]/route";
 import { resetSettingsRuntime } from "@/lib/settings/runtime";
 import { resolveSettingsStore } from "@/lib/settings/store";
@@ -587,9 +592,105 @@ describe("settings (owner only, lib/settings)", () => {
       expect(page).not.toContain(secret);
       expect(JSON.stringify(await resolveAudit().list({ target: "settings:payments" }))).not.toContain(secret);
 
-      // Guessing is capped per staff member (5 per 10 minutes), whatever the IP.
+      // Guessing is capped per staff member (10 per 10 minutes), whatever the IP.
       let last = 0;
-      for (let i = 0; i < 6; i++) last = (await put("payments", { ...body, code: "111111" }, owner, { "x-forwarded-for": `100.70.0.${i + 1}` })).status;
+      for (let i = 0; i < 11; i++) last = (await put("payments", { ...body, code: "111111" }, owner, { "x-forwarded-for": `100.70.0.${i + 1}` })).status;
+      expect(last).toBe(429);
+    } finally {
+      await wipe();
+    }
+  });
+});
+
+describe("SMS providers (owner only, lib/providers)", () => {
+  const KEY = "abcDEF1234567890abcd";
+  const BODY = { name: "MSG91 main", driver: "msg91", credentials: { auth_key: KEY }, senderId: "ALPHAH", otpTemplate: "tmpl_otp_1", templates: {} };
+  const act = (id: string, action: string, body: unknown, cookie?: string, headers?: Record<string, string>) =>
+    smsACTION(req(`/api/admin/sms-providers/${id}/${action}`, "POST", body, { cookie, headers }), p({ id, action }));
+  const freshCode = () => (tick(), totpAt(secrets.get("owner@example.test")!, Math.floor(Date.now() / 30_000)));
+  const wipe = async () => {
+    const store = resolveProviderStore();
+    await store.setActive("sms", null);
+    for (const r of await store.list("sms")) await store.remove("sms", r.id);
+    setActiveSms(null);
+    vi.unstubAllGlobals();
+  };
+
+  it("401 without a session, 403 for non-owners, cross-origin refused, on every route", async () => {
+    try {
+      const manager = await invite(`sms-${ip}@example.test`, "store_manager");
+      const id = "prv_00000000000000000000";
+      for (const [cookie, status] of [[undefined, 401], [manager, 403]] as const) {
+        expect((await smsGET(req("/api/admin/sms-providers", "GET", undefined, { cookie }))).status).toBe(status);
+        expect((await smsPOST(req("/api/admin/sms-providers", "POST", BODY, { cookie }))).status).toBe(status);
+        expect((await smsPATCH(req(`/api/admin/sms-providers/${id}`, "PATCH", BODY, { cookie }), p({ id }))).status).toBe(status);
+        expect((await smsDELETE(req(`/api/admin/sms-providers/${id}`, "DELETE", {}, { cookie }), p({ id }))).status).toBe(status);
+        for (const action of ["test", "activate", "deactivate"]) expect((await act(id, action, {}, cookie)).status).toBe(status);
+      }
+      expect((await smsPOST(req("/api/admin/sms-providers", "POST", BODY, { cookie: owner, headers: { origin: "https://evil.example" } }))).status).toBe(403);
+      expect(await resolveProviderStore().list("sms")).toEqual([]);
+    } finally {
+      await wipe();
+    }
+  });
+
+  it("add → test → make live (fresh TOTP) → sign-in codes go through it; keys never come back; audited without keys", async () => {
+    try {
+      const sent: string[] = [];
+      vi.stubGlobal("fetch", async (url: string) => (sent.push(String(url)), new Response(JSON.stringify({ type: "success", request_id: "r1" }))));
+      const made = await smsPOST(req("/api/admin/sms-providers", "POST", BODY, { cookie: owner }));
+      expect(made.status).toBe(201);
+      const { provider } = await made.json();
+      const id = provider.id as string;
+      expect(JSON.stringify(provider)).not.toContain(KEY);
+      expect((await smsPOST(req("/api/admin/sms-providers", "POST", { ...BODY, driver: "http://evil" }, { cookie: owner }))).status).toBe(422);
+
+      // Not tested yet → can't go live, even with a valid code.
+      expect((await act(id, "activate", { code: freshCode() }, owner)).status).toBe(409);
+      expect((await act(id, "test", { to: "12345" }, owner)).status).toBe(422);
+      const tested = await act(id, "test", { to: "9876543210" }, owner);
+      expect(await tested.json()).toMatchObject({ ok: true, provider: { verified: true } });
+      expect(sent[0]).toContain("https://control.msg91.com/api/v5/otp?");
+
+      // Going live needs a fresh authenticator code.
+      expect((await act(id, "activate", {}, owner)).status).toBe(401);
+      expect((await act(id, "activate", { code: "000000" }, owner)).status).toBe(401);
+      expect(resolveSms().name).toBe("demo");
+      expect((await act(id, "activate", { code: freshCode() }, owner)).status).toBe(200);
+      expect(resolveSms().name).toBe("msg91");
+
+      // A customer sign-in code now leaves through the live provider — and is not echoed back.
+      sent.length = 0;
+      const otp = await (await otpSend(req("/api/otp/send", "POST", { phone: `98111${String(ip).padStart(5, "0")}` }))).json();
+      expect(otp.demoCode).toBeUndefined();
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatch(/^https:\/\/control\.msg91\.com\/api\/v5\/otp\?template_id=tmpl_otp_1&mobile=9198111\d{5}&otp=\d{6}$/);
+
+      // Live: can't be deleted; editing needs a code; page and audit never hold the key.
+      expect((await smsDELETE(req(`/api/admin/sms-providers/${id}`, "DELETE", {}, { cookie: owner }), p({ id }))).status).toBe(409);
+      expect((await smsPATCH(req(`/api/admin/sms-providers/${id}`, "PATCH", { ...BODY, name: "Renamed", credentials: {} }, { cookie: owner }), p({ id }))).status).toBe(401);
+      expect((await smsPATCH(req(`/api/admin/sms-providers/${id}`, "PATCH", { ...BODY, name: "Renamed", credentials: {}, code: freshCode() }, { cookie: owner }), p({ id }))).status).toBe(200);
+      const page = await (await smsGET(req("/api/admin/sms-providers", "GET", undefined, { cookie: owner }))).text();
+      expect(page).not.toContain(KEY);
+      expect(page).toContain("abcD••••cd");
+      const audits = await resolveAudit().list({ target: `sms_provider:${id}` });
+      expect(audits.map((a) => a.action)).toEqual(expect.arrayContaining(["sms_provider.create", "sms_provider.test", "sms_provider.activate", "sms_provider.update"]));
+      expect(JSON.stringify(audits)).not.toContain(KEY);
+
+      expect((await act(id, "deactivate", { code: freshCode() }, owner)).status).toBe(200);
+      expect(resolveSms().name).toBe("demo");
+      expect((await act(id, "wipe", { code: "123456" }, owner)).status).toBe(404);
+    } finally {
+      await wipe();
+    }
+  });
+
+  it("test SMS is capped per staff member (paid API)", async () => {
+    try {
+      vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ type: "success" })));
+      const id = (await (await smsPOST(req("/api/admin/sms-providers", "POST", BODY, { cookie: owner }))).json()).provider.id as string;
+      let last = 0;
+      for (let i = 0; i < 6; i++) last = (await act(id, "test", { to: "9876543210" }, owner, { "x-forwarded-for": `100.71.0.${i + 1}` })).status;
       expect(last).toBe(429);
     } finally {
       await wipe();

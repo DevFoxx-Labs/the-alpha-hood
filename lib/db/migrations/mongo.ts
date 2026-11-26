@@ -227,4 +227,15 @@ export const MONGO_MIGRATIONS: MongoMigration[] = [
       if (await db.listCollections({ name: "app_settings" }, { nameOnly: true }).hasNext()) await db.collection("app_settings").drop();
     },
   },
+  {
+    name: "2026_11_28_010_providers",
+    async up(db) {
+      // Admin-managed providers (SMS first): sealed document; at most one active per kind.
+      await ensureCollection(db, "providers");
+      await db.collection("providers").createIndexes([{ key: { kind: 1, active: 1 }, name: "providers_one_active_uq", unique: true, partialFilterExpression: { active: true } }]);
+    },
+    async down(db) {
+      if (await db.listCollections({ name: "providers" }, { nameOnly: true }).hasNext()) await db.collection("providers").drop();
+    },
+  },
 ];
