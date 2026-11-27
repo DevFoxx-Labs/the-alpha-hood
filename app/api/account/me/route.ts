@@ -1,10 +1,10 @@
+import { accountView } from "@/lib/account/me";
 import { methodCount, signInMethods } from "@/lib/auth/email-auth";
 import { publicCustomer, resolveCustomers } from "@/lib/customers/store";
 import { clientIp, guardPublicWrite, jsonError } from "@/lib/http/guard";
 import { commerceErrorResponse, privateJson, requireAccount } from "@/lib/http/commerce-http";
 import { rateLimiter } from "@/lib/http/rate-limit";
 import { asObject, cleanText, normaliseEmail, rejectUnknownFields } from "@/lib/validation";
-import { resolveCredit } from "@/lib/wallet/store-credit";
 
 /** GET /api/account/me — profile (masked phone), addresses, store credit. PATCH `{ name?, email? }`. */
 export async function GET(request: Request) {
@@ -13,13 +13,9 @@ export async function GET(request: Request) {
   const auth = await requireAccount(request);
   if (!auth.ok) return auth.response;
   try {
-    const customer = await resolveCustomers().get(auth.customerId);
-    if (!customer) return jsonError(401, "unauthenticated", "Please sign in again.");
-    const credit = resolveCredit();
-    return privateJson({
-      customer: publicCustomer(customer),
-      storeCredit: { balance: await credit.balance(customer.id), history: (await credit.history(customer.id)).slice(0, 20) },
-    });
+    const view = await accountView(auth.customerId);
+    if (!view) return jsonError(401, "unauthenticated", "Please sign in again.");
+    return privateJson(view);
   } catch (error) {
     return commerceErrorResponse(error);
   }

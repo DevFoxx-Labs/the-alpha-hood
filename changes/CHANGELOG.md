@@ -1,5 +1,38 @@
 # Change log
 
+## 2026-12-02 — Fix: /account showed the account screen for a few seconds before the sign-in form
+
+**Reported:** opening /account while signed out first showed the account (dashboard) shell, then after 3–4 seconds
+the sign-in form.
+**Cause:** `AccountFrame` started in a "loading" state that drew the account navigation + skeletons, and only after
+`GET /api/account/me` answered 401 did it switch to the sign-in form. The session cookie is HttpOnly, so the browser
+can't tell on its own.
+
+### Now
+- New `app/(store)/account/layout.tsx`: the server checks the session (same check as `requireAccount`:
+  cookie → hashed token → expiry → customer) before any account screen is drawn — `lib/account/server.ts`
+  (`currentAccount`, same pattern as the admin's `lib/admin/server.ts`). The first HTML is already the right
+  screen: **sign-in form for a guest**, the account with its data for a customer. No extra request.
+- The decision is shared through `components/account/account-session.tsx`, which lives in the layout: moving between
+  account pages keeps it, and sign-in / sign-out / profile reloads update it (no stale "signed out" on the next page).
+- The browser only asks `/api/account/me` when the server couldn't decide (accounts switched off, backend down) —
+  the old behaviour, with its error handling.
+- `lib/account/me.ts` (`accountView`) builds the account data for both `GET /api/account/me` and the server render,
+  so they can't drift.
+
+### Security
+- The server render uses the same session check; a forged / expired cookie gets the sign-in form and no data
+  (checked). The account HTML is `Cache-Control: no-store` (checked) and the pages stay `noindex`. Only what the API
+  already returned (masked phone, name, email, addresses, store credit) is in the page. Every account API still
+  checks the session on each call.
+
+### Verified
+- `pnpm typecheck` ✔ (after `next typegen` for the new layout's route types), `pnpm lint` ✔, `pnpm test`
+  42 files / 601 tests ✔.
+- Dev server, first HTML, 12/12 ✔: guest /account, /account/orders, /account/settings → sign-in form and no
+  account menu; signed in → account menu + own email, no sign-in form; `no-store`; forged cookie → sign-in form.
+- Not verified: visually in a browser (extension not connected).
+
 ## 2026-12-02 — OTP entry as separate digit boxes, with visual feedback
 
 **Asked for:** the code field should be separate boxes, one per digit (4 or 6), with visual graphics and actions.

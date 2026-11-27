@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Address } from "@/lib/checkout/address-types";
 import { cn } from "@/lib/utils";
 import { SignInPanel } from "./sign-in-panel";
+import { useAccountSession } from "./account-session";
 
 export interface Me {
   /** `phone` is masked; null = no mobile number yet (account started by email or Google). */
@@ -39,24 +40,37 @@ const NAV = [
 ];
 
 /**
- * ACC-02 account shell: loads the signed-in customer, shows sign-in (mobile, email or Google — ACC-01) when signed out,
- * and the account navigation. All data comes from no-store APIs; nothing personal is server-rendered.
+ * ACC-02 account shell: the signed-in customer's navigation and screens, or sign-in (mobile, email or Google — ACC-01)
+ * when signed out. The first state comes from the server's session check (app/(store)/account/layout.tsx), so a guest
+ * sees the sign-in form straight away; the browser only asks GET /api/account/me when the server couldn't decide.
  */
 export function AccountFrame({ title, children }: { title: string; children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [state, setState] = useState<{ kind: "loading" } | { kind: "signed_out" } | { kind: "error"; message: string } | { kind: "ok"; me: Me }>({ kind: "loading" });
+  const session = useAccountSession();
+  const known = session?.state.known ? session.state : null;
+  const [state, setState] = useState<{ kind: "loading" } | { kind: "signed_out" } | { kind: "error"; message: string } | { kind: "ok"; me: Me }>(() =>
+    known ? (known.me ? { kind: "ok", me: known.me } : { kind: "signed_out" }) : { kind: "loading" },
+  );
+  const setSession = session?.set;
 
   const reload = useCallback(async () => {
     try {
-      setState({ kind: "ok", me: await api<Me>("/api/account/me") });
+      const me = await api<Me>("/api/account/me");
+      setState({ kind: "ok", me });
+      setSession?.(me);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) setState({ kind: "signed_out" });
-      else setState({ kind: "error", message: e instanceof ApiError ? e.message : "Couldn't load your account." });
+      if (e instanceof ApiError && e.status === 401) {
+        setState({ kind: "signed_out" });
+        setSession?.(null);
+      } else setState({ kind: "error", message: e instanceof ApiError ? e.message : "Couldn't load your account." });
     }
-  }, []);
+  }, [setSession]);
 
+  // Only when the server couldn't decide (accounts off / backend unavailable / outside the account layout).
+  const askApi = !known;
   useEffect(() => {
+    if (!askApi) return;
     let cancelled = false;
     api<Me>("/api/account/me")
       .then((me) => !cancelled && setState({ kind: "ok", me }))
@@ -68,12 +82,13 @@ export function AccountFrame({ title, children }: { title: string; children: Rea
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [askApi]);
 
   const signOut = async () => {
     try {
       await api("/api/session/logout", { method: "POST", body: {} });
     } finally {
+      setSession?.(null);
       router.push("/");
       router.refresh();
     }
