@@ -15,6 +15,7 @@ import {
   resolveCredentials,
 } from "./passwords";
 import { sha256 } from "./secrets";
+import { createSecretBox } from "@/lib/db/secret-box";
 import { resolveSocialIdentities, type SocialIdentityStore, type SocialProvider } from "./social-identities";
 
 /**
@@ -166,6 +167,61 @@ export async function verifyEmailCode(input: VerifyEmailInput, deps: EmailAuthDe
   }
   securityEvent("email_code_verified", { customer: customerId, email: maskEmail(email), intent, created });
   return { customerId, created, passwordSet: !!hash, consent: intent === "signup" ? "checkbox" : "signup_notice" };
+}
+
+// ── Forgot password in two steps: code first, then the new password ───────────────────────────────
+
+/**
+ * Step 1: email → code (sendEmailCode). Step 2 (this): the code is checked and used up, then a reset ticket is
+ * issued — sealed (AES-GCM, SECRET_BOX_KEY), bound to this customer + address, valid 10 minutes, and bound to the
+ * password version in force (`v`), so it stops working the moment a password is set: single use without storage.
+ * Step 3: completeReset(ticket, new password).
+ */
+export const RESET_COOKIE = "ah_reset";
+export const RESET_TTL_MS = 10 * 60_000;
+interface ResetTicket {
+  c: string;
+  e: string;
+  v: string;
+  exp: number;
+}
+const credVersion = (cred: { updatedAt: string } | null) => cred?.updatedAt ?? "none";
+
+export async function verifyResetCode(input: { email: unknown; challengeId: unknown; code: unknown }, deps: EmailAuthDeps = {}): Promise<{ customerId: string; ticket: string }> {
+  const email = emailOrThrow(input.email);
+  if (typeof input.challengeId !== "string" || !CHALLENGE_RE.test(input.challengeId) || typeof input.code !== "string") throw new ValidationError("That code is incorrect or has expired.");
+  const key = await verifyOtp(input.challengeId, input.code.trim(), { store: deps.otp ?? resolveOtpStore(), now: deps.now, purpose: purposeFor(email) });
+  if (key !== emailAuthKey(email)) throw new ValidationError("That code is incorrect or has expired.");
+  const customer = await (deps.customers ?? resolveCustomers()).findByLoginEmail(email);
+  // Only the owner of the address gets this far (they entered its code), so naming "no account" reveals nothing.
+  if (!customer || isErased(customer)) throw new AuthError(404, "no_account", "There's no account with this email yet. Create one instead.");
+  const cred = await (deps.credentials ?? resolveCredentials()).get(customer.id);
+  const t: ResetTicket = { c: customer.id, e: email, v: credVersion(cred), exp: (deps.now ?? Date.now()) + RESET_TTL_MS };
+  securityEvent("email_code_verified", { customer: customer.id, email: maskEmail(email), intent: "reset_ticket" });
+  return { customerId: customer.id, ticket: Buffer.from(createSecretBox(deps.env).seal(JSON.stringify(t))).toString("base64url") };
+}
+
+/** Sets the new password with a ticket from verifyResetCode. Returns the customer (the caller signs out every other session). */
+export async function completeReset(rawTicket: string | null | undefined, password: unknown, deps: EmailAuthDeps = {}): Promise<string> {
+  const expired = new AuthError(410, "reset_expired", "This reset has expired or was already used. Request a new code.");
+  if (!rawTicket || rawTicket.length > 2_000 || !/^[A-Za-z0-9_-]+$/.test(rawTicket)) throw expired;
+  let t: ResetTicket;
+  try {
+    t = JSON.parse(createSecretBox(deps.env).open(Buffer.from(rawTicket, "base64url").toString("utf8"))) as ResetTicket;
+  } catch {
+    throw expired;
+  }
+  if (typeof t?.c !== "string" || typeof t.e !== "string" || typeof t.v !== "string" || typeof t.exp !== "number" || t.exp < (deps.now ?? Date.now())) throw expired;
+  const customer = await (deps.customers ?? resolveCustomers()).get(t.c);
+  // The sign-in email must still be the one the code went to.
+  if (!customer || isErased(customer) || customer.loginEmail !== t.e) throw expired;
+  const credentials = deps.credentials ?? resolveCredentials();
+  if (credVersion(await credentials.get(t.c)) !== t.v) throw expired; // a password was set since → ticket used
+  const problem = await newPasswordProblem(password, [t.e, customer.name], deps.env, deps.breachFetcher);
+  if (problem) throw new AuthError(422, "weak_password", problem); // ticket stays valid: fix the password and retry
+  await credentials.set(t.c, await hashCustomerPassword(password as string), deps.now === undefined ? undefined : new Date(deps.now));
+  securityEvent("password_set", { customer: t.c, via: "reset" });
+  return t.c;
 }
 
 /** Email + password sign-in. Returns the customer, or null for every kind of failure (one message for all). */

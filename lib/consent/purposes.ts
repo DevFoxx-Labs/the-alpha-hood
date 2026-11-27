@@ -108,7 +108,7 @@ export const COOKIE_INVENTORY: CookieInfo[] = [
   },
   {
     name: "ah_session",
-    purpose: "Keeps you signed in after you verify your phone number.",
+    purpose: "Keeps you signed in after you verify your phone number or email, or sign in with a password or Google.",
     category: "necessary",
     lifetime: "Up to 90 days (30 by default; set by the store)",
     provider: "The Alpha Hood (first party, HTTP-only)",
@@ -130,6 +130,13 @@ export const COOKIE_INVENTORY: CookieInfo[] = [
   {
     name: "ah_social_link",
     purpose: "Only after “Continue with Google / Facebook”, until you verify your mobile number to link the two.",
+    category: "necessary",
+    lifetime: "10 minutes",
+    provider: "The Alpha Hood (first party, HTTP-only)",
+  },
+  {
+    name: "ah_reset",
+    purpose: "Only during “Forgot password” / “Set a password”: after you enter the code we emailed, lets this browser choose the new password. Works once.",
     category: "necessary",
     lifetime: "10 minutes",
     provider: "The Alpha Hood (first party, HTTP-only)",

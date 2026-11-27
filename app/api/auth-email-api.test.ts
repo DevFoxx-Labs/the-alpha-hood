@@ -10,6 +10,7 @@ import { GET as methodsGET } from "./account/social/route";
 import { POST as emailSend } from "./auth/email/send/route";
 import { POST as emailVerify } from "./auth/email/verify/route";
 import { POST as passwordLogin } from "./auth/password/route";
+import { POST as resetPOST } from "./auth/password/reset/route";
 import { POST as otpSend } from "./otp/send/route";
 import { POST as otpVerify } from "./otp/verify/route";
 import { POST as placePOST } from "./checkout/place/route";
@@ -235,6 +236,55 @@ describe("email sign-up / sign-in / reset routes", () => {
     expect((await me(s3)).status).toBe(200);
     expect((await login(email, STRONG)).status).toBe(401);
     expect((await login(email, "a brand new phrase 42")).status).toBe(200);
+  });
+
+  it("forgot password in 3 steps: code verified FIRST (no sign-in yet), then the new password with a single-use ticket", async () => {
+    const email = freshEmail();
+    const old = await signUp(email);
+    later();
+    // Step 1: code to the email.
+    const sent = await sendCode(email);
+    // Step 2a: a wrong code gives no ticket.
+    const wrong = sent.demoCode === "000000" ? "111111" : "000000";
+    const bad = await emailVerify(req("/api/auth/email/verify", "POST", { email, challengeId: sent.challengeId, code: wrong, intent: "reset" }));
+    expect(bad.status).toBe(422);
+    expect(cookieOf(bad, "ah_reset")).toBeUndefined();
+    // Step 2b: the right code → ticket cookie, nobody signed in, password unchanged.
+    const ok = await emailVerify(req("/api/auth/email/verify", "POST", { email, challengeId: sent.challengeId, code: sent.demoCode, intent: "reset" }));
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ ok: true, step: "new_password" });
+    const ticketHeader = ok.headers.getSetCookie().find((c) => c.startsWith("ah_reset="))!;
+    expect(ticketHeader).toMatch(/HttpOnly/i);
+    expect(ticketHeader).toMatch(/SameSite=Strict/i);
+    expect(ticketHeader).toMatch(/Path=\/api\/auth\/password/);
+    expect(cookieOf(ok, "ah_session")).toBeUndefined();
+    expect((await login(email, STRONG)).status).toBe(200);
+    // The code is used up by step 2.
+    expect((await emailVerify(req("/api/auth/email/verify", "POST", { email, challengeId: sent.challengeId, code: sent.demoCode, intent: "reset" }))).status).toBe(422);
+
+    const ticket = cookieOf(ok, "ah_reset")!;
+    // Step 3: a weak password is refused and the ticket stays usable…
+    expect((await resetPOST(req("/api/auth/password/reset", "POST", { password: "12345678" }, { cookie: ticket }))).status).toBe(422);
+    // …a good one saves it, signs out every other session and signs this browser in.
+    const done = await resetPOST(req("/api/auth/password/reset", "POST", { password: "fresh reset phrase 77" }, { cookie: ticket }));
+    expect(done.status).toBe(200);
+    expect(cookieOf(done, "ah_session")).toBeTruthy();
+    expect((await me(old)).status).toBe(401);
+    expect((await login(email, STRONG)).status).toBe(401);
+    expect((await login(email, "fresh reset phrase 77")).status).toBe(200);
+    // Single use: the same ticket can't set another password.
+    const replay = await resetPOST(req("/api/auth/password/reset", "POST", { password: "attacker phrase 999" }, { cookie: ticket }));
+    expect(replay.status).toBe(410);
+    expect((await login(email, "attacker phrase 999")).status).toBe(401);
+  });
+
+  it("reset step 3 without a valid ticket does nothing (missing, forged, tampered)", async () => {
+    for (const cookie of [undefined, "ah_reset=", `ah_reset=${"A".repeat(120)}`, "ah_reset=not-base64!!"]) {
+      const res = await resetPOST(req("/api/auth/password/reset", "POST", { password: "some good phrase 1" }, { cookie }));
+      expect(res.status, String(cookie)).toBe(410);
+      expect(cookieOf(res, "ah_session")).toBeUndefined();
+    }
+    expect((await resetPOST(req("/api/auth/password/reset", "POST", { password: "x", customerId: "cus_victim" }))).status).toBe(422);
   });
 
   it("reset for an address without an account creates nothing", async () => {

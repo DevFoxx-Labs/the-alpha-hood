@@ -19,8 +19,8 @@ function build(): Notice {
     c === "necessary" || active.has(c) ? "In use" : "Not in use";
   return {
   slug: "cookies",
-  version: "2026-11-30",
-  lastUpdated: "2026-11-30",
+  version: "2026-12-02",
+  lastUpdated: "2026-12-02",
   text: {
     en: {
       title: "Cookie Policy",

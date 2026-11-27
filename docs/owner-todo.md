@@ -266,7 +266,8 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] Host secrets (once, not in the admin): `OTP_PEPPER` (≥ 32 random characters) and `SECRET_BOX_KEY`; optional
   `PASSWORD_BREACH_CHECK=off` only if outbound calls to api.pwnedpasswords.com are blocked.
 - [ ] Turn on Bot Protection (Turnstile) before launch — it guards code sends and password sign-in.
-- [ ] Lawyer: Privacy Notice 2026-12-02 (sign-in email, password hash, Google sign-up, breached-password check).
+- [ ] Lawyer: Privacy Notice 2026-12-02 (sign-in email, password hash, Google sign-up, breached-password check) and
+  Cookie Policy 2026-12-02 (`ah_reset`).
 - [ ] Production: run migration `2026_12_01_016_customer_login` through the deploy pipeline (additive; backfills
   already-verified emails as sign-in emails).
 - [ ] Before launch: pentest the sign-in flows (part of the High-tier pentest in docs/known-gaps.md).

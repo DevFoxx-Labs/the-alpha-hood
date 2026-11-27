@@ -1,5 +1,45 @@
 # Change log
 
+## 2026-12-02 — Fix: "Forgot password" asks for the code first, then the new password
+
+**Reported:** Email sign-in → "Forgot password?" asked for the new password straight away, before any code was sent.
+**Cause:** the reset form showed the "New password" field on the first screen and sent code + password together at
+the end. Not a security hole — the server only saved the password after checking the emailed code (tested) — but the
+order was wrong, and a wrong code was only reported after typing a new password.
+
+### Now (3 steps)
+1. Email → "Email me a code".
+2. Code → **"Verify code"**: checked on the server and used up (`POST /api/auth/email/verify`, `intent: "reset"`,
+   no password). Nobody is signed in yet. The browser gets a reset ticket in the `ah_reset` cookie.
+3. "✓ Code verified" → new password → "Save new password" (`POST /api/auth/password/reset`): saved, every other
+   session signed out, this browser signed in fresh.
+- Same flow for Account → Settings → "Set a password".
+- The old one-call `reset` (code + password together) still works for API clients.
+
+### The ticket
+- Sealed with `SECRET_BOX_KEY` (AES-GCM), bound to the customer + the sign-in email the code went to, 10 minutes,
+  HttpOnly, `SameSite=Strict`, sent only to `/api/auth/password`.
+- **Single use** without storage: it is bound to the password version in force, so it is void the moment any
+  password is saved. A weak password is refused and the ticket stays usable for the retry.
+
+| Abuse case | Defence | Test |
+|---|---|---|
+| Set the password without the code | No ticket → 410; the ticket is only issued after a valid code | `without a valid ticket` |
+| Forged / tampered ticket | AES-GCM seal; anything unreadable → 410 | `forged, tampered` |
+| Replay the ticket | Bound to the password version → 410 after use | `Single use` |
+| Ticket for an email no longer on the account | The email must still be the account's sign-in email | — (code path) |
+| Code brute force at step 2 | Same 5 tries / lock as sign-in codes | existing lock test |
+| CSRF on step 3 | Same-origin check + `SameSite=Strict` cookie | existing cross-site test |
+
+- Cookie Policy **2026-12-02**: `ah_reset` listed (strictly necessary, 10 minutes); `ah_session` text now covers
+  email / password / Google sign-in.
+
+### Verified
+- `pnpm typecheck` ✔, `pnpm lint` ✔, `pnpm test` 41 files / 595 tests ✔ (2 new reset tests). Live on the dev server
+  (local `alpha_hood_dev`): 8/8 ✔ — code sent, code verified → asks for new password, not signed in yet, ticket set,
+  new password saved + signed in, old password refused, new password works, ticket can't be reused.
+- Not verified: the screens visually (browser extension not connected).
+
 ## 2026-12-02 — PDP-10 "Notify me" for guests (mobile number or email)
 
 **Asked for:** when a product is out of stock, the customer can give a mobile number or email on the product page and

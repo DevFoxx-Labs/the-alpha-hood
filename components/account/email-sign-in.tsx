@@ -15,7 +15,8 @@ import { Input } from "@/components/ui/input";
  * - "password": email + password.
  * - "signup": name (optional), email, password and the unticked Terms checkbox → a code to the email → account.
  * - "code": a code to the email signs in (or creates the account; one-tap notice next to the button).
- * - "reset": a code to the email + a new password (forgot password; also "Set a password" in Settings).
+ * - "reset": email → a code → the code is checked on the server → only then the new password (forgot password;
+ *   also "Set a password" in Settings). Step 2 leaves a 10-minute single-use ticket in an HttpOnly cookie.
  * The server validates everything again (password policy, the checkbox, the code); this is UX only.
  */
 export type EmailMode = "password" | "signup" | "code" | "reset";
@@ -60,6 +61,8 @@ export function EmailSignIn({
   const [mode, setMode] = useState<EmailMode>(initialMode);
   const [email, setEmail] = useState(lockedEmail ?? "");
   const [password, setPassword] = useState("");
+  /** Reset only: the server accepted the code; now ask for the new password. */
+  const [codeOk, setCodeOk] = useState(false);
   const [name, setName] = useState("");
   const [terms, setTerms] = useState(false);
   const [code, setCode] = useState("");
@@ -80,11 +83,13 @@ export function EmailSignIn({
     setChallenge(null);
     setCode("");
     setPassword("");
+    setCodeOk(false);
     setError(null);
   };
 
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
-  const needsPassword = mode === "signup" || mode === "reset";
+  const needsPassword = mode === "signup";
+  const showPassword = mode === "password" || needsPassword || (mode === "reset" && codeOk);
 
   const fail = (e: unknown, fallback: string) => {
     setError(e instanceof ApiError ? e.message : fallback);
@@ -125,6 +130,13 @@ export function EmailSignIn({
     setBusy(true);
     setError(null);
     try {
+      if (mode === "reset") {
+        await api("/api/auth/email/verify", { method: "POST", body: { email: email.trim(), challengeId: challenge.id, code, intent: "reset" } });
+        setCodeOk(true);
+        setPassword("");
+        setBusy(false);
+        return;
+      }
       const intent = mode === "code" ? "signin" : mode;
       const r = await api<{ created: boolean; passwordSet: boolean }>("/api/auth/email/verify", {
         method: "POST",
@@ -143,18 +155,42 @@ export function EmailSignIn({
     }
   };
 
-  const submitLabel = challenge
+  const saveNewPassword = async () => {
+    if (password.length < MIN) return setError(`Use at least ${MIN} characters for your password.`);
+    setBusy(true);
+    setError(null);
+    try {
+      await api("/api/auth/password/reset", { method: "POST", body: { password } });
+      onSignedIn({ passwordSet: true });
+    } catch (e) {
+      // Ticket expired / used: start again from the code.
+      if (e instanceof ApiError && e.status === 410) {
+        setCodeOk(false);
+        setChallenge(null);
+        setCode("");
+      }
+      fail(e, "Couldn't save your new password.");
+    }
+  };
+
+  const submitLabel = codeOk
+    ? "Save new password"
+    : challenge
     ? mode === "signup"
       ? "Verify & create account"
       : mode === "reset"
-        ? "Save new password"
+        ? "Verify code"
         : "Verify & sign in"
     : mode === "password"
       ? "Sign in"
       : mode === "signup"
         ? "Create account"
         : "Email me a code";
-  const canSubmit = challenge ? code.length === 6 && (!needsPassword || password.length >= MIN) : emailOk && (mode !== "password" || password.length > 0);
+  const canSubmit = codeOk
+    ? password.length >= MIN
+    : challenge
+      ? code.length === 6 && (!needsPassword || password.length >= MIN)
+      : emailOk && (mode !== "password" || password.length > 0);
 
   return (
     <form
@@ -163,6 +199,7 @@ export function EmailSignIn({
         e.preventDefault();
         if (!canSubmit || busy) return;
         if (mode === "password") void signInWithPassword();
+        else if (codeOk) void saveNewPassword();
         else if (challenge) void verify();
         else void send();
       }}
@@ -194,7 +231,14 @@ export function EmailSignIn({
         />
       </div>
 
-      {mode === "password" || needsPassword ? (
+      {mode === "reset" && !challenge && !codeOk ? (
+        <p className="text-[12.5px] text-ink-2">Enter the email on your account. We&apos;ll send a 6-digit code to confirm it&apos;s you, then you choose a new password.</p>
+      ) : null}
+      {mode === "reset" && codeOk ? (
+        <p role="status" className="text-[12.5px] font-semibold">✓ Code verified. Choose your new password — other devices will be signed out.</p>
+      ) : null}
+
+      {showPassword ? (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline justify-between gap-2">
             <label htmlFor={`${id}-password`} className={label}>
@@ -207,7 +251,7 @@ export function EmailSignIn({
             ) : null}
           </div>
           <PasswordInput id={`${id}-password`} value={password} onChange={setPassword} autoComplete={mode === "password" ? "current-password" : "new-password"} />
-          {needsPassword ? <p className="text-[12px] text-ink-2">At least {MIN} characters. A short phrase is easy to remember and hard to guess.</p> : null}
+          {needsPassword || mode === "reset" ? <p className="text-[12px] text-ink-2">At least {MIN} characters. A short phrase is easy to remember and hard to guess.</p> : null}
         </div>
       ) : null}
 
@@ -228,7 +272,7 @@ export function EmailSignIn({
         </div>
       ) : null}
 
-      {challenge ? (
+      {challenge && !codeOk ? (
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${id}-code`} className={label}>
             6-digit code sent to {email.trim()}
