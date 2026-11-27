@@ -4,7 +4,7 @@ import { Add01Icon, ArrowDown01Icon, ArrowUp01Icon, Delete02Icon, ImageUpload01I
 import type { IconSvgElement } from "@hugeicons/react";
 import Image from "next/image";
 import { useEffect, useId, useState } from "react";
-import type { HomepageContent, StoredAmbassador, StoredCampaign, StoredHeroSlide, StoredLimited, StoredSeo } from "@/lib/cms/homepage";
+import type { HomepageContent, LandingLayout, StoredAmbassador, StoredCampaign, StoredDrop, StoredHeroSlide, StoredLimited, StoredPoints, StoredSeo, StoredSpotlight } from "@/lib/cms/homepage";
 import { cn } from "@/lib/utils";
 import { adminApi, notify, useAdmin } from "./admin-shell";
 import { ProductPicker } from "./taxonomy";
@@ -18,10 +18,21 @@ import { AButton, AIcon, AInput, ALabel, ASelect, ATextarea, Card, Confirm, Erro
 interface View {
   revision: number;
   content: HomepageContent;
-  builtIn: Required<HomepageContent>;
+  builtIn: Required<HomepageContent> & { drop: Required<StoredDrop> };
   builtInImages: string[];
   productTitles: Record<string, string>;
-  limits: { slides: number; headlineLines: number; seoGroups: number; seoLinks: number; seoParagraphs: number; ambassadorProducts: number; limitedProducts: number; editionMax: number };
+  /** Live stock of every colour of each picked product's style. */
+  stock: Record<string, StyleStock>;
+  /** LANDING_LAYOUT on the server (used while the admin hasn't chosen); null = not set. */
+  envLayout: LandingLayout | null;
+  /** What the store shows right now. */
+  liveLayout: LandingLayout;
+  limits: { slides: number; headlineLines: number; seoGroups: number; seoLinks: number; seoParagraphs: number; ambassadorProducts: number; limitedProducts: number; editionMax: number; spotlights: number; spotlightDetails: number; points: number };
+}
+
+interface StyleStock {
+  styleId: string;
+  colours: { id: string; colour: string; sku: string; status: string; sizes: { label: string; stock: number }[] }[];
 }
 
 const errText = (e: unknown, fallback = "Something went wrong.") => (e instanceof Error ? e.message : fallback);
@@ -156,9 +167,17 @@ export function HomepageScreen() {
   const canEdit = can("catalog.write");
   const [view, setView] = useState<View | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hero, setHero] = useState<StoredHeroSlide[] | null>(null);
+  /** The admin's landing page choice (saved with the rest); null = follow LANDING_LAYOUT / the full store. */
+  const [layout, setLayout] = useState<LandingLayout | null>(null);
+  /** Which layout's own hero / SEO the cards below edit. */
+  const [target, setTarget] = useState<LandingLayout>("store");
+  const [storeHero, setStoreHero] = useState<StoredHeroSlide[] | null>(null);
+  const [dropHero, setDropHero] = useState<StoredHeroSlide[] | null>(null);
+  const [dropSeo, setDropSeo] = useState<StoredSeo | null>(null);
+  const [spotlights, setSpotlights] = useState<StoredSpotlight[] | null>(null);
+  const [points, setPoints] = useState<StoredPoints | null>(null);
   const [campaign, setCampaign] = useState<StoredCampaign | null>(null);
-  const [seo, setSeo] = useState<StoredSeo | null>(null);
+  const [storeSeo, setStoreSeo] = useState<StoredSeo | null>(null);
   const [ambassador, setAmbassador] = useState<StoredAmbassador | null>(null);
   const [limited, setLimited] = useState<StoredLimited | null>(null);
   const [titles, setTitles] = useState<Record<string, string>>({});
@@ -174,9 +193,15 @@ export function HomepageScreen() {
       .then((v) => {
         if (cancelled) return;
         setView(v);
-        setHero(v.content.hero ?? null);
+        setStoreHero(v.content.hero ?? null);
+        setLayout(v.content.layout ?? null);
+        setTarget(v.liveLayout);
+        setDropHero(v.content.drop?.hero ?? null);
+        setDropSeo(v.content.drop?.seo ?? null);
+        setSpotlights(v.content.drop?.spotlights ?? null);
+        setPoints(v.content.drop?.points ?? null);
         setCampaign(v.content.campaign ?? null);
-        setSeo(v.content.seo ?? null);
+        setStoreSeo(v.content.seo ?? null);
         setAmbassador(v.content.ambassador ?? null);
         setLimited(v.content.limited ?? null);
         setTitles(v.productTitles);
@@ -190,9 +215,15 @@ export function HomepageScreen() {
   }, [nonce]);
   const reload = () => setNonce((n) => n + 1);
   const change = <T,>(set: (v: T) => void) => (v: T) => (set(v), setDirty(true));
-  const editHero = change(setHero);
+  const editLayout = change(setLayout);
+  const editSpotlights = change(setSpotlights);
+  const editPoints = change(setPoints);
+  // The hero and SEO cards edit the layout picked in "Edit content for".
+  const hero = target === "drop" ? dropHero : storeHero;
+  const editHero = target === "drop" ? change(setDropHero) : change(setStoreHero);
   const editCampaign = change(setCampaign);
-  const editSeo = change(setSeo);
+  const seo = target === "drop" ? dropSeo : storeSeo;
+  const editSeo = target === "drop" ? change(setDropSeo) : change(setStoreSeo);
   const editAmbassador = change(setAmbassador);
   const editLimited = change(setLimited);
 
@@ -200,7 +231,7 @@ export function HomepageScreen() {
     if (!view) return;
     setSaving(true);
     try {
-      await adminApi("/api/admin/homepage", { method: "PUT", body: { revision: view.revision, hero, campaign, seo, ambassador, limited } });
+      await adminApi("/api/admin/homepage", { method: "PUT", body: { revision: view.revision, layout, hero: storeHero, campaign, seo: storeSeo, ambassador, limited, drop: { hero: dropHero, seo: dropSeo, spotlights, points } } });
       notify("success", "Homepage saved — the store shows it within a few seconds");
       reload();
     } catch (e) {
@@ -212,19 +243,69 @@ export function HomepageScreen() {
 
   if (error) return <ErrorState message={error} onRetry={reload} />;
   if (!view) return <div className="h-64 animate-pulse rounded-xl bg-muted" aria-busy="true" />;
-  const slides = hero ?? view.builtIn.hero;
+  const heroBuiltIn = target === "drop" ? view.builtIn.drop.hero : view.builtIn.hero;
+  const seoBuiltIn = target === "drop" ? view.builtIn.drop.seo : view.builtIn.seo;
+  const slides = hero ?? heroBuiltIn;
 
   return (
     <div className="space-y-5 pb-20">
       <PageHeader title="Homepage" description="The hero carousel, the brand-ambassador and limited-edition sections, the campaign band and the SEO links on the home page. Categories on the homepage are set in Categories → Homepage category rail." />
 
+      {/* ── Landing page layout ── */}
+      <Card title="Landing page layout">
+        <p className="mb-3 text-sm text-muted-foreground">
+          The choice made here wins. With <b>Follow the environment</b>, the server&apos;s <code className="rounded bg-muted px-1">LANDING_LAYOUT</code> decides
+          {view.envLayout ? <> — it is set to <b>{view.envLayout === "drop" ? "Exclusive drop" : "Full store"}</b></> : " — it isn't set, so the full store shows"}.
+        </p>
+        <div role="radiogroup" aria-label="Landing page layout" className="grid gap-3 lg:grid-cols-3">
+          {(
+            [
+              ["store", "Full store", "The full catalogue homepage: categories, offers, trending, new arrivals and more."],
+              ["drop", "Exclusive drop", "For a few signed, limited pieces: hero, ambassador, a big spotlight per piece with colours and Add to bag, why it's exclusive, the limited-edition finale."],
+              [null, "Follow the environment", `No choice here: LANDING_LAYOUT decides (now: ${view.envLayout === "drop" ? "Exclusive drop" : view.envLayout === "store" ? "Full store" : "not set → Full store"}).`],
+            ] as const
+          ).map(([value, label, help]) => (
+            <button
+              key={value ?? "env"}
+              type="button"
+              role="radio"
+              aria-checked={layout === value}
+              disabled={!canEdit}
+              onClick={() => {
+                editLayout(value);
+                setTarget(value ?? view.envLayout ?? "store");
+              }}
+              className={cn(
+                "rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed",
+                layout === value ? "border-primary bg-accent" : "border-border hover:bg-accent/50",
+              )}
+            >
+              <span className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold">{label}</span>
+                {(view.content.layout ?? null) === value ? <StatusBadge status="live" tone="success" label={value === null ? `Live now · ${view.liveLayout === "drop" ? "drop" : "full store"}` : "Live now"} /> : layout === value ? <StatusBadge status="pending" tone="pending" label="Live after save" /> : null}
+              </span>
+              <span className="mt-1 block text-xs text-muted-foreground">{help}</span>
+            </button>
+          ))}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+          <span className="text-sm text-muted-foreground">Edit the hero and SEO block of:</span>
+          {(["store", "drop"] as const).map((t) => (
+            <AButton key={t} size="sm" variant={target === t ? "default" : "outline"} aria-pressed={target === t} onClick={() => setTarget(t)}>
+              {t === "store" ? "Full store" : "Exclusive drop"}
+            </AButton>
+          ))}
+          <span className="text-xs text-muted-foreground">The ambassador, limited-edition and campaign sections are shared by both.</span>
+        </div>
+      </Card>
+
       {/* ── Hero ── */}
       <Card
-        title={`Hero carousel · ${slides.length} slide${slides.length === 1 ? "" : "s"}`}
+        title={`Hero carousel${target === "drop" ? " (exclusive drop)" : " (full store)"} · ${slides.length} slide${slides.length === 1 ? "" : "s"}`}
         action={
           canEdit ? (
             hero === null ? (
-              <AButton size="sm" onClick={() => editHero(view.builtIn.hero.map((s) => ({ ...s })))}>
+              <AButton size="sm" onClick={() => editHero(heroBuiltIn.map((s) => ({ ...s })))}>
                 Customise
               </AButton>
             ) : (
@@ -272,6 +353,86 @@ export function HomepageScreen() {
           ))}
         </ul>
       </Card>
+
+      {target === "drop" ? (
+        <>
+          <Card
+            title={`Product spotlights (exclusive drop) · ${(spotlights ?? view.builtIn.drop.spotlights).length}`}
+            action={
+              canEdit ? (
+                spotlights === null ? (
+                  <AButton size="sm" onClick={() => editSpotlights(view.builtIn.drop.spotlights.map((x) => ({ ...x })))}>
+                    Customise
+                  </AButton>
+                ) : (
+                  <div className="flex gap-2">
+                    <AButton size="sm" variant="ghost" onClick={() => editSpotlights(null)}>
+                      Use built-in
+                    </AButton>
+                    <AButton size="sm" variant="ghost" asChild>
+                      <a href="/admin/catalog/new" target="_blank" rel="noopener">
+                        New product ↗
+                      </a>
+                    </AButton>
+                    <AButton size="sm" variant="outline" disabled={spotlights.length >= view.limits.spotlights} onClick={() => editSpotlights([...spotlights, { lead: `Piece ${String(spotlights.length + 1).padStart(2, "0")}`, title: "", productId: "", details: [], signedBy: null, editionSize: null, reverse: spotlights.length % 2 === 1 }])}>
+                      <AIcon icon={Add01Icon} /> Add spotlight
+                    </AButton>
+                  </div>
+                )
+              ) : undefined
+            }
+          >
+            <p className="mb-3 text-sm text-muted-foreground">
+              One big section per piece (up to {view.limits.spotlights}): its photos, price, colour swatches, sizes and Add to bag. Pick any colour of a style — every colour of it shows as a swatch. A new piece: create it with <b>New product</b>, then <b>Add spotlight</b> and pick it. Stock is changed in Inventory (audited); each spotlight shows it live.
+              {spotlights === null ? " Showing the built-in demo (the store's hoodie and a tee) — customise it and pick your products." : ""}
+            </p>
+            {spotlights !== null ? (
+              <div className="space-y-4">
+                {spotlights.map((sp, i) => (
+                  <SpotlightFields
+                    key={i}
+                    index={i}
+                    count={spotlights.length}
+                    value={sp}
+                    titles={titles}
+                    onTitles={(t) => setTitles((x) => ({ ...x, ...t }))}
+                    stock={sp.productId ? view.stock[sp.productId] : undefined}
+                    maxDetails={view.limits.spotlightDetails}
+                    editionMax={view.limits.editionMax}
+                    disabled={!canEdit}
+                    onChange={(v) => editSpotlights(spotlights.map((x, j) => (j === i ? v : x)))}
+                    onMove={(d) => editSpotlights(move(spotlights, i, d))}
+                    onRemove={() => editSpotlights(spotlights.filter((_, j) => j !== i))}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </Card>
+
+          <Card
+            title="Why it's exclusive (exclusive drop)"
+            action={
+              canEdit ? (
+                points === null ? (
+                  <AButton size="sm" onClick={() => editPoints({ ...view.builtIn.drop.points, points: view.builtIn.drop.points.points.map((x) => ({ ...x })) })}>
+                    Customise
+                  </AButton>
+                ) : (
+                  <AButton size="sm" variant="ghost" onClick={() => editPoints(null)}>
+                    Use built-in
+                  </AButton>
+                )
+              ) : undefined
+            }
+          >
+            {points === null ? (
+              <p className="text-sm text-muted-foreground">Showing the built-in points: {view.builtIn.drop.points.points.map((x) => x.title).join(" · ")}.</p>
+            ) : (
+              <PointsFields value={points} onChange={editPoints} max={view.limits.points} disabled={!canEdit} />
+            )}
+          </Card>
+        </>
+      ) : null}
 
       {/* ── Brand ambassador exclusives ── */}
       <Card
@@ -356,11 +517,11 @@ export function HomepageScreen() {
 
       {/* ── SEO block ── */}
       <Card
-        title="SEO block (bottom of the homepage)"
+        title={`SEO block${target === "drop" ? " (exclusive drop)" : " (full store)"}`}
         action={
           canEdit ? (
             seo === null ? (
-              <AButton size="sm" onClick={() => editSeo({ ...view.builtIn.seo })}>
+              <AButton size="sm" onClick={() => editSeo({ ...seoBuiltIn })}>
                 Customise
               </AButton>
             ) : (
@@ -373,10 +534,10 @@ export function HomepageScreen() {
       >
         {seo === null ? (
           <p className="text-sm text-muted-foreground">
-            Showing the built-in block: {view.builtIn.seo.groups.map((g) => `${g.title} (${g.links.length} links)`).join(", ")} and {view.builtIn.seo.text.length} paragraphs.
+            Showing the built-in block: {seoBuiltIn.groups.map((g) => `${g.title} (${g.links.length} links)`).join(", ")} and {seoBuiltIn.text.length} paragraphs.
           </p>
         ) : (
-          <SeoFields value={seo} onChange={editSeo} limits={view.limits} disabled={!canEdit} />
+          <SeoFields key={target} value={seo} onChange={editSeo} limits={view.limits} disabled={!canEdit} />
         )}
       </Card>
 
@@ -706,5 +867,161 @@ function LimitedFields({ value, onChange, builtIns, titles, onTitles, max, editi
         </div>
       </div>
     </fieldset>
+  );
+}
+
+// ── Exclusive drop: spotlight + points fields ───────────────────────────────────────────────────
+
+function SpotlightFields({ index, count, value, titles, onTitles, stock, maxDetails, editionMax, disabled, onChange, onMove, onRemove }: { index: number; count: number; value: StoredSpotlight; titles: Record<string, string>; onTitles: (t: Record<string, string>) => void; stock?: StyleStock; maxDetails: number; editionMax: number; disabled: boolean; onChange: (v: StoredSpotlight) => void; onMove: (d: -1 | 1) => void; onRemove: () => void }) {
+  const id = useId();
+  const set = (patch: Partial<StoredSpotlight>) => onChange({ ...value, ...patch });
+  const [details, setDetails] = useState(value.details.join("\n"));
+  return (
+    <fieldset disabled={disabled} className="rounded-lg border border-border p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <legend className="text-sm font-semibold">Spotlight {index + 1}{value.title ? ` — ${value.title}` : ""}</legend>
+        <div className="flex items-center">
+          <IconButton icon={ArrowUp01Icon} label="Move spotlight up" disabled={index === 0} onClick={() => onMove(-1)} />
+          <IconButton icon={ArrowDown01Icon} label="Move spotlight down" disabled={index === count - 1} onClick={() => onMove(1)} />
+          <Confirm trigger={<IconButton icon={Delete02Icon} tone="danger" label="Remove spotlight" disabled={count <= 1} />} title="Remove this spotlight?" description="Nothing changes on the store until you save." confirmLabel="Remove" destructive onConfirm={onRemove} />
+        </div>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field id={`${id}-l`} label="Small line" help="e.g. Piece 01">
+              <AInput id={`${id}-l`} value={value.lead} maxLength={30} onChange={(e) => set({ lead: e.target.value })} />
+            </Field>
+            <Field id={`${id}-t`} label="Big title" help="e.g. The Hoodie (up to 40)">
+              <AInput id={`${id}-t`} value={value.title} maxLength={40} onChange={(e) => set({ title: e.target.value })} />
+            </Field>
+          </div>
+          <Field id={`${id}-d`} label="Details" help={`One per row, up to ${maxDetails} (fabric, fit, signature, certificate…).`}>
+            <ATextarea
+              id={`${id}-d`}
+              rows={4}
+              value={details}
+              onChange={(e) => {
+                setDetails(e.target.value);
+                set({ details: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) });
+              }}
+            />
+          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field id={`${id}-s`} label="Hand-signed by (optional)">
+              <AInput id={`${id}-s`} value={value.signedBy ?? ""} maxLength={40} onChange={(e) => set({ signedBy: e.target.value || null })} />
+            </Field>
+            <Field id={`${id}-e`} label="Pieces in the edition (optional)" help={`1–${editionMax.toLocaleString("en-IN")}`}>
+              <AInput id={`${id}-e`} type="number" inputMode="numeric" min={1} max={editionMax} value={value.editionSize ?? ""} onChange={(e) => set({ editionSize: e.target.value === "" ? null : Number(e.target.value) })} />
+            </Field>
+          </div>
+          <Check id={`${id}-r`} checked={value.reverse} onChange={(v) => set({ reverse: v })} label="Photos on the right (desktop)" />
+        </div>
+        <div className="space-y-1.5">
+          <ALabel>Product</ALabel>
+          <ProductPicker ids={value.productId ? [value.productId] : []} titles={titles} onTitles={onTitles} onChange={(ids) => set({ productId: ids[0] ?? "" })} max={1} />
+          <p className="text-xs text-muted-foreground">Price, photos, colours, sizes and stock come from the product. Its price shows without any MRP or discount.</p>
+          {value.productId ? <SpotlightStock stock={stock} /> : null}
+        </div>
+      </div>
+    </fieldset>
+  );
+}
+
+function PointsFields({ value, onChange, max, disabled }: { value: StoredPoints; onChange: (v: StoredPoints) => void; max: number; disabled: boolean }) {
+  const id = useId();
+  const set = (patch: Partial<StoredPoints>) => onChange({ ...value, ...patch });
+  return (
+    <fieldset disabled={disabled} className="space-y-4">
+      <Field id={`${id}-t`} label="Title">
+        <AInput id={`${id}-t`} value={value.title} maxLength={50} onChange={(e) => set({ title: e.target.value })} />
+      </Field>
+      <div className="grid gap-3 lg:grid-cols-2">
+        {value.points.map((pt, i) => (
+          <div key={i} className="space-y-2 rounded-lg border border-border p-3">
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Field id={`${id}-p${i}`} label={`Point ${i + 1} title`}>
+                  <AInput id={`${id}-p${i}`} value={pt.title} maxLength={30} onChange={(e) => set({ points: value.points.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)) })} />
+                </Field>
+              </div>
+              <IconButton icon={Delete02Icon} tone="danger" label={`Remove point ${i + 1}`} disabled={value.points.length <= 1} onClick={() => set({ points: value.points.filter((_, j) => j !== i) })} />
+            </div>
+            <ATextarea aria-label={`Point ${i + 1} text`} rows={2} maxLength={160} value={pt.text} onChange={(e) => set({ points: value.points.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)) })} />
+          </div>
+        ))}
+      </div>
+      {value.points.length < max ? (
+        <AButton size="sm" variant="outline" onClick={() => set({ points: [...value.points, { title: "", text: "" }] })}>
+          <AIcon icon={Add01Icon} /> Add point
+        </AButton>
+      ) : null}
+    </fieldset>
+  );
+}
+
+/** Live stock of every colour × size of the spotlight's style, with links to edit the product and change stock. */
+function SpotlightStock({ stock }: { stock?: StyleStock }) {
+  if (!stock) return <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">Save the page to see this product&apos;s stock here.</p>;
+  const sizes = [...new Set(stock.colours.flatMap((c) => c.sizes.map((x) => x.label)))];
+  const total = stock.colours.reduce((n, c) => n + (c.status === "active" ? c.sizes.reduce((m, x) => m + x.stock, 0) : 0), 0);
+  return (
+    <div className="mt-2 space-y-2 rounded-lg border border-border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium">
+          Stock · <span className={total === 0 ? "text-red-600" : undefined}>{total} on sale</span>
+        </p>
+        <div className="flex gap-2">
+          <AButton size="sm" variant="outline" asChild>
+            <a href={`/admin/catalog/style/${stock.styleId}`} target="_blank" rel="noopener">
+              Edit product ↗
+            </a>
+          </AButton>
+          <AButton size="sm" variant="outline" asChild>
+            <a href={`/admin/inventory?q=${encodeURIComponent((stock.colours[0]?.sku ?? "").replace(/-[^-]+$/, ""))}`} target="_blank" rel="noopener">
+              Manage stock ↗
+            </a>
+          </AButton>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-left text-muted-foreground">
+              <th className="py-1 pr-3 font-medium">Colour</th>
+              {sizes.map((sz) => (
+                <th key={sz} className="px-2 py-1 text-right font-medium">
+                  {sz}
+                </th>
+              ))}
+              <th className="py-1 pl-2 text-right font-medium">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stock.colours.map((c) => {
+              const row = c.sizes.reduce((n, x) => n + x.stock, 0);
+              return (
+                <tr key={c.id} className="border-t border-border">
+                  <td className="py-1 pr-3">
+                    {c.colour}
+                    {c.status !== "active" ? <span className="ml-1 text-muted-foreground">({c.status})</span> : null}
+                  </td>
+                  {sizes.map((sz) => {
+                    const n = c.sizes.find((x) => x.label === sz)?.stock;
+                    return (
+                      <td key={sz} className={cn("px-2 py-1 text-right tabular-nums", n === 0 && "text-red-600", n !== undefined && n > 0 && n <= 3 && "text-orange-600")}>
+                        {n ?? "—"}
+                      </td>
+                    );
+                  })}
+                  <td className={cn("py-1 pl-2 text-right font-medium tabular-nums", row === 0 && "text-red-600")}>{row}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[11px] text-muted-foreground">Red = sold out, orange = 3 or fewer. Customers see &ldquo;N left&rdquo; and &ldquo;Sold out&rdquo; from these numbers.</p>
+    </div>
   );
 }

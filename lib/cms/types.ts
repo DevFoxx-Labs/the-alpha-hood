@@ -88,6 +88,29 @@ export type HomeBlock = Targeting & { id: string } & (
         productIds: string[];
       }
     | {
+        /**
+         * Drop layout: one style, big — photos, price (no MRP), colour swatches that switch the photos, sizes and Add to
+         * bag right on the homepage. `productId` = any colour of the style; every colour of it is shown.
+         */
+        type: "product_spotlight";
+        lead: string;
+        title: string;
+        productId: string;
+        /** Built-in demo only: used when `productId` isn't in the catalogue (pick a style from this category). */
+        demoCategory?: string;
+        details: string[];
+        signedBy: string | null;
+        editionSize: number | null;
+        /** Photo on the right (desktop). */
+        reverse: boolean;
+      }
+    | {
+        /** Drop layout: why the pieces are worth it (signed, numbered, certificate, packaging). */
+        type: "exclusive_points";
+        title: string;
+        points: { title: string; text: string }[];
+      }
+    | {
         /** Editorial band: art on one side, headline + CTA on the other (MASCOT_PROMPTS §7 collection launch). */
         type: "campaign_band";
         kicker: string;

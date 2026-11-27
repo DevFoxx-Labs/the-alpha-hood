@@ -211,6 +211,13 @@
   edits the hero, campaign band and SEO block. Still built-in only: promo band, collection tiles, offer tiles,
   trending tabs, Shop the Look, new arrivals, Alpha Club band, announcements, header / menu / footer. Next step: an
   "own" CMS provider that serves every block from Admin → Homepage (with the offers set to real running offers).
+- 🟡 (2026-12-02) "Exclusive drop" layout: the header, menu drawer, footer Shop column and mini-cart add-ons now follow
+  the drop (fixed). Still catalogue-wide: the search overlay's trending searches, the PDP's "You may also like" /
+  complete-the-look rails and the /men and category pages — with the 27-product demo catalogue they show other
+  products; with a real catalogue of only the drop's pieces they show only those.
+- 🟠 (2026-12-02) Alpha Mascot Tee placeholders (from `pnpm catalog:add-mascot-tee`): price ₹2,499, 20 per size,
+  manufacturer "to be confirmed" (Legal Metrology requires the real name and address on the PDP), weight 300 g —
+  set the real values in Admin → Products before launch.
 - 🟠 (2026-12-02) **Ambassador / limited-edition commerce rules not built yet** (only the homepage sections are):
   no per-customer purchase limit, no prepaid-only (COD off) rule for signed / limited pieces, no numbered pieces
   ("No. 37 / 100") on orders and invoices, no drop launch time / countdown, and no separate return policy for signed

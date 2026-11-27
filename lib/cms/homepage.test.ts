@@ -6,9 +6,9 @@ import { seedDemoCatalog } from "@/lib/catalog/seed";
 import { createMemoryCatalogStore } from "@/lib/catalog/store";
 import { parseShopAll, saveCategories, saveCollections, shopAllCategories, taxonomyView } from "@/lib/catalog/taxonomy";
 import { createMemoryReviewStore } from "@/lib/reviews/store";
-import { applyHomepage, BUILTIN_IMAGES, builtInContent, INTERNAL_HREF_RE, parseAmbassador, parseCampaign, parseHeroSlides, parseLimited, parseSeo } from "./homepage";
+import { applyHomepage, BUILTIN_IMAGES, builtInContent, builtInDrop, envLandingLayout, INTERNAL_HREF_RE, landingLayout, parseAmbassador, parseCampaign, parseHeroSlides, parseHomepage, parseLimited, parsePoints, parseSeo, parseSpotlights } from "./homepage";
 import { homepageView, saveHomepage } from "./homepage-admin";
-import { MOCK_HOMEPAGE } from "./mock-home";
+import { MOCK_DROP_HOMEPAGE, MOCK_HOMEPAGE } from "./mock-home";
 
 /**
  * Admin → Homepage (hero, campaign band, SEO block) and Categories → Shop all page. One test per abuse case:
@@ -193,6 +193,100 @@ describe("brand ambassador + limited edition sections", () => {
     const after = await homepageView(deps);
     expect(after.content.ambassador?.productIds).toEqual(real);
     expect(Object.keys(after.productTitles).sort()).toEqual([...real].sort());
+  });
+});
+
+describe("landing page layout switch (full store ↔ exclusive drop)", () => {
+  const drop = builtInDrop(MOCK_DROP_HOMEPAGE);
+
+  it("the drop layout has no discount / combo / category / tab / new-arrival blocks — only the drop's sections", () => {
+    const types = MOCK_DROP_HOMEPAGE.map((b) => b.type);
+    for (const gone of ["promo_band", "offer_tiles", "collection_tiles", "category_rail", "product_tabs", "product_grid"]) expect(types, gone).not.toContain(gone);
+    expect(types).toEqual(["hero", "ambassador", "product_spotlight", "product_spotlight", "exclusive_points", "limited_edition", "club_band", "ugc_grid", "trust_strip", "seo"]);
+  });
+
+  it("layout must be store, drop or null (follow the environment); default store", () => {
+    expect(landingLayout(undefined, {})).toBe("store");
+    expect(landingLayout({ layout: "drop" }, {})).toBe("drop");
+    expect(() => parseHomepage({ layout: "luxury" }, undefined)).toThrow();
+    expect(parseHomepage({ layout: "drop" }, undefined).layout).toBe("drop");
+    expect(parseHomepage({ layout: null }, { layout: "drop" }).layout).toBeUndefined();
+  });
+
+  it("priority: the admin's choice, else LANDING_LAYOUT, else the full store", () => {
+    // admin set → admin wins, whatever the environment says
+    expect(landingLayout({ layout: "store" }, { LANDING_LAYOUT: "drop" })).toBe("store");
+    expect(landingLayout({ layout: "drop" }, { LANDING_LAYOUT: "store" })).toBe("drop");
+    // admin not set → the environment decides
+    expect(landingLayout({}, { LANDING_LAYOUT: "drop" })).toBe("drop");
+    expect(landingLayout(undefined, { LANDING_LAYOUT: " DROP " })).toBe("drop");
+    expect(landingLayout({}, { LANDING_LAYOUT: "store" })).toBe("store");
+    // neither / an unknown value → the full store
+    expect(landingLayout({}, { LANDING_LAYOUT: "luxury" })).toBe("store");
+    expect(landingLayout({}, { LANDING_LAYOUT: "" })).toBe("store");
+    expect(envLandingLayout({ LANDING_LAYOUT: "luxury" })).toBeNull();
+  });
+
+  it("each layout uses its own hero and SEO; ambassador / limited are shared", () => {
+    const content = {
+      hero: parseHeroSlides([slide({ id: "store-hero", headline: ["Store"] })]),
+      drop: { hero: parseHeroSlides([slide({ id: "drop-hero", headline: ["Drop"] })]) },
+      ambassador: { ...builtInContent(MOCK_HOMEPAGE).ambassador, ambassadorName: "Shared Star" },
+    };
+    const store = applyHomepage(MOCK_HOMEPAGE, content, "store");
+    const dropPage = applyHomepage(MOCK_DROP_HOMEPAGE, content, "drop");
+    const headline = (bs: typeof store) => bs.find((b) => b.type === "hero")?.type === "hero" && (bs.find((b) => b.type === "hero") as Extract<(typeof bs)[number], { type: "hero" }>).slides[0].headline[0];
+    expect(headline(store)).toBe("Store");
+    expect(headline(dropPage)).toBe("Drop");
+    for (const page of [store, dropPage]) {
+      const amb = page.find((b) => b.type === "ambassador");
+      expect(amb?.type === "ambassador" && amb.ambassadorName).toBe("Shared Star");
+    }
+  });
+
+  it("spotlights: the admin's list replaces the demo ones in place; demo category dropped", () => {
+    const spotlights = parseSpotlights([{ ...drop.spotlights[0], productId: "p_hoodie" }]);
+    const page = applyHomepage(MOCK_DROP_HOMEPAGE, { drop: { spotlights } }, "drop");
+    const sps = page.filter((b) => b.type === "product_spotlight");
+    expect(sps).toHaveLength(1);
+    expect(sps[0].type === "product_spotlight" && [sps[0].productId, sps[0].demoCategory]).toEqual(["p_hoodie", undefined]);
+    expect(page.map((b) => b.type).indexOf("product_spotlight")).toBe(MOCK_DROP_HOMEPAGE.map((b) => b.type).indexOf("product_spotlight"));
+  });
+
+  it("spotlight / points validation: one product each, no repeats, caps, no price from here", () => {
+    const base = { ...drop.spotlights[0], productId: "p_a" };
+    expect(() => parseSpotlights([])).toThrow();
+    expect(() => parseSpotlights([base, base])).toThrow(/already has a spotlight/);
+    expect(() => parseSpotlights([{ ...base, productId: "" }])).toThrow();
+    expect(() => parseSpotlights([{ ...base, details: ["a", "b", "c", "d", "e", "f"].map((x) => `detail ${x}`) }])).toThrow();
+    expect(() => parseSpotlights([{ ...base, price: 99 }])).toThrow();
+    expect(() => parseSpotlights([{ ...base, editionSize: 0 }])).toThrow();
+    expect(parseSpotlights([{ ...base, signedBy: "" }])[0].signedBy).toBeNull();
+    expect(() => parsePoints({ title: "Why", points: [] })).toThrow();
+    expect(() => parsePoints({ title: "Why it's exclusive", points: Array.from({ length: 5 }, (_, i) => ({ title: `P${i}x`, text: "Long enough text" })) })).toThrow();
+  });
+
+  it("saving the switch keeps every other part; a spotlight product must exist", async () => {
+    let v = await homepageView(deps);
+    await saveHomepage(deps, { revision: v.revision, hero: [slide()] });
+    v = await homepageView(deps);
+    await expect(saveHomepage(deps, { revision: v.revision, layout: "drop", drop: { spotlights: [{ ...drop.spotlights[0], productId: "ghost_product" }] } })).rejects.toThrow(/isn't in the catalogue/);
+    const real = (await deps.store.listRecords())[0].id;
+    await saveHomepage(deps, { revision: v.revision, layout: "drop", drop: { spotlights: [{ ...drop.spotlights[0], productId: real }] } });
+    v = await homepageView(deps);
+    expect(v.content.layout).toBe("drop");
+    expect(v.content.hero?.[0].id).toBe("drop"); // the full store's hero is kept for switching back
+    expect(v.content.drop?.spotlights?.[0].productId).toBe(real);
+    // The editor sees the live stock of every colour of the picked style (admin-only view).
+    const rec = (await deps.store.listRecords()).find((r) => r.id === real)!;
+    const colours = (await deps.store.listRecords()).filter((r) => r.styleId === rec.styleId).length;
+    expect(v.stock[real].styleId).toBe(rec.styleId);
+    expect(v.stock[real].colours).toHaveLength(colours);
+    expect(v.stock[real].colours.every((c) => c.sizes.every((x) => Number.isInteger(x.stock) && x.stock >= 0))).toBe(true);
+    await saveHomepage(deps, { revision: v.revision, layout: "store" });
+    v = await homepageView(deps);
+    expect(v.content.layout).toBe("store");
+    expect(v.content.drop?.spotlights?.[0].productId).toBe(real); // and the drop's content is kept too
   });
 });
 

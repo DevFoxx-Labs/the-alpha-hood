@@ -10,8 +10,10 @@ import { reviews } from "@/lib/reviews";
 import { isLive, liveBlocks } from "@/lib/cms/schedule";
 import type { CatalogQuery, CatalogScope } from "@/lib/catalog/types";
 import type { HomeBlock } from "@/lib/cms/types";
-import { applyHomepage } from "@/lib/cms/homepage";
+import { applyHomepage, landingLayout } from "@/lib/cms/homepage";
+import { MOCK_DROP_HOMEPAGE } from "@/lib/cms/mock-home";
 import { storedCatalogDocs } from "@/lib/cms/stored";
+import { dropNavigation } from "@/lib/cms/drop-nav";
 import { shopAllCategories } from "@/lib/catalog/taxonomy";
 
 /**
@@ -38,6 +40,16 @@ export async function getShell() {
     cms.getTrendingSearches(),
     commerce.listProducts({ limit: 60 }),
   ]);
+  // "Exclusive drop" layout: header links, menu and the footer's Shop column offer only the drop's pieces.
+  const docs = await storedCatalogDocs();
+  if (landingLayout(docs?.homepage) === "drop") {
+    const home = (await getHomePage()) ?? [];
+    const pieces = home.flatMap((r) => (r.block.type === "product_spotlight" && "initial" in r && r.products.length ? [{ title: r.block.title, product: r.products[r.initial] ?? r.products[0] }] : []));
+    const nav = dropNavigation(pieces, { menu, footer });
+    // Mini-cart add-ons: the drop's other pieces only.
+    const upsell = pieces.map((p) => p.product).filter((p) => p.sizes.some((s) => s.stock > 0)).slice(0, 3);
+    return { announcements, headerLinks: nav.headerLinks, menu: nav.menu, footer: nav.footer, trendingSearches, upsell };
+  }
   // Mini-cart "complete your fit" row: in-stock add-ons at ₹999 or less.
   const upsell = catalogue.products.filter((p) => p.price <= 99_900 && p.sizes.some((s) => s.stock > 0)).slice(0, 3);
   return { announcements, headerLinks, menu, footer, trendingSearches, upsell };
@@ -49,8 +61,10 @@ export type ResolvedHomeBlock =
   | { block: Extract<HomeBlock, { type: "product_grid" }>; products: Product[] }
   | { block: Extract<HomeBlock, { type: "ambassador" }>; products: Product[] }
   | { block: Extract<HomeBlock, { type: "limited_edition" }>; products: Product[] }
+  /** Every colour of the style (the picked colour first in its own place); empty = nothing to show. */
+  | { block: Extract<HomeBlock, { type: "product_spotlight" }>; products: Product[]; initial: number }
   | { block: Extract<HomeBlock, { type: "shop_the_look" }>; look: Look | null; products: Product[] }
-  | { block: Exclude<HomeBlock, { type: "category_rail" | "product_tabs" | "product_grid" | "shop_the_look" | "ambassador" | "limited_edition" }> };
+  | { block: Exclude<HomeBlock, { type: "category_rail" | "product_tabs" | "product_grid" | "shop_the_look" | "ambassador" | "limited_edition" | "product_spotlight" }> };
 
 export async function getHomePage(): Promise<ResolvedHomeBlock[] | null> {
   "use cache";
@@ -59,8 +73,11 @@ export async function getHomePage(): Promise<ResolvedHomeBlock[] | null> {
   if (!storefrontAvailable()) return null;
 
   // Admin → Homepage content (hero, campaign band, SEO block) replaces the built-in parts it covers.
-  const [builtIn, docs] = await Promise.all([cms.getHomepage(), storedCatalogDocs()]);
-  const blocks = liveBlocks(applyHomepage(builtIn, docs?.homepage), new Date());
+  // Landing page layout (Admin → Homepage): the full store, or the "Exclusive drop" page for a few signed pieces.
+  const [storeBlocks, docs] = await Promise.all([cms.getHomepage(), storedCatalogDocs()]);
+  const layout = landingLayout(docs?.homepage);
+  const builtIn = layout === "drop" ? MOCK_DROP_HOMEPAGE : storeBlocks;
+  const blocks = liveBlocks(applyHomepage(builtIn, docs?.homepage, layout), new Date());
   return Promise.all(
     blocks.map(async (block): Promise<ResolvedHomeBlock> => {
       switch (block.type) {
@@ -78,6 +95,19 @@ export async function getHomePage(): Promise<ResolvedHomeBlock[] | null> {
         }
         case "product_grid":
           return { block, products: (await commerce.listProducts({ sort: block.sort, limit: block.limit })).products };
+        case "product_spotlight": {
+          let main = block.productId ? await commerce.getProductById(block.productId) : null;
+          // Built-in DEMO (no product picked): the style with the most colours in its category, black first.
+          if (!main && block.demoCategory) {
+            const inCat = (await commerce.listProducts({ category: block.demoCategory, limit: 60 })).products;
+            main = [...inCat].sort((a, b) => b.colours.length - a.colours.length || Number(/black/i.test(b.colour.name)) - Number(/black/i.test(a.colour.name)))[0] ?? null;
+          }
+          if (!main) return { block, products: [], initial: 0 };
+          const handles = main.colours.map((c) => c.handle).filter((h): h is string => !!h);
+          const variants = handles.length ? (await Promise.all(handles.map((h) => (h === main!.handle ? main : commerce.getProduct(h))))).filter((p): p is Product => !!p) : [main];
+          const list = variants.length ? variants : [main];
+          return { block, products: list, initial: Math.max(0, list.findIndex((p) => p.id === main!.id)) };
+        }
         case "ambassador":
         case "limited_edition": {
           const max = block.type === "ambassador" ? 4 : 3;
@@ -207,6 +237,10 @@ export async function getProductPage(handle: string) {
   // Coupon liveness depends on the time — evaluated inside the cache scope (PDP-02).
   const best = bestCouponFor(product.price, DEMO_COUPONS, new Date());
   const coupon = best ? { code: best.coupon.code, description: best.coupon.description, finalPrice: best.finalPrice } : null;
+  // "Exclusive drop" layout: a few signed pieces, so no cross-selling the rest of the catalogue — no Complete the
+  // look / You may also like / Shop the look rails and no Recently viewed (the page reads `drop`).
+  const drop = landingLayout((await storedCatalogDocs())?.homepage) === "drop";
+  if (drop) return { product, category, reviewData, firstPage, coupon, completeLook: [], similar: [], look: null, drop };
   // PDP-09 rails (rule-based, from the cached catalogue).
   const all = await getAllProducts();
   const look = lookFor(product.id);
@@ -219,6 +253,7 @@ export async function getProductPage(handle: string) {
     completeLook: completeTheLook(product, all),
     similar: similarProducts(product, all),
     look: look ? { id: look.id, title: look.title, percent: look.percent } : null,
+    drop,
   };
 }
 

@@ -272,6 +272,18 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
   already-verified emails as sign-in emails).
 - [ ] Before launch: pentest the sign-in flows (part of the High-tier pentest in docs/known-gaps.md).
 
+## 2026-12-02 (exclusive drop: Alpha Mascot Tee, hoodie, drop layout)
+- [ ] Admin → Products → Alpha Mascot Tee: set the real price, stock per colour / size, manufacturer name + address
+  (shown on the PDP — Legal Metrology), weight; check the photos and alt texts.
+- [ ] The black hoodie is still the demo product — create the real one in Admin → Products (photos, price, stock) and
+  pick it in Admin → Homepage → Product spotlights.
+- [ ] Admin → Homepage: choose the landing page (or set `LANDING_LAYOUT=drop` on the host), customise the ambassador
+  and limited-edition sections with the real ambassador photo and name.
+- [ ] Decide the signed / limited rules (purchase limit per customer, prepaid only, numbering, return policy for signed
+  pieces) — see docs/known-gaps.md.
+- [ ] Production: run `pnpm catalog:add-mascot-tee --apply --production` once against the live database (or create
+  the tee in Admin → Products with the photos in `assets/products/alpha-mascot-tee/photos`).
+
 ## 2026-12-01 (review photos, store replies, review / feedback emails)
 - [ ] Lawyer: Privacy Notice 2026-12-01 (review photos, public store replies, review / feedback emails).
 - [ ] Tell moderators what a review photo may not show (other people's faces, addresses, phone numbers, nudity).

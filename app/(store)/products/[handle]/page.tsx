@@ -63,16 +63,19 @@ async function ProductContent({ params }: Pick<PageProps<"/products/[handle]">, 
   const { handle } = await params;
   const data = await getProductPage(handle);
   if (!data) notFound();
-  const { product, category, reviewData, firstPage, coupon, completeLook, similar, look } = data;
+  const { product, category, reviewData, firstPage, coupon, completeLook, similar, look, drop } = data;
   const categoryTitle = category?.title ?? product.category;
   const sub = category?.subcategories.find((s) => s.handle === product.subcategory);
-  const crumbs = [
-    { label: "Home", href: "/" },
-    { label: "Men", href: "/men" },
-    { label: categoryTitle, href: `/men/${product.category}` },
-    ...(sub ? [{ label: sub.title, href: `/men/${product.category}/${sub.handle}` }] : []),
-    { label: product.title.split(" — ")[0] },
-  ];
+  // "Exclusive drop" layout: no path into the full catalogue (Men / category pages), just Home › piece.
+  const crumbs = drop
+    ? [{ label: "Home", href: "/" }, { label: product.title.split(" — ")[0] }]
+    : [
+        { label: "Home", href: "/" },
+        { label: "Men", href: "/men" },
+        { label: categoryTitle, href: `/men/${product.category}` },
+        ...(sub ? [{ label: sub.title, href: `/men/${product.category}/${sub.handle}` }] : []),
+        { label: product.title.split(" — ")[0] },
+      ];
   const base = SITE_ORIGIN;
   const ld = productJsonLd({
     product,
@@ -118,8 +121,13 @@ async function ProductContent({ params }: Pick<PageProps<"/products/[handle]">, 
           <p className="mt-3 text-[13px] text-ink-2">No reviews yet. Verified buyers can review after delivery.</p>
         </div>
       )}
-      <PdpRails completeLook={completeLook} similar={similar} look={look} />
-      <RecentlyViewed currentId={product.id} />
+      {/* Drop layout: no Complete the look / You may also like / Shop the look / Recently viewed — the store has only the drop's pieces. */}
+      {drop ? null : (
+        <>
+          <PdpRails completeLook={completeLook} similar={similar} look={look} />
+          <RecentlyViewed currentId={product.id} />
+        </>
+      )}
     </>
   );
 }

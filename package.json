@@ -17,6 +17,7 @@
     "ops:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-transform-types --import ./scripts/alias-loader.mjs scripts/ops-check.ts",
     "admin:reset-link": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-transform-types --import ./scripts/alias-loader.mjs scripts/admin-reset-link.ts",
     "catalog:import": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-transform-types --import ./scripts/alias-loader.mjs scripts/catalog-import.ts",
+    "catalog:add-mascot-tee": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-transform-types --import ./scripts/alias-loader.mjs scripts/catalog-add-mascot-tee.ts",
     "db:test:migrate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/db.ts migrate --env-file=.env.test.local",
     "db:mongo:dev": "node scripts/mongo-rs-start.mjs",
     "db:mongo:init": "node scripts/mongo-rs-init.mjs"

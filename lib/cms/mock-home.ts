@@ -189,6 +189,89 @@ export const MOCK_HOMEPAGE: HomeBlock[] = [
   },
 ];
 
+const blockById = (id: string) => MOCK_HOMEPAGE.find((b) => b.id === id)!;
+
+/**
+ * "Exclusive drop" landing page (Admin → Homepage → Landing page layout): a few signed, limited pieces instead of a
+ * full catalogue. No discount promos, combo offers, category rails or empty tabs. Hero, ambassador, limited edition,
+ * campaign and SEO content are shared with the full-store layout (one admin content for both). DEMO copy.
+ */
+export const MOCK_DROP_HOMEPAGE: HomeBlock[] = [
+  {
+    id: "hero",
+    type: "hero",
+    slides: [
+      {
+        id: "the-drop",
+        kicker: "The signed drop · Limited",
+        headline: ["The", "drop"],
+        subline: "Two pieces. Hand-signed by our ambassador. Made in small numbers.",
+        cta: { label: "Shop the hoodie", href: "#spotlight-hoodie" },
+        textTone: "volt",
+        image: { desktop: MASCOT_HERO["hood-up"].desktop, mobile: MASCOT_HERO["hood-up"].mobile, alt: "The signed black hoodie" },
+        placeholder: { fill: "#0a0a0a", look: { top: "#151515", bottom: "#151515", skin: "#C9946B" } },
+      },
+    ],
+  },
+  blockById("ambassador"),
+  {
+    id: "spotlight-hoodie",
+    type: "product_spotlight",
+    lead: "Piece 01",
+    title: "The Hoodie",
+    productId: "",
+    demoCategory: "hoodies",
+    details: ["Heavyweight 450 GSM brushed fleece", "Boxy, dropped-shoulder fit", "Hand-signed on the inside hem", "Numbered, with a certificate of authenticity"],
+    signedBy: "Alpha",
+    editionSize: 100,
+    reverse: false,
+  },
+  {
+    id: "spotlight-tee",
+    type: "product_spotlight",
+    lead: "Piece 02",
+    title: "The Tee",
+    productId: "",
+    demoCategory: "t-shirts",
+    details: ["240 GSM combed cotton", "Oversized fit, holds its shape", "Pick your colour", "Signed print on the back"],
+    signedBy: "Alpha",
+    editionSize: null,
+    reverse: true,
+  },
+  {
+    id: "exclusive",
+    type: "exclusive_points",
+    title: "Why it's exclusive",
+    points: [
+      { title: "Hand-signed", text: "Every piece carries our ambassador's autograph — signed by hand, not printed." },
+      { title: "Numbered", text: "Your piece has its own number in the edition. When the run ends, it doesn't come back." },
+      { title: "Certified", text: "A certificate of authenticity ships with every order." },
+      { title: "Boxed", text: "Packed in our collector's box, ready to keep or to gift." },
+    ],
+  },
+  blockById("limited-edition"),
+  blockById("alpha-club"),
+  blockById("wear-the-hood"),
+  blockById("trust"),
+  {
+    id: "seo",
+    type: "seo",
+    heading: "About The Alpha Hood drop",
+    groups: [
+      {
+        title: "Shop",
+        links: [
+          { label: "Signed hoodie", href: "/men/hoodies" },
+          { label: "Signed tee", href: "/men/t-shirts" },
+          { label: "Size guide", href: "/help/size-guide" },
+          { label: "Alpha Club", href: "/alpha-club" },
+        ],
+      },
+    ],
+    text: ["The Alpha Hood releases streetwear in small, signed drops. Each piece is hand-signed by our brand ambassador, numbered and shipped with a certificate of authenticity. Prices include all taxes."],
+  },
+];
+
 export function mockFooter(env: Record<string, string | undefined>): FooterContent {
   const social: FooterContent["social"] = [];
   const add = (label: string, url: string | undefined) => {

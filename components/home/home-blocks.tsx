@@ -3,6 +3,8 @@ import { ArrowLink, CampaignBand, CollectionTile, OfferTile, PromoBand } from "@
 import { CategorySlider } from "./category-slider";
 import { AmbassadorBand } from "./ambassador-band";
 import { LimitedFinale } from "./limited-finale";
+import { ProductSpotlight } from "./product-spotlight";
+import { ExclusivePoints } from "./exclusive-points";
 import { SectionHeader } from "@/components/store/section-header";
 import { deviceClass } from "@/lib/cms/schedule";
 import type { ResolvedHomeBlock } from "@/lib/storefront";
@@ -101,6 +103,12 @@ function Block({ resolved }: { resolved: ResolvedHomeBlock }) {
 
     case "limited_edition":
       return <LimitedFinale block={block} products={"products" in resolved ? resolved.products : []} />;
+
+    case "product_spotlight":
+      return "initial" in resolved && resolved.products.length ? <ProductSpotlight block={block} products={resolved.products} initial={resolved.initial} /> : null;
+
+    case "exclusive_points":
+      return block.points.length ? <ExclusivePoints block={block} /> : null;
 
     case "shop_the_look": {
       if (!("look" in resolved) || !resolved.look) return null;

@@ -14,7 +14,7 @@ import type { Device, FigureLook, HeroSlide, HomeBlock } from "./types";
  * own media store (`/api/media/med_…`, checked to exist) or one of the built-in brand images (allow-list). Nothing
  * here is ever fetched from a URL an admin typed.
  */
-export const HOMEPAGE_LIMITS = { slides: 6, headlineLines: 3, seoGroups: 3, seoLinks: 24, seoParagraphs: 3, ambassadorProducts: 4, limitedProducts: 3, editionMax: 100_000 } as const;
+export const HOMEPAGE_LIMITS = { slides: 6, headlineLines: 3, seoGroups: 3, seoLinks: 24, seoParagraphs: 3, ambassadorProducts: 4, limitedProducts: 3, editionMax: 100_000, spotlights: 6, spotlightDetails: 5, points: 4 } as const;
 
 export interface StoredHeroSlide {
   id: string;
@@ -83,7 +83,36 @@ export interface StoredLimited {
   productIds: string[];
 }
 
+export interface StoredSpotlight {
+  lead: string;
+  title: string;
+  productId: string;
+  details: string[];
+  signedBy: string | null;
+  editionSize: number | null;
+  reverse: boolean;
+}
+
+export interface StoredPoints {
+  title: string;
+  points: { title: string; text: string }[];
+}
+
+export type LandingLayout = "store" | "drop";
+
+/** The "Exclusive drop" landing page's own parts (hero and SEO differ from the full store's). */
+export interface StoredDrop {
+  hero?: StoredHeroSlide[];
+  seo?: StoredSeo;
+  spotlights?: StoredSpotlight[];
+  points?: StoredPoints;
+}
+
 export interface HomepageContent {
+  /** Which landing page the store shows. Absent = "store" (the full catalogue page). */
+  layout?: LandingLayout;
+  /** Parts used only by the "Exclusive drop" layout. */
+  drop?: StoredDrop;
   hero?: StoredHeroSlide[];
   campaign?: StoredCampaign;
   seo?: StoredSeo;
@@ -108,6 +137,7 @@ const builtinBg = new Map<string, string | null>(Object.values(MASCOT).map((m) =
 export function mediaIdsOf(c: HomepageContent): string[] {
   const paths = [
     ...(c.hero ?? []).flatMap((s) => [s.desktopImage, s.mobileImage]),
+    ...(c.drop?.hero ?? []).flatMap((s) => [s.desktopImage, s.mobileImage]),
     c.campaign?.image ?? null,
     c.ambassador?.desktopImage ?? null,
     c.ambassador?.mobileImage ?? null,
@@ -301,15 +331,93 @@ export function parseLimited(raw: unknown): StoredLimited {
 }
 
 /** Product ids the content points at (checked against the catalogue before saving). */
-export const productIdsOf = (c: HomepageContent) => [...(c.ambassador?.productIds ?? []), ...(c.limited?.productIds ?? [])];
+export const productIdsOf = (c: HomepageContent) => [...(c.ambassador?.productIds ?? []), ...(c.limited?.productIds ?? []), ...(c.drop?.spotlights ?? []).map((s) => s.productId)];
+
+export function parseSpotlights(raw: unknown): StoredSpotlight[] {
+  if (!Array.isArray(raw) || raw.length < 1 || raw.length > HOMEPAGE_LIMITS.spotlights) throw new ValidationError(`The drop shows 1–${HOMEPAGE_LIMITS.spotlights} product spotlights.`);
+  const seen = new Set<string>();
+  return raw.map((r, i) => {
+    const where = `Spotlight ${i + 1}`;
+    const o = asObject(r);
+    rejectUnknownFields(o, ["lead", "title", "productId", "details", "signedBy", "editionSize", "reverse"]);
+    const [productId] = productIds([o.productId], where, 1);
+    if (seen.has(productId)) throw new ValidationError(`${where}: this product already has a spotlight.`);
+    seen.add(productId);
+    if (!Array.isArray(o.details) || o.details.length > HOMEPAGE_LIMITS.spotlightDetails) throw new ValidationError(`${where}: up to ${HOMEPAGE_LIMITS.spotlightDetails} detail lines.`);
+    let editionSize: number | null = null;
+    if (o.editionSize !== null && o.editionSize !== undefined && o.editionSize !== "") {
+      if (typeof o.editionSize !== "number" || !Number.isSafeInteger(o.editionSize) || o.editionSize < 1 || o.editionSize > HOMEPAGE_LIMITS.editionMax) throw new ValidationError(`${where}: pieces must be a whole number from 1 to ${HOMEPAGE_LIMITS.editionMax}.`);
+      editionSize = o.editionSize;
+    }
+    const signed = o.signedBy === null || o.signedBy === undefined || o.signedBy === "" ? null : text(o.signedBy, `${where} signed by`, 2, 40);
+    return {
+      lead: text(o.lead, `${where} small line`, 0, 30),
+      title: text(o.title, `${where} title`, 2, 40),
+      productId,
+      details: o.details.map((d, j) => text(d, `${where} detail ${j + 1}`, 2, 80)),
+      signedBy: signed,
+      editionSize,
+      reverse: o.reverse === true,
+    };
+  });
+}
+
+export function parsePoints(raw: unknown): StoredPoints {
+  const o = asObject(raw);
+  rejectUnknownFields(o, ["title", "points"]);
+  if (!Array.isArray(o.points) || o.points.length < 1 || o.points.length > HOMEPAGE_LIMITS.points) throw new ValidationError(`"Why it's exclusive": 1–${HOMEPAGE_LIMITS.points} points.`);
+  return {
+    title: text(o.title, "“Why it's exclusive” title", 2, 50),
+    points: o.points.map((p, i) => {
+      const po = asObject(p);
+      rejectUnknownFields(po, ["title", "text"]);
+      return { title: text(po.title, `Point ${i + 1} title`, 2, 30), text: text(po.text, `Point ${i + 1} text`, 4, 160) };
+    }),
+  };
+}
+
+/** `drop` in the save body: each part content or null (built-in); parts left out keep what is stored. */
+export function parseDrop(raw: unknown, current: StoredDrop | undefined): StoredDrop {
+  const o = asObject(raw);
+  rejectUnknownFields(o, ["hero", "seo", "spotlights", "points"]);
+  const next: StoredDrop = { ...(current ?? {}) };
+  if (o.hero !== undefined) {
+    if (o.hero === null) delete next.hero;
+    else next.hero = parseHeroSlides(o.hero);
+    if (next.hero?.length === 0) delete next.hero;
+  }
+  if (o.seo !== undefined) {
+    if (o.seo === null) delete next.seo;
+    else next.seo = parseSeo(o.seo);
+  }
+  if (o.spotlights !== undefined) {
+    if (o.spotlights === null) delete next.spotlights;
+    else next.spotlights = parseSpotlights(o.spotlights);
+  }
+  if (o.points !== undefined) {
+    if (o.points === null) delete next.points;
+    else next.points = parsePoints(o.points);
+  }
+  return next;
+}
 
 /**
  * The admin's save body `{ hero?, campaign?, seo?, ambassador?, limited? }`: each part is either the new content or
  * `null` (go back to the built-in content). Parts left out keep what is stored.
  */
 export function parseHomepage(body: Record<string, unknown>, current: HomepageContent | undefined): HomepageContent {
-  rejectUnknownFields(body, ["revision", "hero", "campaign", "seo", "ambassador", "limited"]);
+  rejectUnknownFields(body, ["revision", "layout", "drop", "hero", "campaign", "seo", "ambassador", "limited"]);
   const next: HomepageContent = { ...(current ?? {}) };
+  if (body.layout !== undefined) {
+    // null = no admin choice: follow LANDING_LAYOUT (or the full store).
+    if (body.layout === null) delete next.layout;
+    else if (body.layout !== "store" && body.layout !== "drop") throw new ValidationError("Choose the landing page: full store, exclusive drop, or follow the environment.");
+    else next.layout = body.layout;
+  }
+  if (body.drop !== undefined) {
+    if (body.drop === null) delete next.drop;
+    else next.drop = parseDrop(body.drop, current?.drop);
+  }
   if (body.hero !== undefined) {
     if (body.hero === null) delete next.hero;
     else next.hero = parseHeroSlides(body.hero);
@@ -338,11 +446,46 @@ export function parseHomepage(body: Record<string, unknown>, current: HomepageCo
 
 const DEFAULT_LOOK: FigureLook = { top: "#151515", bottom: "#151515", skin: "#C9946B" };
 
+const heroOf = (blocks: HomeBlock[]): StoredHeroSlide[] => {
+  const hero = blocks.find((b) => b.type === "hero");
+  return hero?.type === "hero"
+    ? hero.slides.map((s) => ({
+        id: s.id,
+        enabled: true,
+        kicker: s.kicker,
+        headline: s.headline,
+        subline: s.subline,
+        cta: s.cta,
+        textTone: s.textTone,
+        desktopImage: s.image?.desktop ?? null,
+        mobileImage: s.image?.mobile ?? null,
+        alt: s.image?.alt ?? "",
+        fill: s.placeholder.fill,
+      }))
+    : [];
+};
+const seoOf = (blocks: HomeBlock[]): StoredSeo => {
+  const seo = blocks.find((b) => b.type === "seo");
+  return seo?.type === "seo" ? { heading: seo.heading, groups: seo.groups, text: seo.text } : { heading: "More about shopping with us", groups: [], text: [] };
+};
+
+/** The built-in drop parts in the stored shape (spotlight product ids are empty: the admin picks them). */
+export function builtInDrop(dropBlocks: HomeBlock[]): Required<StoredDrop> {
+  const points = dropBlocks.find((b) => b.type === "exclusive_points");
+  return {
+    hero: heroOf(dropBlocks),
+    seo: seoOf(dropBlocks),
+    spotlights: dropBlocks.flatMap((b) =>
+      b.type === "product_spotlight" ? [{ lead: b.lead, title: b.title, productId: b.productId, details: b.details, signedBy: b.signedBy, editionSize: b.editionSize, reverse: b.reverse }] : [],
+    ),
+    points: points?.type === "exclusive_points" ? { title: points.title, points: points.points } : { title: "Why it's exclusive", points: [] },
+  };
+}
+
 /** The built-in parts in the stored shape, so "Customise" starts from what the store shows today. */
-export function builtInContent(blocks: HomeBlock[]): Required<HomepageContent> {
+export function builtInContent(blocks: HomeBlock[], dropBlocks: HomeBlock[] = []): Required<HomepageContent> {
   const hero = blocks.find((b) => b.type === "hero");
   const campaign = blocks.find((b) => b.type === "campaign_band");
-  const seo = blocks.find((b) => b.type === "seo");
   const amb = blocks.find((b) => b.type === "ambassador");
   const ltd = blocks.find((b) => b.type === "limited_edition");
   const strip = <T extends { type: string; id: string }>(b: T) => {
@@ -351,7 +494,10 @@ export function builtInContent(blocks: HomeBlock[]): Required<HomepageContent> {
     void _i;
     return rest;
   };
+  void hero;
   return {
+    layout: "store",
+    drop: builtInDrop(dropBlocks),
     ambassador:
       amb?.type === "ambassador"
         ? { enabled: true, ...(strip(amb) as Omit<StoredAmbassador, "enabled">) }
@@ -360,27 +506,12 @@ export function builtInContent(blocks: HomeBlock[]): Required<HomepageContent> {
       ltd?.type === "limited_edition"
         ? { enabled: true, ...(strip(ltd) as Omit<StoredLimited, "enabled">) }
         : { enabled: false, eyebrow: "", line1: "Limited", line2: "Edition.", text: "", cta: { label: "Shop the drop", href: "/collections/new-in" }, editionSize: null, cutoutImage: MASCOT["alpha-01-hero-stance"].src, cutoutAlt: "Limited edition", sceneImage: MASCOT["scene-25-lookbook"].src, productIds: [] },
-    hero:
-      hero?.type === "hero"
-        ? hero.slides.map((s) => ({
-            id: s.id,
-            enabled: true,
-            kicker: s.kicker,
-            headline: s.headline,
-            subline: s.subline,
-            cta: s.cta,
-            textTone: s.textTone,
-            desktopImage: s.image?.desktop ?? null,
-            mobileImage: s.image?.mobile ?? null,
-            alt: s.image?.alt ?? "",
-            fill: s.placeholder.fill,
-          }))
-        : [],
+    hero: heroOf(blocks),
     campaign:
       campaign?.type === "campaign_band"
         ? { enabled: true, kicker: campaign.kicker, headline: campaign.headline, text: campaign.text, cta: campaign.cta, image: campaign.image.src, alt: campaign.image.alt, bg: campaign.image.bg }
         : { enabled: false, kicker: "", headline: ["New season"], text: "", cta: { label: "Shop now", href: "/collections/new-in" }, image: MASCOT["scene-22-the-pack"].src, alt: "Campaign image", bg: null },
-    seo: seo?.type === "seo" ? { heading: seo.heading, groups: seo.groups, text: seo.text } : { heading: "More about shopping with us", groups: [], text: [] },
+    seo: seoOf(blocks),
   };
 }
 
@@ -404,13 +535,48 @@ function heroSlide(s: StoredHeroSlide): HeroSlide {
   };
 }
 
-/** The homepage blocks with the admin's content in place of the built-in hero / campaign / SEO. */
-export function applyHomepage(blocks: HomeBlock[], content: HomepageContent | null | undefined): HomeBlock[] {
+/**
+ * `LANDING_LAYOUT` environment variable: "drop" or "store" — the deployment's default landing page, used while the
+ * admin hasn't chosen one. Empty / anything else = not set.
+ */
+export function envLandingLayout(env: Record<string, string | undefined> = process.env): LandingLayout | null {
+  const v = env.LANDING_LAYOUT?.trim().toLowerCase();
+  return v === "drop" || v === "store" ? v : null;
+}
+
+/**
+ * Which landing page is live, in this order: the admin's choice (Admin → Homepage → Landing page layout), else
+ * `LANDING_LAYOUT`, else the full store. "Follow the environment" in the admin clears the admin's choice.
+ */
+export const landingLayout = (content: HomepageContent | null | undefined, env: Record<string, string | undefined> = process.env): LandingLayout =>
+  content?.layout === "drop" || content?.layout === "store" ? content.layout : (envLandingLayout(env) ?? "store");
+
+/**
+ * The homepage blocks with the admin's content in place of the built-in parts. `blocks` is the built-in list of the
+ * live layout (full store or drop); for the drop, its own hero / SEO / spotlights / points are used.
+ */
+export function applyHomepage(blocks: HomeBlock[], content: HomepageContent | null | undefined, layout: LandingLayout = "store"): HomeBlock[] {
   if (!content) return blocks;
+  const drop = layout === "drop" ? content.drop : undefined;
+  const heroContent = layout === "drop" ? drop?.hero : content.hero;
+  const seoContent = layout === "drop" ? drop?.seo : content.seo;
+  let spotlightsDone = false;
   const out: HomeBlock[] = [];
   for (const block of blocks) {
-    if (block.type === "hero" && content.hero) {
-      const slides = content.hero.filter((s) => s.enabled).map(heroSlide);
+    if (block.type === "product_spotlight" && drop?.spotlights) {
+      // The admin's list replaces the built-in spotlights, at the first one's place.
+      if (!spotlightsDone) {
+        spotlightsDone = true;
+        drop.spotlights.forEach((sp, i) => out.push({ ...block, id: `spotlight-${i + 1}`, ...sp, demoCategory: undefined }));
+      }
+      continue;
+    }
+    if (block.type === "exclusive_points" && drop?.points) {
+      out.push({ ...block, title: drop.points.title, points: drop.points.points });
+      continue;
+    }
+    if (block.type === "hero" && heroContent) {
+      const slides = heroContent.filter((s) => s.enabled).map(heroSlide);
       if (slides.length) out.push({ ...block, slides });
       continue;
     }
@@ -427,8 +593,8 @@ export function applyHomepage(blocks: HomeBlock[], content: HomepageContent | nu
       });
       continue;
     }
-    if (block.type === "seo" && content.seo) {
-      out.push({ ...block, heading: content.seo.heading, groups: content.seo.groups, text: content.seo.text });
+    if (block.type === "seo" && seoContent) {
+      out.push({ ...block, heading: seoContent.heading, groups: seoContent.groups, text: seoContent.text });
       continue;
     }
     if (block.type === "ambassador" && content.ambassador) {

@@ -1,5 +1,126 @@
 # Change log
 
+## 2026-12-02 — Drop products: live stock in Admin → Homepage, up to 6 pieces
+
+**Asked for:** manage the drop's products, their stock and quantity from the admin, and add more products later.
+
+- Already there (unchanged): create / edit products with colours, sizes, photos and price in **Admin → Products**;
+  change stock per size (audited, never below zero, low-stock filter) in **Admin → Inventory**; choose the drop's
+  pieces in **Admin → Homepage → Product spotlights**.
+- New: each spotlight shows the **live stock of every colour × size** of its style (red = sold out, orange ≤ 3, total
+  on sale), with **Edit product ↗** (`/admin/catalog/style/<id>`) and **Manage stock ↗** (`/admin/inventory?q=<SKU>`,
+  every colour) links; the card has **New product ↗**. Links open a new tab so unsaved homepage edits aren't lost.
+  `homepageView()` returns `stock` (admin-only, `catalog.read`).
+- Spotlight limit raised from 4 to **6** pieces.
+- Verified: `pnpm typecheck` ✔, ESLint ✔, `pnpm test` 44 files / 628 tests ✔ (the switch test now also checks the
+  stock view: one row per colour of the style, whole non-negative numbers).
+- Not built (needs a decision — see the session report): a working pincode check on the live store.
+
+## 2026-12-02 — Drop layout: product page without cross-selling rails
+
+**Asked for:** in the drop view, the hoodie's product page must not show Complete the look, You may also like or
+Recently viewed — the store only has the limited pieces.
+
+- `getProductPage()` (`lib/storefront.ts`) returns `drop: true` and no rails in the drop layout (and skips computing
+  them); the PDP (`app/(store)/products/[handle]/page.tsx`) then renders no Complete the look / You may also like /
+  Shop the look and no Recently viewed, and its breadcrumb is Home › piece (no Men / category links into the full
+  catalogue — also in the product's structured data). Full-store layout: unchanged.
+- Verified live (the store is on drop): `/products/heavyweight-oversized-hoodie-black` → 0 × "Complete the look",
+  "You may also like", "Recently viewed", "Shop the look", `href="/men"`; reviews still shown. `pnpm typecheck` ✔,
+  ESLint ✔, `pnpm test` 44 files / 628 tests ✔.
+
+## 2026-12-02 — Alpha Mascot Tee (real photos, 5 colours) + drop-layout header, menu and footer
+
+**Asked for:** put the owner's five "Alpha Mascot Tee" images in the project and show them; make the drop store
+buildable from the admin. Then: in the drop layout the header (New in / Bestsellers / Sale) and the menu drawer must
+match the drop, not the full store.
+
+### The tee
+- Sources: `assets/products/alpha-mascot-tee/{black,olive,navy,teal,bone}.png` (1254² posters) + README. Cropped once
+  into `photos/<colour>-{front,back}.jpg` (700 × 875, 4:5 — the store's photo shape) and `<colour>-poster.jpg` (the
+  full poster). The posters' detail tiles are under the 600 px photo minimum, so they stay inside the poster photo.
+- `pnpm catalog:add-mascot-tee [--apply] [--production]` (`scripts/catalog-add-mascot-tee.ts`): creates the style with
+  5 colours through the **same services as Admin → Products** (`prepareProductPhoto` → media store, `saveStyle`), front /
+  back photos tagged as hanger views, alt text per photo. Dry run by default, prints the target, non-local needs
+  `--production`, idempotent (skips when `AH-AMT-*` SKUs exist), audited `system:catalog-add-mascot-tee`.
+- Applied on local `alpha_hood_dev`: style `style_489eda2c2529`, 15 photos. From now on it is edited in
+  **Admin → Products** like any product (photos, colours, price, stock, text).
+- **Placeholders to replace in the admin:** price ₹2,499 (no MRP / discount), 20 per size (S–XXL), manufacturer
+  "to be confirmed", HSN 6109, 300 g.
+- Local dev drop spotlights now point at the real hoodie (black) and this tee (black) — "The Mascot Tee".
+
+### Drop layout navigation (`lib/cms/drop-nav.ts`, used by `getShell()`)
+- Built from the drop's own spotlights, so it follows Admin → Homepage → Product spotlights automatically:
+  - header: each piece's title → its product page, + Alpha Club (no New in / Bestsellers / Sale);
+  - menu drawer: one "The drop" tab — the pieces, Size guide, Alpha Club, Track order, and two promo tiles of the
+    pieces (the Shop / Collections tabs with 27 categories are gone); gift card / club tiles stay;
+  - footer: the Shop column lists the pieces + Size guide; Help and Company stay;
+  - mini-cart add-ons: only the drop's other pieces.
+- Full-store layout: unchanged.
+
+### Verified
+- `lib/cms` 34/34 ✔ (new `drop-nav.test.ts`: header, drawer, footer, fewer than two pieces). Live (local dev, layout
+  switched to drop briefly and back to "Follow the environment"): drop page shows "The Mascot Tee" with 15 real photos
+  (served `image/jpeg`), all 5 colour swatches; on a product page the header / menu carry "The Hoodie", "The Mascot
+  Tee", "The drop", "Size guide" and **no** "New in", "Bestsellers", "Winter drop", `/collections/sale`; PDP
+  `/products/alpha-mascot-tee-black` 200.
+- Not verified: visually in a browser (extension not connected).
+
+## 2026-12-02 — `LANDING_LAYOUT` environment variable for the landing page
+
+**Asked for:** switch the landing page from an env variable too — a choice made in the admin gets priority,
+otherwise the env variable's.
+
+- `LANDING_LAYOUT=drop | store` (in `.env.example`, empty = not set; case / spaces ignored; anything else = not set).
+- **Priority** (`landingLayout()` in `lib/cms/homepage.ts`): 1) Admin → Homepage → Landing page layout, if chosen;
+  2) `LANDING_LAYOUT`; 3) the full store.
+- The admin card now has three choices: **Full store**, **Exclusive drop**, and **Follow the environment** (clears the
+  admin's choice, `layout: null`), shows what `LANDING_LAYOUT` is set to and which layout is live now.
+- The local dev database's admin choice (set to "store" while testing the switch earlier) was cleared back to
+  "Follow the environment", as it was before the test.
+- Verified: `pnpm typecheck` ✔, ESLint ✔, `lib/cms` 30/30 ✔ (new priority test: admin beats env both ways, env
+  decides without an admin choice, unknown / empty → full store, `null` clears).
+- Note: env files are read when the server starts — after changing `LANDING_LAYOUT`, restart / redeploy.
+
+## 2026-12-02 — Landing page layout switch: "Full store" ↔ "Exclusive drop"
+
+**Asked for:** an admin option to show either landing page — the new one for just two exclusive articles (a black
+hoodie and a tee in 4–5 colours) when switched on, the old full-store one when switched off.
+
+### Admin → Homepage
+- New card **"Landing page layout"**: *Full store* (the page as before) or *Exclusive drop*. Shows which one is
+  "Live now" and which goes "Live after save". Saved with the page (one revision, audited `layoutDrop`).
+- **"Edit the hero and SEO block of: Full store | Exclusive drop"** — each layout keeps its own hero and SEO block, so
+  you can prepare the drop page while the full store is live, and switch back without losing anything. The
+  ambassador, limited-edition and campaign sections are shared by both.
+- Drop-only cards: **Product spotlights** (1–4: small line, big title, product picker, up to 5 detail lines, hand-
+  signed by, edition size, photos left/right) and **Why it's exclusive** (title + up to 4 points).
+
+### The "Exclusive drop" page (`MOCK_DROP_HOMEPAGE`)
+Hero (1 slide) → brand ambassador band → **spotlight: The Hoodie** → **spotlight: The Tee** → **Why it's exclusive**
+(Hand-signed · Numbered · Certified · Boxed) → limited-edition finale → Alpha Club → #WearTheHood → trust strip → a
+short SEO block. No discount promo, combo offers, collection tiles, category rail, trending tabs or new-arrivals grid.
+- `components/home/product-spotlight.tsx`: big photos of the chosen colour, price **without MRP / % off**, "Hand-signed
+  by …", "Edition of N", "N left" (real stock), colour swatches (every colour of the style) that switch the photos,
+  sizes and **Add to bag on the homepage** (the bag / checkout re-check stock and price on the server), "Sold out ·
+  Notify me" when nothing is left, link to the full PDP.
+- `components/home/exclusive-points.tsx`: numbered tiles on black.
+- Demo: with no product picked, a spotlight shows the style with the most colours in its category (hoodie black first)
+  — development only, the built-in content is the mock CMS.
+
+### Security
+- `layout` must be `store` or `drop`; spotlights: 1–4, one product each (must exist in the catalogue), no repeats,
+  details ≤ 5 × 80 chars, edition 1–100,000, plain text; points 1–4; unknown fields (e.g. `price`) refused; same
+  `catalog.write` + audit + revision as the rest. Prices always come from the product.
+
+### Verified
+- `pnpm typecheck` ✔, ESLint ✔, `lib/cms` 29/29 ✔ (6 new tests: layout values, own hero / SEO per layout, shared
+  sections, spotlights replace the demo in place, validation, switching keeps both layouts' content).
+- Live on the dev server (local `alpha_hood_dev`, switched through the same service): **drop** → 2 spotlights, "Why
+  it's exclusive", colour swatches, 2 Add to bag, ambassador + limited sections, and no 40% promo / Trending /
+  category slider; switched back to **store** → category slider and Trending return, no spotlights.
+- Not verified: the editor and the drop page visually in a browser (extension not connected).
+
 ## 2026-12-02 — Homepage: brand-ambassador signed exclusives + limited-edition drop (GymYardHQ designs)
 
 **Asked for:** two admin-customisable homepage sections only for the brand ambassador's exclusive, autographed,
