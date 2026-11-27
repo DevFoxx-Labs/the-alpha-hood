@@ -1,5 +1,29 @@
 # Change log
 
+## 2026-12-02 — OTP entry as separate digit boxes, with visual feedback
+
+**Asked for:** the code field should be separate boxes, one per digit (4 or 6), with visual graphics and actions.
+
+- New `components/ui/otp-input.tsx` (`OtpInput`, `length` 4 | 6, default 6), used by every customer code field:
+  mobile sign-in (`otp-sign-in.tsx`, also order tracking), email sign-in / sign-up / forgot password
+  (`email-sign-in.tsx`), checkout contact (`contact-step.tsx`), Settings email verification (`email-verify.tsx`).
+- Visual actions: the next box is active (2 px black border + blinking caret); each digit pops in; a wrong code
+  shakes the row and turns it red, and typing again starts a fresh code; success turns it green with a small
+  staggered bounce. Animations use only `transform` / `opacity` (no layout shift) and stop under
+  `prefers-reduced-motion` (`app/globals.css`).
+- **Auto-verify**: entering / pasting the last digit submits it (the button still works). Sign-up waits until its
+  password is filled.
+- One real `<input>` lies over the boxes, so SMS / email autofill (`autocomplete="one-time-code"`), pasting the whole
+  code (spaces / dashes dropped), backspace and screen readers work as with a normal field; the boxes are
+  `aria-hidden`. 16 px font (no iOS zoom), boxes shrink to fit 320 px. The field stays enabled while verifying, so
+  focus isn't lost after a wrong code.
+- Not changed: the admin panel's authenticator / provider code fields (admin design system).
+- Tests: `components/ui/otp-input.test.ts` 6/6 (box count 4 / 6, one input with OTP hints, error / success states,
+  digits only, paste, auto-verify fires once, fresh code after an error). No DOM test library in the repo, so typing
+  is tested through the pure `nextOtpValue`, the markup through React's server renderer. Full run: `pnpm typecheck`
+  ✔, `pnpm lint` ✔, `pnpm test` 42 files / 601 tests ✔.
+- Not verified: the look and animations in a browser at 1440 / 390 / 360 px (browser extension not connected).
+
 ## 2026-12-02 — Fix: "Forgot password" asks for the code first, then the new password
 
 **Reported:** Email sign-in → "Forgot password?" asked for the new password straight away, before any code was sent.

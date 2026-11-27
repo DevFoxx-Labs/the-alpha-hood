@@ -4,7 +4,7 @@ import { useEffect, useId, useState } from "react";
 import { api, ApiError } from "@/components/checkout/api";
 import { showMessageToast } from "@/components/store/toast";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { OtpInput } from "@/components/ui/otp-input";
 
 /**
  * Account → Settings: confirm the email address on the account with a 6-digit code. Until it is confirmed, order and
@@ -41,12 +41,12 @@ export function EmailVerify({ email, verified, onVerified }: { email: string | n
       setBusy(false);
     }
   };
-  const confirm = async () => {
-    if (!challenge) return;
+  const confirm = async (entered = code) => {
+    if (!challenge || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await api("/api/account/email/confirm", { method: "POST", body: { challengeId: challenge.id, code } });
+      await api("/api/account/email/confirm", { method: "POST", body: { challengeId: challenge.id, code: entered } });
       showMessageToast("Email verified");
       setChallenge(null);
       onVerified();
@@ -67,8 +67,18 @@ export function EmailVerify({ email, verified, onVerified }: { email: string | n
           <label htmlFor={`${id}-code`} className="text-[12px] font-bold uppercase tracking-[0.06em]">
             Code sent to {email}
           </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <Input id={`${id}-code`} inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} className="tabular max-w-[160px] tracking-[0.3em]" />
+          <OtpInput
+            id={`${id}-code`}
+            value={code}
+            autoFocus
+            status={error ? "error" : "idle"}
+            onChange={(v) => {
+              setCode(v);
+              if (error) setError(null);
+            }}
+            onComplete={(v) => void confirm(v)}
+          />
+          <div className="flex flex-wrap items-center gap-3">
             <Button type="button" size="sm" loading={busy} disabled={code.length !== 6} onClick={() => void confirm()}>
               Verify
             </Button>

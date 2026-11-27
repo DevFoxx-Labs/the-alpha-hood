@@ -5,6 +5,7 @@ import { useEffect, useId, useState } from "react";
 import { CheckoutStep, DoneLine } from "@/components/store/checkout-blocks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { OtpInput } from "@/components/ui/otp-input";
 import { useHumanCheck } from "@/components/security/human-check";
 import { api, ApiError } from "./api";
 
@@ -57,12 +58,12 @@ export function ContactStep({ customer, onVerified }: { customer: { phone: strin
     }
   };
 
-  const verify = async () => {
-    if (!challenge) return;
+  const verify = async (entered = code) => {
+    if (!challenge || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await api("/api/otp/verify", { method: "POST", body: { challengeId: challenge.id, code, ...(email ? { email } : {}) } });
+      await api("/api/otp/verify", { method: "POST", body: { challengeId: challenge.id, code: entered, ...(email ? { email } : {}) } });
       onVerified();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Couldn't verify the code.");
@@ -118,15 +119,16 @@ export function ContactStep({ customer, onVerified }: { customer: { phone: strin
             <label htmlFor={`${id}-code`} className="text-[12px] font-bold uppercase tracking-[0.06em]">
               6-digit code sent to +91 {phone}
             </label>
-            <Input
+            <OtpInput
               id={`${id}-code`}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
               value={code}
               autoFocus
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              className="tabular max-w-[220px] tracking-[0.4em]"
+              status={error ? "error" : "idle"}
+              onChange={(v) => {
+                setCode(v);
+                if (error) setError(null);
+              }}
+              onComplete={(v) => void verify(v)}
             />
             {challenge.demoCode ? (
               <p className="border border-dashed border-ink-2 bg-white px-3 py-2 text-[12px]" role="status">

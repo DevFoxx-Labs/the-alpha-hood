@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 import { api, ApiError } from "@/components/checkout/api";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { OtpInput } from "@/components/ui/otp-input";
 import { useHumanCheck } from "@/components/security/human-check";
 import { SocialButtons, useSocialNotice } from "./social-sign-in";
 
@@ -19,6 +19,7 @@ export function OtpSignIn({ onSignedIn, orderNumber, submitLabel = "Continue", s
   const id = useId();
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
+  const [verified, setVerified] = useState(false);
   const [challenge, setChallenge] = useState<{ id: string; demoCode?: string; message?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,12 +52,13 @@ export function OtpSignIn({ onSignedIn, orderNumber, submitLabel = "Continue", s
     }
   };
 
-  const verify = async () => {
-    if (!challenge) return;
+  const verify = async (entered = code) => {
+    if (!challenge || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await api("/api/otp/verify", { method: "POST", body: { challengeId: challenge.id, code } });
+      await api("/api/otp/verify", { method: "POST", body: { challengeId: challenge.id, code: entered } });
+      setVerified(true);
       onSignedIn();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Couldn't verify the code.");
@@ -110,15 +112,17 @@ export function OtpSignIn({ onSignedIn, orderNumber, submitLabel = "Continue", s
           <label htmlFor={`${id}-code`} className="text-[12px] font-bold uppercase tracking-[0.06em]">
             6-digit code
           </label>
-          <Input
+          <OtpInput
             id={`${id}-code`}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
             value={code}
             autoFocus
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-            className="tabular max-w-[220px] tracking-[0.4em]"
+            status={verified ? "success" : error ? "error" : "idle"}
+            disabled={verified}
+            onChange={(v) => {
+              setCode(v);
+              if (error) setError(null);
+            }}
+            onComplete={(v) => void verify(v)}
           />
           {challenge.demoCode ? (
             <p className="border border-dashed border-ink-2 bg-white px-3 py-2 text-[12px]" role="status">

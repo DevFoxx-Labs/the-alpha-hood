@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
+import { OtpInput } from "@/components/ui/otp-input";
 
 /**
  * ACC-01 email sign-in. Four modes, one form:
@@ -125,13 +126,13 @@ export function EmailSignIn({
     }
   };
 
-  const verify = async () => {
-    if (!challenge) return;
+  const verify = async (entered = code) => {
+    if (!challenge || busy) return;
     setBusy(true);
     setError(null);
     try {
       if (mode === "reset") {
-        await api("/api/auth/email/verify", { method: "POST", body: { email: email.trim(), challengeId: challenge.id, code, intent: "reset" } });
+        await api("/api/auth/email/verify", { method: "POST", body: { email: email.trim(), challengeId: challenge.id, code: entered, intent: "reset" } });
         setCodeOk(true);
         setPassword("");
         setBusy(false);
@@ -143,7 +144,7 @@ export function EmailSignIn({
         body: {
           email: email.trim(),
           challengeId: challenge.id,
-          code,
+          code: entered,
           intent,
           ...(needsPassword ? { password } : {}),
           ...(mode === "signup" ? { acceptTerms: terms, ...(name.trim() ? { name: name.trim() } : {}) } : {}),
@@ -277,15 +278,19 @@ export function EmailSignIn({
           <label htmlFor={`${id}-code`} className={label}>
             6-digit code sent to {email.trim()}
           </label>
-          <Input
+          <OtpInput
             id={`${id}-code`}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
             value={code}
             autoFocus
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-            className="tabular max-w-[220px] tracking-[0.4em]"
+            status={error ? "error" : "idle"}
+            onChange={(v) => {
+              setCode(v);
+              if (error) setError(null);
+            }}
+            // Auto-verify only when nothing else is still needed (sign-up's password was asked before the code).
+            onComplete={(v) => {
+              if (!needsPassword || password.length >= MIN) void verify(v);
+            }}
           />
           <p className="text-[12px] text-ink-2">Check your inbox (and spam folder). The code expires in 5 minutes.</p>
           {challenge.demoCode ? (
