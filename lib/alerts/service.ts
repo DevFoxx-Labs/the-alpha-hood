@@ -32,6 +32,8 @@ export interface AlertStore {
   create(a: Omit<ProductAlert, "id" | "createdAt" | "firedAt">, now?: Date): Promise<ProductAlert>;
   listByCustomer(customerId: string): Promise<ProductAlert[]>;
   open(productId?: string): Promise<ProductAlert[]>;
+  /** Every alert (open and fired) for these products — Admin's demand counts (lib/catalog/hold.ts). */
+  forProducts(productIds: string[]): Promise<ProductAlert[]>;
   fire(id: string, now?: Date): Promise<boolean>;
   remove(customerId: string, id: string): Promise<boolean>;
   erase(customerId: string): Promise<void>;
@@ -52,6 +54,10 @@ export function createMemoryAlertStore(): AlertStore {
     },
     async open(productId) {
       return [...alerts.values()].filter((a) => !a.firedAt && (!productId || a.productId === productId));
+    },
+    async forProducts(ids) {
+      const want = new Set(ids);
+      return [...alerts.values()].filter((a) => want.has(a.productId));
     },
     async fire(id, now = new Date()) {
       const a = alerts.get(id);
@@ -79,7 +85,7 @@ export function resolveAlerts(env: Env = process.env): AlertStore {
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Product alerts");
   };
-  return { create: fail, listByCustomer: fail, open: fail, fire: fail, remove: fail, erase: fail };
+  return { create: fail, listByCustomer: fail, open: fail, forProducts: fail, fire: fail, remove: fail, erase: fail };
 }
 
 export class AlertError extends Error {

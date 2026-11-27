@@ -46,6 +46,7 @@ import {
   createSqlOutbox,
   createSqlUgcStore,
 } from "./stores/growth";
+import { holdInventory } from "@/lib/catalog/hold-inventory";
 import { createOwnCatalog } from "@/lib/catalog/own";
 import type { CatalogStore } from "@/lib/catalog/store";
 import { type ReviewStore, reviewsFromStore } from "@/lib/reviews/store";
@@ -156,10 +157,12 @@ function catalogParts(
     own() {
       if (own) return own;
       const cat = createOwnCatalog(catalog, reviewStore);
-      // The reader is the catalogue; bag + stock wrap it (inventory seeds a new SKU from the product's stock).
+      // The reader is the catalogue; bag + stock wrap it. The inventory reads the REAL stock (it seeds a new SKU from
+      // the product's stock, and Admin → Inventory lists it); the store's inventory sells nothing of a product on
+      // "Show as sold out" (lib/catalog/hold.ts).
       const readOnly = { ...cat.reader, name: "own" } as CommerceAdapter;
-      const { repo, inventory } = bag(readOnly);
-      own = { commerce: { ...createDbCommerce(readOnly, repo, inventory), name: "own" }, invalidate: cat.invalidate };
+      const { repo, inventory } = bag({ ...cat.stockReader, name: "own" } as CommerceAdapter);
+      own = { commerce: { ...createDbCommerce(readOnly, repo, holdInventory(inventory, cat.isHeld)), name: "own" }, invalidate: cat.invalidate };
       return own;
     },
   };

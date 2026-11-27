@@ -1,7 +1,9 @@
 import { audit, requireStaff } from "@/lib/admin/auth";
 import { adminError, adminWrite, privateJson } from "@/lib/admin/http";
 import { can } from "@/lib/admin/permissions";
+import { resolveAlerts } from "@/lib/alerts/service";
 import { CatalogAdminError } from "@/lib/catalog/admin";
+import { demandFor } from "@/lib/catalog/hold";
 import { catalogAdminDeps } from "@/lib/catalog/admin-deps";
 import { getStyle, saveStyle, STYLE_ID_RE } from "@/lib/catalog/style";
 import { jsonError } from "@/lib/http/guard";
@@ -23,7 +25,9 @@ export async function GET(request: Request, ctx: RouteContext<"/api/admin/styles
     if (!STYLE_ID_RE.test(styleId)) return jsonError(404, "not_found", "Product not found.");
     const style = await getStyle(deps, styleId, can(auth.staff.role, "catalog.write"));
     if (!style) return jsonError(404, "not_found", "Product not found.");
-    return privateJson({ style });
+    // "Notify me" sign-ups per colour (counts only) for the "Show as sold out" card.
+    const demand = await demandFor(resolveAlerts(), style.variants.map((v) => v.id)).catch(() => null);
+    return privateJson({ style, demand });
   } catch (error) {
     return adminError(error);
   }

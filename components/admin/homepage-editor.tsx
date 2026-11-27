@@ -7,6 +7,7 @@ import { useEffect, useId, useState } from "react";
 import type { HomepageContent, LandingLayout, StoredAmbassador, StoredCampaign, StoredDrop, StoredHeroSlide, StoredLimited, StoredPoints, StoredSeo, StoredSpotlight } from "@/lib/cms/homepage";
 import { cn } from "@/lib/utils";
 import { adminApi, notify, useAdmin } from "./admin-shell";
+import { type HoldColour, SoldOutHold } from "./sold-out-hold";
 import { ProductPicker } from "./taxonomy";
 import { AButton, AIcon, AInput, ALabel, ASelect, ATextarea, Card, Confirm, ErrorState, FormDialog, PageHeader, StatusBadge } from "./ui";
 
@@ -32,7 +33,7 @@ interface View {
 
 interface StyleStock {
   styleId: string;
-  colours: { id: string; colour: string; sku: string; status: string; sizes: { label: string; stock: number }[] }[];
+  colours: (HoldColour & { sku: string; sizes: { label: string; stock: number }[] })[];
 }
 
 const errText = (e: unknown, fallback = "Something went wrong.") => (e instanceof Error ? e.message : fallback);
@@ -214,6 +215,11 @@ export function HomepageScreen() {
     };
   }, [nonce]);
   const reload = () => setNonce((n) => n + 1);
+  // After "Show as sold out" is switched: refresh only the stock / sign-ups, keeping unsaved edits.
+  const refreshStock = () =>
+    adminApi<View>("/api/admin/homepage")
+      .then((v) => setView((cur) => (cur ? { ...cur, stock: v.stock } : cur)))
+      .catch(() => notify("error", "Switched — reload the page to see the latest stock."));
   const change = <T,>(set: (v: T) => void) => (v: T) => (set(v), setDirty(true));
   const editLayout = change(setLayout);
   const editSpotlights = change(setSpotlights);
@@ -397,6 +403,7 @@ export function HomepageScreen() {
                     titles={titles}
                     onTitles={(t) => setTitles((x) => ({ ...x, ...t }))}
                     stock={sp.productId ? view.stock[sp.productId] : undefined}
+                    onStockChanged={refreshStock}
                     maxDetails={view.limits.spotlightDetails}
                     editionMax={view.limits.editionMax}
                     disabled={!canEdit}
@@ -872,7 +879,7 @@ function LimitedFields({ value, onChange, builtIns, titles, onTitles, max, editi
 
 // ── Exclusive drop: spotlight + points fields ───────────────────────────────────────────────────
 
-function SpotlightFields({ index, count, value, titles, onTitles, stock, maxDetails, editionMax, disabled, onChange, onMove, onRemove }: { index: number; count: number; value: StoredSpotlight; titles: Record<string, string>; onTitles: (t: Record<string, string>) => void; stock?: StyleStock; maxDetails: number; editionMax: number; disabled: boolean; onChange: (v: StoredSpotlight) => void; onMove: (d: -1 | 1) => void; onRemove: () => void }) {
+function SpotlightFields({ index, count, value, titles, onTitles, stock, onStockChanged, maxDetails, editionMax, disabled, onChange, onMove, onRemove }: { index: number; count: number; value: StoredSpotlight; titles: Record<string, string>; onTitles: (t: Record<string, string>) => void; stock?: StyleStock; onStockChanged: () => void; maxDetails: number; editionMax: number; disabled: boolean; onChange: (v: StoredSpotlight) => void; onMove: (d: -1 | 1) => void; onRemove: () => void }) {
   const id = useId();
   const set = (patch: Partial<StoredSpotlight>) => onChange({ ...value, ...patch });
   const [details, setDetails] = useState(value.details.join("\n"));
@@ -921,7 +928,7 @@ function SpotlightFields({ index, count, value, titles, onTitles, stock, maxDeta
           <ALabel>Product</ALabel>
           <ProductPicker ids={value.productId ? [value.productId] : []} titles={titles} onTitles={onTitles} onChange={(ids) => set({ productId: ids[0] ?? "" })} max={1} />
           <p className="text-xs text-muted-foreground">Price, photos, colours, sizes and stock come from the product. Its price shows without any MRP or discount.</p>
-          {value.productId ? <SpotlightStock stock={stock} /> : null}
+          {value.productId ? <SpotlightStock stock={stock} onChanged={onStockChanged} /> : null}
         </div>
       </div>
     </fieldset>
@@ -961,7 +968,8 @@ function PointsFields({ value, onChange, max, disabled }: { value: StoredPoints;
 }
 
 /** Live stock of every colour × size of the spotlight's style, with links to edit the product and change stock. */
-function SpotlightStock({ stock }: { stock?: StyleStock }) {
+function SpotlightStock({ stock, onChanged }: { stock?: StyleStock; onChanged: () => void }) {
+  const { can } = useAdmin();
   if (!stock) return <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">Save the page to see this product&apos;s stock here.</p>;
   const sizes = [...new Set(stock.colours.flatMap((c) => c.sizes.map((x) => x.label)))];
   const total = stock.colours.reduce((n, c) => n + (c.status === "active" ? c.sizes.reduce((m, x) => m + x.stock, 0) : 0), 0);
@@ -969,7 +977,8 @@ function SpotlightStock({ stock }: { stock?: StyleStock }) {
     <div className="mt-2 space-y-2 rounded-lg border border-border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">
-          Stock · <span className={total === 0 ? "text-red-600" : undefined}>{total} on sale</span>
+          Stock · <span className={total === 0 ? "text-red-600" : undefined}>{total} {stock.colours.some((c) => c.status === "active" && c.soldOutHold) ? "in stock" : "on sale"}</span>
+          {stock.colours.some((c) => c.status === "active" && c.soldOutHold) ? <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">Shown as sold out</span> : null}
         </p>
         <div className="flex gap-2">
           <AButton size="sm" variant="outline" asChild>
@@ -1022,6 +1031,7 @@ function SpotlightStock({ stock }: { stock?: StyleStock }) {
         </table>
       </div>
       <p className="text-[11px] text-muted-foreground">Red = sold out, orange = 3 or fewer. Customers see &ldquo;N left&rdquo; and &ldquo;Sold out&rdquo; from these numbers.</p>
+      <SoldOutHold styleId={stock.styleId} colours={stock.colours} canEdit={can("catalog.write")} onChanged={onChanged} />
     </div>
   );
 }

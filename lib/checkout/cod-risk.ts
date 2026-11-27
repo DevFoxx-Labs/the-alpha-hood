@@ -1,5 +1,5 @@
 import { rupees, type Paise } from "@/lib/format";
-import type { DeliveryPromise } from "@/lib/shipping";
+import type { DeliveryPromise } from "@/lib/shipping/common";
 
 /**
  * CHK-07 COD risk controls. Hard rules block COD; soft signals add to a risk score stored on the order so

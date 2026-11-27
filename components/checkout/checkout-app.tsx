@@ -19,7 +19,7 @@ import type { Address } from "@/lib/checkout/address-types";
 import { COD_FEE, type PriceBreakdown } from "@/lib/pricing/price-cart";
 import { formatINR } from "@/lib/format";
 import { PREPAID_OFFER } from "@/lib/promotions/automatic";
-import type { DeliveryPromise } from "@/lib/shipping";
+import type { DeliveryPromise } from "@/lib/shipping/common";
 import { cn } from "@/lib/utils";
 import { AddressStep } from "./address-step";
 import { api, ApiError, goToPayment } from "./api";

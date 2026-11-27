@@ -59,6 +59,10 @@ export function createSqlAlertStore(db: SqlDb): AlertStore {
       if (productId) q = q.where("product_id", "=", productId);
       return (await q.execute()).map(alertFromRow);
     },
+    async forProducts(ids) {
+      if (!ids.length) return [];
+      return (await db.selectFrom("product_alerts").select(ALERT_COLS).where("product_id", "in", ids).execute()).map(alertFromRow);
+    },
     async fire(id, now = new Date()) {
       const r = await db.updateTable("product_alerts").set({ fired_at: now, open_key: null }).where("id", "=", id).where("fired_at", "is", null).executeTakeFirst();
       return Number(r.numUpdatedRows) === 1;
@@ -229,6 +233,10 @@ export function createMongoAlertStore(conn: Promise<MongoConn>): AlertStore {
     },
     async open(productId) {
       return (await (await col()).find({ firedAt: null, ...(productId ? { productId } : {}) }).toArray()).map(strip);
+    },
+    async forProducts(ids) {
+      if (!ids.length) return [];
+      return (await (await col()).find({ productId: { $in: ids } }).toArray()).map(strip);
     },
     async fire(id, now = new Date()) {
       const r = await (await col()).updateOne({ _id: id, firedAt: null }, { $set: { firedAt: now.toISOString() }, $unset: { openKey: "" } });

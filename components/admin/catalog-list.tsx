@@ -23,6 +23,8 @@ type StyleRow = {
   price: { min: number; max: number };
   stock: number;
   status: Status;
+  /** Live colours on "Show as sold out". */
+  held: number;
   image: { art: string; colour: string; url?: string };
 };
 interface TreeNode {
@@ -180,7 +182,16 @@ export function CatalogScreen() {
             },
             { key: "c", header: "Category", cell: (r: StyleRow) => r.category },
             { key: "p", header: "Price", cell: (r: StyleRow) => (r.price.min === r.price.max ? formatINR(r.price.min) : `${formatINR(r.price.min)} – ${formatINR(r.price.max)}`) },
-            { key: "k", header: "Stock", cell: (r: StyleRow) => <span className={r.stock === 0 ? "font-semibold text-red-600 dark:text-red-400" : ""}>{r.stock}</span> },
+            {
+      key: "k",
+      header: "Stock",
+      cell: (r: StyleRow) => (
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          <span className={r.stock === 0 ? "font-semibold text-red-600 dark:text-red-400" : ""}>{r.stock}</span>
+          {r.held ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">Shown sold out</span> : null}
+        </span>
+      ),
+    },
             { key: "st", header: "Status", cell: (r: StyleRow) => <StatusBadge status={r.status} tone={TONE[r.status]} label={r.status === "active" ? "live" : r.status} /> },
           ]}
           footer={data && data.total > styles.length ? <p className="px-4 py-3 text-xs text-muted-foreground">Showing {styles.length} of {data.total}. Search to narrow down.</p> : null}

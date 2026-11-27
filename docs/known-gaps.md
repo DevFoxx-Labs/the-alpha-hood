@@ -22,6 +22,14 @@
   If added, ask for geolocation just-in-time and never send coordinates without consent.
 - 🟡 Hindi only for the Privacy Notice; Terms/Refund/Cookie and the banner are English.
 
+## "Show as sold out" demand test (2026-12-04)
+- 🟡 Demand counts only come from signed-in "Notify me" alerts (guests sign in with OTP first). Sent alerts are deleted
+  after 90 days (retention), so "already notified" fades after that — note the numbers before switching off.
+- 🟡 Switching off sends every waiting alert at once (outbox). Fine for hundreds; for a very large list add batching.
+- 🟡 Switched on another server, the store can show the old state for up to ~10 s (catalogue snapshot TTL).
+- 🟡 Exchanges into a held piece are refused like a sale (it looks sold out).
+- 🟡 PostgreSQL / MongoDB paths of `AlertStore.forProducts` are covered by the contract tests but weren't run locally.
+
 ## Customer dashboard (2026-11-30)
 - 🟠 **OpenStreetMap is for light use.** Public OSM tiles and Nominatim allow modest traffic (Nominatim: 1 request
   a second per app, enforced on our server). Before launch traffic, add a MapTiler key and switch suggestions to
@@ -33,6 +41,13 @@
 - 🟡 Private review photos replaced in an edit stay attached to that review (owner can still see them) until the
   retention job for unattached / old photos exists (`lib/returns/photos.ts`).
 - 🟡 Review photos are not auto-checked for faces / nudity; moderators check them by eye in Admin → Reviews.
+- 🟠 (2026-12-03) Shiprocket answers delivery checks only (Admin → Shipping). Not built: creating Shiprocket orders /
+  AWB / labels at dispatch, reverse pickups for returns, tracking webhooks — the adapter fails closed for those, staff
+  still advance orders in the admin. Shiprocket's JSON field names are from common integrations (their reference is
+  JavaScript-only); the admin Test must pass with the real account before going live. Delivery dates use the store's
+  2 pm cut-off and skip Sundays only (no courier holidays). The 6 h per-pincode cache is per server instance.
+- 🟡 Town / state names need `data/pincodes.json` (`pnpm geo:import-pincodes`, owner downloads the India Post CSV);
+  until then they come from Shiprocket only (and the demo regions in development).
 - 🟡 Couriers don't receive the map pin yet: no shipping provider adapter exists (labels show the address text).
 - 🟡 Addresses saved before this change have no pin, no alternate number and no default until the customer
   edits them; the first one becomes default only when another is added or set.

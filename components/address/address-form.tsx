@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { type Address, type GeoPoint, INDIAN_STATES } from "@/lib/checkout/address-types";
-import type { DeliveryPromise } from "@/lib/shipping";
+import type { DeliveryPromise } from "@/lib/shipping/common";
 
 /**
  * The one address form (account address book and checkout). Professional e-commerce fields: who receives it (for

@@ -1,4 +1,5 @@
 import { audit, requireStaff } from "@/lib/admin/auth";
+import { resolveAlerts } from "@/lib/alerts/service";
 import { adminError, adminWrite, privateJson } from "@/lib/admin/http";
 import { CatalogAdminError } from "@/lib/catalog/admin";
 import { catalogAdminDeps } from "@/lib/catalog/admin-deps";
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
   try {
     const deps = catalogAdminDeps();
     if (!deps) throw readonly();
-    return privateJson(await homepageView(deps));
+    return privateJson(await homepageView(deps, resolveAlerts()));
   } catch (error) {
     return adminError(error);
   }

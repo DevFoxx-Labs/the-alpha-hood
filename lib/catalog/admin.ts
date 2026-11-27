@@ -325,7 +325,7 @@ const imagesFor = (title: string, art: GarmentKind, hex: string): Product["image
     alt: `${title}, ${view === "model" ? "on model" : view === "detail" ? "fabric close-up" : view}`,
   }));
 
-export function apply(input: ProductInput, base: { id: string; styleId: string; createdAt: string; popularity: number; version: number; sizes: { label: string; stock: number }[]; images?: Product["images"] }, now: Date): ProductRecord {
+export function apply(input: ProductInput, base: { id: string; styleId: string; createdAt: string; popularity: number; version: number; sizes: { label: string; stock: number }[]; images?: Product["images"]; soldOutHold?: boolean }, now: Date): ProductRecord {
   // Seeded DEMO photos (public/demo/products/, never accepted from a request) survive an edit that uploads none,
   // so saving a demo product in the editor or re-importing its CSV doesn't swap its photos for drawings.
   const demoImages = !input.photos.length && base.images?.some((i) => i.url?.startsWith("/demo/products/")) ? base.images : null;
@@ -373,6 +373,8 @@ export function apply(input: ProductInput, base: { id: string; styleId: string; 
     ...(input.weightGrams ? { weightGrams: input.weightGrams } : {}),
     ...(input.dimensionsCm ? { dimensionsCm: input.dimensionsCm } : {}),
     status: input.status,
+    // "Show as sold out" is switched only through lib/catalog/hold.ts; a product save or CSV import keeps it.
+    ...(base.soldOutHold === true ? { soldOutHold: true } : {}),
     version: base.version,
     updatedAt: now.toISOString(),
   };

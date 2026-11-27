@@ -9,7 +9,7 @@ import { RadioCard, RadioDot, RadioGroup } from "@/components/ui/radio-group";
 import { AddressForm } from "@/components/address/address-form";
 import type { Address } from "@/lib/checkout/address-types";
 import { formatINR } from "@/lib/format";
-import type { DeliveryPromise } from "@/lib/shipping";
+import type { DeliveryPromise } from "@/lib/shipping/common";
 
 /** CHK-03 saved addresses + new address (the shared form with the map) + delivery speed. */
 export function AddressStep({

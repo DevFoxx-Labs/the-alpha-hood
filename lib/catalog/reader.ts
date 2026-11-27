@@ -17,6 +17,8 @@ export interface CatalogSnapshot {
   collections: (Collection & { rule: CollectionRule })[];
   /** Reference time for "new" rules. */
   now: number;
+  /** Ids of live products on "Show as sold out" (lib/catalog/hold.ts); absent = none. */
+  held?: ReadonlySet<string>;
 }
 
 export type CatalogReader = Omit<CommerceAdapter, "name" | "cart" | "inventory">;

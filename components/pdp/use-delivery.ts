@@ -2,7 +2,7 @@
 
 import { track } from "@/lib/analytics/client";
 import { useCallback, useEffect, useState } from "react";
-import type { DeliveryPromise } from "@/lib/shipping";
+import type { DeliveryPromise } from "@/lib/shipping/common";
 
 /**
  * PDP-05 delivery state. The pincode is remembered on this device only (`ah_pincode`, listed in the Cookie

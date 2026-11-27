@@ -211,10 +211,10 @@ export function ProductDetail({
           <Icon icon={DeliveryTruck01Icon} size={18} className="shrink-0" />
           {p?.serviceable && p.standardBy ? (
             <span>
-              {freeShipping ? "Free delivery" : "Delivery"} by <b>{formatDeliveryDate(p.standardBy)}</b> to {p.pincode}
+              {freeShipping ? "Free delivery" : "Delivery"} by <b>{formatDeliveryDate(p.standardBy)}</b> to {p.city ? `${p.city} (${p.pincode})` : p.pincode}
             </span>
           ) : p && !p.serviceable ? (
-            <span>We don&apos;t deliver to {p.pincode} yet</span>
+            <span>We don&apos;t deliver to {p.city ? `${p.city} (${p.pincode})` : p.pincode} yet</span>
           ) : (
             <a href="#delivery" className="underline underline-offset-2">
               {freeShipping ? "Free delivery" : "Delivery"} · check your pincode
@@ -256,6 +256,7 @@ export function ProductDetail({
                   const r = await delivery.check(pin);
                   if (!r || !r.serviceable || !r.standardBy) return null;
                   return {
+                    place: r.city ? `${r.city}${r.state ? `, ${r.state}` : ""}` : r.state,
                     date: formatDeliveryDate(r.standardBy),
                     cod: r.cod.available,
                     codFee: r.cod.available ? formatINR(r.cod.fee) : undefined,

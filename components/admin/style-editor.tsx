@@ -11,6 +11,7 @@ import type { GarmentKind } from "@/lib/commerce/types";
 import { formatINR } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { adminApi, notify, useAdmin } from "./admin-shell";
+import { type Demand, type HoldColour, SoldOutHold } from "./sold-out-hold";
 import { AButton, AIcon, AInput, ALabel, ASelect, ATextarea, Card, ErrorState, PageHeader, StatusBadge } from "./ui";
 
 /**
@@ -124,6 +125,7 @@ interface StyleView {
     id: string;
     version: number;
     status: Status;
+    soldOutHold: boolean;
     handle: string;
     sku: string;
     colour: { name: string; hex: string };
@@ -309,6 +311,8 @@ function StyleEditor({ styleId, copyFrom }: { styleId?: string; copyFrom?: strin
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [nonce, setNonce] = useState(0);
+  /** "Show as sold out" per saved colour + its Notify me sign-ups (null = new product / a copy). */
+  const [hold, setHold] = useState<HoldColour[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -320,8 +324,9 @@ function StyleEditor({ styleId, copyFrom }: { styleId?: string; copyFrom?: strin
         setTree(opts.options?.tree ?? []);
         const source = styleId ?? copyFrom;
         if (source && opts.editable) {
-          const { style } = await adminApi<{ style: StyleView }>(`/api/admin/styles/${source}`);
+          const { style, demand } = await adminApi<{ style: StyleView; demand: Record<string, Demand> | null }>(`/api/admin/styles/${source}`);
           if (cancelled) return;
+          setHold(copyFrom ? null : style.variants.map((x) => ({ id: x.id, colour: x.colour.name, status: x.status, soldOutHold: x.soldOutHold, demand: demand?.[x.id] ?? null })));
           setShared({ ...sharedFrom(style), ...(copyFrom ? { baseTitle: `${style.baseTitle} (copy)` } : {}) });
           setVariants(variantsFrom(style, !!copyFrom));
           setActive((a) => Math.min(a, style.variants.length - 1));
@@ -616,6 +621,17 @@ function StyleEditor({ styleId, copyFrom }: { styleId?: string; copyFrom?: strin
               <p className="text-xs text-muted-foreground">All colours are saved together. If someone else saved first, you&apos;ll be asked to reload.</p>
             </div>
           </Card>
+          {hold && styleId ? (
+            <Card title="Demand test">
+              <SoldOutHold
+                styleId={styleId}
+                colours={hold}
+                canEdit={canEdit}
+                blockedReason={dirty ? "Save or discard your changes first — switching reloads this product." : undefined}
+                onChanged={() => setNonce((n) => n + 1)}
+              />
+            </Card>
+          ) : null}
         </div>
       </form>
 

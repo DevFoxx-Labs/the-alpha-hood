@@ -272,6 +272,18 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
   already-verified emails as sign-in emails).
 - [ ] Before launch: pentest the sign-in flows (part of the High-tier pentest in docs/known-gaps.md).
 
+## 2026-12-03 (Shiprocket pincode check)
+- [ ] Shiprocket: sign up free (shiprocket.in → Sign Up Free → I am Seller), verify mobile, complete KYC, add the
+  pickup address. MFA on the account.
+- [ ] Shiprocket → Settings → API → Configure → **Create API User** (an email *different* from your Shiprocket login,
+  a strong password) → Generate API Credential.
+- [ ] Admin → Shipping: enter that email + password, the pickup address's pincode, a parcel weight → Save → Test →
+  Make live (authenticator code). Tell me if the test shows an unexpected answer.
+- [ ] Town / state names: on data.gov.in search "All India Pincode Directory", download the CSV, then on the server
+  `pnpm geo:import-pincodes <file.csv>` and restart.
+- [ ] Lawyer: Privacy Notice 2026-12-03 (courier row: pincode-only checks with Shiprocket); confirm Shiprocket's
+  legal entity name for the notice.
+
 ## 2026-12-02 (exclusive drop: Alpha Mascot Tee, hoodie, drop layout)
 - [ ] Admin → Products → Alpha Mascot Tee: set the real price, stock per colour / size, manufacturer name + address
   (shown on the PDP — Legal Metrology), weight; check the photos and alt texts.
@@ -288,3 +300,9 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] Lawyer: Privacy Notice 2026-12-01 (review photos, public store replies, review / feedback emails).
 - [ ] Tell moderators what a review photo may not show (other people's faces, addresses, phone numbers, nudity).
 - [ ] Check Admin → Settings → Notifications → "Reviews & help" and switch off any email you don't want sent.
+
+## 2026-12-04 ("Show as sold out" demand test)
+- [ ] Try the switch in Admin → Homepage → Product spotlights and Admin → Products (Demand test card) at 1440 / 390 px —
+      it wasn't viewed in a browser here (admin sign-in needs your password + authenticator).
+- [ ] Lawyer review of the Privacy Notice change (product alerts also counted, numbers only) — EN + HI, version 2026-12-04.
+- [ ] Optional: set `TEST_POSTGRES_URL` / `TEST_MONGODB_URL` so the PostgreSQL / MongoDB contract tests run locally.

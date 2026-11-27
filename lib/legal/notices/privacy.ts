@@ -7,8 +7,8 @@ import type { Notice } from "../types";
  */
 export const PRIVACY_NOTICE: Notice = {
   slug: "privacy",
-  version: "2026-12-02",
-  lastUpdated: "2026-12-02",
+  version: "2026-12-04",
+  lastUpdated: "2026-12-04",
   text: {
     en: {
       title: "Privacy Notice",
@@ -54,7 +54,7 @@ export const PRIVACY_NOTICE: Notice = {
                 ["Store credit balance and history", "Give and track store credit from returns", "Your consent when you choose store credit"],
                 ["Alpha Club membership (optional): tier, 12-month spend, Hood Coins history, referral code and who joined with it", "Give you coins, tier perks and referral rewards; stop referral abuse (we compare phone, delivery address and a random browser id between referrer and friend)", "Optional consent when you join — leave any time"],
                 ["#WearTheHood photo, caption and first name (optional)", "Review it and, once approved, show it on our website", "Optional consent per photo — remove any time"],
-                ["Product alerts you set (product, size, price at the time)", "Tell you when a size is back or the price drops", "Your request when you set the alert"],
+                ["Product alerts you set (product, size, price at the time)", "Tell you when a size is back or the price drops; count how many people are waiting for each product and size (numbers only, without names or contact details) to decide how much to make and when to sell it", "Your request when you set the alert"],
                 ["Gift cards, store credit and Hood Coins used to pay (amounts, which order; gift card codes are stored only in a scrambled, one-way form)", "Take payment, refund to the right place, keep accounts and stop misuse", "Your consent when you pay; and keeping records required by tax law"],
                 ["Order updates on WhatsApp (optional)", "Send order, delivery and alert messages on WhatsApp too", "Optional consent — off by default"],
                 ["Size advice", "Suggest a size from the sizes you kept and returned before (no new data is collected)", "Necessary to provide the feature you use, shown only to you"],
@@ -85,7 +85,7 @@ export const PRIVACY_NOTICE: Notice = {
               rows: [
                 ["E-commerce platform and hosting", "Run the store, your account, cart and orders", "To be confirmed before launch"],
                 ["Payment gateway", "Take payments and refunds (UPI, cards, netbanking, wallets). We send only the order number and amount; you enter payment details on the gateway's own page", "Razorpay Software Private Limited, India (when online payment is switched on)"],
-                ["Courier and logistics partners", "Deliver orders, pick up returns, show tracking", "To be confirmed before launch"],
+                ["Courier and logistics partners", "Deliver orders, pick up returns, show tracking. When you check a pincode on a product page or at checkout, only that pincode (with our pickup pincode and a parcel weight) is sent to check delivery — never your name, phone or address", "Shiprocket (legal entity to be confirmed), once switched on; the couriers it assigns"],
                 ["SMS, email and WhatsApp providers", "OTPs and order updates; offers only if you opted in", "To be confirmed before launch"],
                 ["Error monitoring", "Find and fix technical faults: the error text, the page path and the release. No payment data, cookies, IP addresses or phone numbers", "Sentry (used once switched on)"],
                 ["Bot protection", "Confirm that a request for a sign-in code comes from a person, not a script. The provider sees your IP address and browser details", "Cloudflare Turnstile (used once switched on)"],
@@ -301,7 +301,7 @@ export const PRIVACY_NOTICE: Notice = {
                 ["स्टोर क्रेडिट बैलेंस और इतिहास", "रिटर्न से स्टोर क्रेडिट देना और उसका हिसाब रखना", "स्टोर क्रेडिट चुनते समय आपकी सहमति"],
                 ["Alpha Club सदस्यता (वैकल्पिक): टियर, 12 महीने का खर्च, Hood Coins का इतिहास, रेफ़रल कोड और उससे जुड़ने वाले लोग", "आपको कॉइन, टियर के लाभ और रेफ़रल इनाम देना; रेफ़रल के दुरुपयोग को रोकना (रेफ़र करने वाले और दोस्त के फ़ोन, डिलीवरी पते और एक रैंडम ब्राउज़र ID की तुलना)", "जुड़ते समय वैकल्पिक सहमति — कभी भी छोड़ सकते हैं"],
                 ["#WearTheHood फ़ोटो, कैप्शन और पहला नाम (वैकल्पिक)", "समीक्षा करना और स्वीकृत होने पर हमारी वेबसाइट पर दिखाना", "हर फ़ोटो के लिए वैकल्पिक सहमति — कभी भी हटा सकते हैं"],
-                ["आपके द्वारा सेट किए गए प्रोडक्ट अलर्ट (प्रोडक्ट, साइज़, उस समय की कीमत)", "साइज़ वापस आने या कीमत घटने पर आपको बताना", "अलर्ट सेट करते समय आपका अनुरोध"],
+                ["आपके द्वारा सेट किए गए प्रोडक्ट अलर्ट (प्रोडक्ट, साइज़, उस समय की कीमत)", "साइज़ वापस आने या कीमत घटने पर आपको बताना; हर प्रोडक्ट और साइज़ के लिए कितने लोग इंतज़ार कर रहे हैं, यह गिनना (केवल संख्या, बिना नाम या संपर्क विवरण के) ताकि तय कर सकें कि कितना बनाना है और कब बेचना है", "अलर्ट सेट करते समय आपका अनुरोध"],
                 ["भुगतान में उपयोग किए गए गिफ़्ट कार्ड, स्टोर क्रेडिट और Hood Coins (राशि, कौन-सा ऑर्डर; गिफ़्ट कार्ड कोड केवल एकतरफ़ा कूटबद्ध रूप में रखे जाते हैं)", "भुगतान लेना, सही जगह रिफ़ंड करना, हिसाब रखना और दुरुपयोग रोकना", "भुगतान करते समय आपकी सहमति; और कर कानून के तहत आवश्यक रिकॉर्ड"],
                 ["WhatsApp पर ऑर्डर अपडेट (वैकल्पिक)", "ऑर्डर, डिलीवरी और अलर्ट संदेश WhatsApp पर भी भेजना", "वैकल्पिक सहमति — शुरुआत में बंद"],
                 ["साइज़ सलाह", "आपके पहले रखे और लौटाए गए साइज़ से साइज़ सुझाना (कोई नया डेटा नहीं लिया जाता)", "आपके द्वारा उपयोग की गई सुविधा के लिए आवश्यक, केवल आपको दिखता है"],
@@ -332,7 +332,7 @@ export const PRIVACY_NOTICE: Notice = {
               rows: [
                 ["ई-कॉमर्स प्लेटफ़ॉर्म और होस्टिंग", "स्टोर, आपका खाता, कार्ट और ऑर्डर चलाना", "लॉन्च से पहले तय किया जाएगा"],
                 ["पेमेंट गेटवे", "भुगतान और रिफ़ंड (UPI, कार्ड, नेटबैंकिंग, वॉलेट)। हम केवल ऑर्डर नंबर और राशि भेजते हैं; भुगतान विवरण आप गेटवे के अपने पेज पर भरते हैं", "Razorpay Software Private Limited, भारत (ऑनलाइन भुगतान चालू होने पर)"],
-                ["कूरियर और लॉजिस्टिक्स साझेदार", "ऑर्डर पहुँचाना, रिटर्न उठाना, ट्रैकिंग दिखाना", "लॉन्च से पहले तय किया जाएगा"],
+                ["कूरियर और लॉजिस्टिक्स साझेदार", "ऑर्डर पहुँचाना, रिटर्न उठाना, ट्रैकिंग दिखाना। जब आप प्रोडक्ट पेज या चेकआउट पर पिनकोड जाँचते हैं, तो डिलीवरी जाँचने के लिए केवल वह पिनकोड (हमारे पिकअप पिनकोड और पार्सल वज़न के साथ) भेजा जाता है — आपका नाम, फ़ोन या पता कभी नहीं", "Shiprocket (कानूनी नाम की पुष्टि बाकी), चालू होने पर; और जिन कूरियर को वह सौंपता है"],
                 ["SMS, ईमेल और WhatsApp प्रदाता", "OTP और ऑर्डर अपडेट; ऑफ़र केवल तब जब आपने सहमति दी हो", "लॉन्च से पहले तय किया जाएगा"],
                 ["एरर मॉनिटरिंग", "तकनीकी खराबियाँ ढूँढना और ठीक करना: एरर का टेक्स्ट, पेज का पाथ और रिलीज़। भुगतान डेटा, कुकीज़, IP पता या फ़ोन नंबर नहीं", "Sentry (चालू होने पर उपयोग)"],
                 ["बॉट से सुरक्षा", "यह पक्का करना कि साइन-इन कोड का अनुरोध किसी व्यक्ति ने किया है, स्क्रिप्ट ने नहीं। प्रदाता को आपका IP पता और ब्राउज़र की जानकारी दिखती है", "Cloudflare Turnstile (चालू होने पर उपयोग)"],

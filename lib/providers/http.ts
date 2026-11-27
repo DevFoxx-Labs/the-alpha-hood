@@ -22,11 +22,12 @@ export function providerError(error: unknown): Response {
 /** Changing who sends sign-in codes needs a fresh authenticator code, even inside a signed-in session. */
 export const stepUp = (staff: Staff, code: unknown) => confirmTotp(staff, code);
 
-export type ProviderArea = "sms" | "email" | "storage";
+export type ProviderArea = "sms" | "email" | "storage" | "shipping";
 const AREA: Record<ProviderArea, { subject: string; what: string; page: string }> = {
   sms: { subject: "the SMS provider was changed", what: "This provider sends every sign-in code and order SMS.", page: "Admin → SMS providers" },
   email: { subject: "the email provider was changed", what: "This provider sends every store email, including staff password-reset codes.", page: "Admin → Email providers" },
   storage: { subject: "the file storage was changed", what: "New product and return photos are stored there from now on.", page: "Admin → Storage" },
+  shipping: { subject: "the shipping (courier) account was changed", what: "This account answers every delivery check (pincode, delivery date, COD) on the store.", page: "Admin → Shipping" },
 };
 
 /**

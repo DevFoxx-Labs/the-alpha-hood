@@ -35,6 +35,8 @@ export interface VariantView {
   id: string;
   version: number;
   status: ProductStatus;
+  /** "Show as sold out" (lib/catalog/hold.ts) — switched with its own endpoint, not saved with the style. */
+  soldOutHold: boolean;
   handle: string;
   sku: string;
   colour: { name: string; hex: string };
@@ -67,6 +69,7 @@ function variantView(r: ProductRecord, onHand: Map<string, number>, canSeeCost: 
     id: r.id,
     version: r.version,
     status: r.status,
+    soldOutHold: r.soldOutHold === true,
     handle: r.handle,
     sku: r.sku,
     colour: { name: r.colour.name, hex: r.colour.hex },
@@ -122,6 +125,8 @@ export interface StyleRow {
   price: { min: number; max: number };
   stock: number;
   status: ProductStatus;
+  /** Live colours on "Show as sold out". */
+  held: number;
   image: ProductRecord["images"][number];
   updatedAt: string;
 }
@@ -146,6 +151,7 @@ export function styleRows(records: ProductRecord[], onHand: Map<string, number>,
       stock: rs.reduce((n, r) => n + r.sizes.reduce((m, s) => m + Math.max(0, onHand.get(skuKey(r.id, s.label)) ?? s.stock), 0), 0),
       // A style is live when any colour is live.
       status: rs.some((r) => r.status === "active") ? "active" : rs.some((r) => r.status === "draft") ? "draft" : "archived",
+      held: rs.filter((r) => r.status === "active" && r.soldOutHold === true).length,
       image: (rs.find((r) => r.status === "active") ?? rs[0]).images[0],
       updatedAt: rs.map((r) => r.updatedAt).sort().at(-1)!,
     });

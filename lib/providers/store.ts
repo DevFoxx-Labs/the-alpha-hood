@@ -7,7 +7,7 @@ import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from
  * The whole document — credentials included — is sealed (AES-256-GCM) by the database stores before it is written.
  * `doc` is null when a row can't be opened with the configured SECRET_BOX_KEY.
  */
-export type ProviderKind = "sms" | "email" | "storage";
+export type ProviderKind = "sms" | "email" | "storage" | "shipping";
 
 export interface ProviderRow<T> {
   id: string;

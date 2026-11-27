@@ -337,6 +337,12 @@ for (const target of testTargets()) {
       expect(await s.alerts.remove("cus_other", again.id)).toBe(false);
       expect(await s.alerts.remove("cus_al", again.id)).toBe(true);
       await s.alerts.create({ ...a, kind: "price_drop", size: null });
+      // Demand view: open and fired alerts of the asked products only.
+      await s.alerts.create({ ...a, customerId: "cus_al2", productId: "mock_012" });
+      const demand = await s.alerts.forProducts(["mock_011", "mock_999"]);
+      expect(demand.map((x) => [x.productId, x.kind, x.firedAt === null]).sort()).toEqual([["mock_011", "back_in_stock", false], ["mock_011", "price_drop", true]].sort());
+      expect(await s.alerts.forProducts([])).toEqual([]);
+      await s.alerts.erase("cus_al2");
       await s.alerts.erase("cus_al");
       expect(await s.alerts.listByCustomer("cus_al")).toEqual([]);
     });

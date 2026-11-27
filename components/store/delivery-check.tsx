@@ -13,6 +13,8 @@ export interface DeliveryEstimate {
   cod: boolean;
   codFee?: string;
   note?: string;
+  /** Town and state of the pincode, e.g. "Pune, Maharashtra" (from the courier or the India Post directory). */
+  place?: string;
 }
 
 /**
@@ -99,6 +101,12 @@ export function DeliveryCheck({
         ) : null}
         {result ? (
           <ul className="mt-2.5 space-y-1.5 text-[12px] text-ink-2">
+            {result.place ? (
+              <li className="flex items-center gap-1.5">
+                <Icon icon={CheckmarkCircle02Icon} size={15} className="text-green" />
+                Delivering to <b className="font-semibold text-ink">{result.place}</b>
+              </li>
+            ) : null}
             <li className="flex items-center gap-1.5">
               <Icon icon={CheckmarkCircle02Icon} size={15} className="text-green" />
               Delivery by <b className="font-semibold text-green">{result.date}</b>

@@ -1,44 +1,21 @@
-import { STORE_CONFIG } from "@/lib/config/store";
-import type { Paise } from "@/lib/format";
+import { pincodePlace } from "@/lib/geo/pincodes";
 import { rupees } from "@/lib/format";
 import { BackendUnavailableError, type Env, mockDataAllowed } from "@/lib/mock-guard";
+import { securityEvent } from "@/lib/security/log";
+import { addBusinessDays, COD, type DeliveryPromise, PINCODE_RE, type ShippingAdapter } from "./common";
+import { liveShiprocket } from "./runtime";
+import { type Fetcher, shiprocketCheck, ShiprocketError, type ShiprocketConfig } from "./shiprocket";
 
 /**
- * PDP-05 delivery promise via the shipping partner (Shiprocket / Delhivery — PRD §9). The storefront only
- * uses `ShippingAdapter`. Mock: deterministic by pincode region, refused in production.
+ * PDP-05 delivery promise via the shipping partner. The storefront only uses `ShippingAdapter`.
+ * - Shiprocket, when it is live in Admin → Shipping (owner sets the API user + pickup pincode, tests, activates).
+ * - Otherwise the development demo (deterministic by pincode region), refused in production.
+ * Town and state come from the courier, else from the India Post directory (lib/geo/pincodes.ts).
+ * Answers are cached per pincode for 6 hours in this process (couriers change serviceability rarely; it keeps
+ * Shiprocket calls low). The pincode is used only for the lookup — not stored or logged.
  */
-export const PINCODE_RE = /^[1-9][0-9]{5}$/;
-
-export interface DeliveryPromise {
-  pincode: string;
-  serviceable: boolean;
-  city?: string;
-  state?: string;
-  /** ISO date (IST calendar day) of the standard delivery estimate. */
-  standardBy?: string;
-  express?: { by: string; fee: Paise } | null;
-  cod: { available: boolean; fee: Paise; maxOrderValue: Paise };
-}
-
-export interface ShippingAdapter {
-  check(pincode: string, now?: Date): Promise<DeliveryPromise>;
-  /** Forward shipment at dispatch (ORD-01 tracking). */
-  createShipment(orderNumber: string): Promise<{ courier: string; awb: string }>;
-  /** RET-04 reverse pickup. */
-  bookPickup(returnNumber: string, input: { pincode: string; date: string; slot: "morning" | "afternoon" }): Promise<{ courier: string; awb: string }>;
-}
-
-/** Adds business days (Sundays skipped), in IST, from an order placed `now`. Dispatch cut-off 2 pm IST. */
-export function addBusinessDays(now: Date, days: number): string {
-  const ist = new Date(now.getTime() + 330 * 60_000);
-  let d = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()));
-  let remaining = days + (ist.getUTCHours() >= 14 ? 1 : 0);
-  while (remaining > 0) {
-    d = new Date(d.getTime() + 86_400_000);
-    if (d.getUTCDay() !== 0) remaining--;
-  }
-  return d.toISOString().slice(0, 10);
-}
+export { addBusinessDays, COD, PINCODE_RE };
+export type { DeliveryPromise, ShippingAdapter };
 
 const REGIONS: Record<string, { city: string; state: string; days: number; express: boolean }> = {
   "11": { city: "New Delhi", state: "Delhi", days: 2, express: true },
@@ -57,12 +34,11 @@ const REGIONS: Record<string, { city: string; state: string; days: number; expre
 const UNSERVICEABLE_PREFIXES = ["744", "194"];
 const PREPAID_ONLY_PREFIXES = ["79", "18"];
 
-export const COD = { fee: STORE_CONFIG.codFee, maxOrderValue: STORE_CONFIG.codMaxOrderValue };
-
 const awb = () => String(Math.floor(1e11 + Math.random() * 9e11));
 
 export function createMockShipping(): ShippingAdapter {
   return {
+    name: "demo",
     async createShipment() {
       return { courier: "Demo Courier", awb: awb() };
     },
@@ -94,17 +70,78 @@ export function createMockShipping(): ShippingAdapter {
   };
 }
 
+/** Shiprocket for delivery checks. Shipment / pickup booking through Shiprocket isn't built yet (fails closed). */
+export function createShiprocketShipping(cfg: ShiprocketConfig, fetcher: Fetcher = fetch): ShippingAdapter {
+  const notYet = async (): Promise<never> => {
+    throw new BackendUnavailableError("Shiprocket shipments");
+  };
+  return {
+    name: "shiprocket",
+    async check(pincode, now = new Date()) {
+      try {
+        const { couriers: _n, ...promise } = await shiprocketCheck(cfg, pincode, fetcher, now);
+        void _n;
+        return promise;
+      } catch (e) {
+        if (e instanceof ShiprocketError && e.code === "auth") securityEvent("provider_changed", { area: "shipping", action: "auth_failed" });
+        // The shopper sees "couldn't check right now", never Shiprocket's text.
+        throw new BackendUnavailableError("Delivery check");
+      }
+    },
+    createShipment: notYet,
+    bookPickup: notYet,
+  };
+}
+
 export function resolveShipping(env: Env = process.env): ShippingAdapter {
+  // The live account applies to the real process environment only (tests pass their own `env`).
+  const live = env === process.env ? liveShiprocket() : null;
+  if (live) return createShiprocketShipping(live);
   if (mockDataAllowed(env)) return createMockShipping();
   const fail = async (): Promise<never> => {
     throw new BackendUnavailableError("Shipping");
   };
-  return { check: fail, createShipment: fail, bookPickup: fail };
+  return { name: "disabled", check: fail, createShipment: fail, bookPickup: fail };
 }
 
-export const shipping = resolveShipping();
+// ── Per-pincode cache + town / state names ──────────────────────────────────────────────────────
+
+const CACHE_MS = 6 * 3_600_000;
+const CACHE_MAX = 5_000;
+const g = globalThis as unknown as { __alpha_hood_delivery_cache?: Map<string, { at: number; day: string; promise: DeliveryPromise }> };
+const cache = () => (g.__alpha_hood_delivery_cache ??= new Map());
+export const clearDeliveryCache = () => cache().clear();
+
+const istDay = (now: Date) => new Date(now.getTime() + 330 * 60_000).toISOString().slice(0, 10);
+
+/** Fills in the town / state from the India Post directory when the courier didn't name them. */
+export function withPlace(p: DeliveryPromise): DeliveryPromise {
+  if (p.city && p.state) return p;
+  const place = pincodePlace(p.pincode);
+  return place ? { ...p, city: p.city ?? place.city, state: p.state ?? place.state } : p;
+}
+
+/**
+ * The adapter the store uses, resolved at call time (so a provider made live in the admin applies at once):
+ * cached per pincode and per IST day (dates move at midnight) and per adapter.
+ */
+export const shipping: ShippingAdapter = {
+  get name() {
+    return resolveShipping().name;
+  },
+  async check(pincode, now = new Date()) {
+    const adapter = resolveShipping();
+    const key = `${adapter.name}:${pincode}`;
+    const hit = cache().get(key);
+    if (hit && now.getTime() - hit.at < CACHE_MS && hit.day === istDay(now)) return hit.promise;
+    const promise = withPlace(await adapter.check(pincode, now));
+    if (cache().size >= CACHE_MAX) cache().clear();
+    cache().set(key, { at: now.getTime(), day: istDay(now), promise });
+    return promise;
+  },
+  createShipment: (orderNumber) => resolveShipping().createShipment(orderNumber),
+  bookPickup: (ref, input) => resolveShipping().bookPickup(ref, input),
+};
 
 /** Free standard shipping above the threshold (STORE_CONFIG). */
-export function shippingFee(subtotal: Paise): Paise {
-  return subtotal >= STORE_CONFIG.freeShippingThreshold ? 0 : STORE_CONFIG.shippingFee;
-}
+export { shippingFee } from "./fee";

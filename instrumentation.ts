@@ -20,6 +20,9 @@ export async function register() {
   // Where new uploads go (Admin → Storage) and how to reach older files (lib/storage/runtime.ts).
   const { startStorageRuntime } = await import("./lib/storage/runtime");
   await startStorageRuntime();
+  // Courier account made live in Admin → Shipping (lib/shipping/runtime.ts) — delivery checks.
+  const { startShippingRuntime } = await import("./lib/shipping/runtime");
+  await startShippingRuntime();
 }
 
 export async function onRequestError(error: unknown, request: { path: string; method: string }, context: { routePath: string; routeType: string }) {

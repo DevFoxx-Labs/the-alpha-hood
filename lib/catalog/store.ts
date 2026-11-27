@@ -36,12 +36,17 @@ export type ProductRecord = Omit<Product, "colours" | "rating" | "sizes"> & {
   /** Packed size in cm (courier volumetric weight). */
   dimensionsCm?: { length: number; width: number; height: number };
   status: ProductStatus;
+  /**
+   * "Show as sold out" (lib/catalog/hold.ts): the store shows every size as sold out and refuses to sell it, while the
+   * real stock stays untouched — customers can only ask to be told when it's on sale. Absent = normal.
+   */
+  soldOutHold?: boolean;
   version: number;
   updatedAt: string;
 };
 
 /** Record fields that must never leave the admin (see ProductRecord). */
-export const ADMIN_ONLY_FIELDS = ["costPrice", "weightGrams", "dimensionsCm", "status", "version", "updatedAt"] as const;
+export const ADMIN_ONLY_FIELDS = ["costPrice", "weightGrams", "dimensionsCm", "status", "soldOutHold", "version", "updatedAt"] as const;
 
 export interface CatalogDocs {
   tree: CategoryNode[];
@@ -96,15 +101,21 @@ export function recordFromProduct(p: Product, now: Date, status: ProductStatus =
   return { ...rest, status, version: 1, updatedAt: now.toISOString() };
 }
 
-export function toProduct(r: ProductRecord, colours: Product["colours"], rating: Product["rating"], onHand: Map<string, number>): Product {
+/**
+ * The storefront shape of a record. A held record (`soldOutHold`) shows 0 per size — every listing, filter, sort, feed
+ * and product page then treats it as sold out. `raw` keeps the real numbers: the inventory seeds a SKU from them, and
+ * Admin → Inventory shows them (a hold must never turn into a real stock loss).
+ */
+export function toProduct(r: ProductRecord, colours: Product["colours"], rating: Product["rating"], onHand: Map<string, number>, opts: { raw?: boolean } = {}): Product {
   const rest: Partial<ProductRecord> = structuredClone(r);
   for (const k of ADMIN_ONLY_FIELDS) delete rest[k];
+  const held = r.soldOutHold === true && !opts.raw;
   return {
     ...(rest as Omit<Product, "colours" | "rating" | "sizes">),
     rating,
     colour: colours.find((c) => c.handle === r.handle) ?? r.colour,
     colours,
-    sizes: r.sizes.map((s) => ({ label: s.label, stock: Math.max(0, onHand.get(skuKey(r.id, s.label)) ?? s.stock) })),
+    sizes: r.sizes.map((s) => ({ label: s.label, stock: held ? 0 : Math.max(0, onHand.get(skuKey(r.id, s.label)) ?? s.stock) })),
   };
 }
 
@@ -114,6 +125,7 @@ export function buildSnapshot(
   onHand: Map<string, number>,
   ratings: Map<string, { average: number; count: number }>,
   now: number,
+  opts: { raw?: boolean } = {},
 ): CatalogSnapshot {
   const active = records.filter((r) => r.status === "active");
   const byStyle = new Map<string, ProductRecord[]>();
@@ -124,7 +136,8 @@ export function buildSnapshot(
     swatches.set(style, ordered.map((r) => ({ name: r.colour.name, hex: r.colour.hex, handle: r.handle })));
   }
   return {
-    products: active.map((r) => toProduct(r, swatches.get(r.styleId)!, ratings.get(r.styleId), onHand)),
+    products: active.map((r) => toProduct(r, swatches.get(r.styleId)!, ratings.get(r.styleId), onHand, opts)),
+    held: new Set(active.filter((r) => r.soldOutHold === true).map((r) => r.id)),
     tree: docs?.tree ?? [],
     featured: docs?.featured ?? [],
     collections: docs?.collections ?? [],

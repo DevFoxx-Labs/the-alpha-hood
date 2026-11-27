@@ -1,5 +1,92 @@
 # Change log
 
+## 2026-12-04 — "Show as sold out" switch: demand test for products and drop spotlights
+
+**Asked for:** a switch on products, and on the drop's spotlight products, that shows a piece as out of stock while it
+is really in stock, so customers can only sign up to be told — and the owner can see how many want it before selling.
+Must work in both the drop and the full-store layout.
+
+- **Where:** Admin → Products → (a product) → **Demand test** card, and Admin → Homepage → Product spotlights → each
+  spotlight's stock panel. One switch for every colour, plus one per colour. Products list shows **Shown sold out**.
+  The switch saves at once (`POST /api/admin/styles/[styleId]/sold-out`, `catalog.write`, audited
+  `catalog.style.sold_out_on/off`); on the product editor it is locked while there are unsaved edits.
+- **On:** the store shows every size as sold out everywhere (cards, product page, spotlight, filters, search, feeds,
+  structured data) — it's a product-level flag, so drop and full-store layouts both follow it. Customers see the
+  existing **Sold out · Notify me** (per size; guests sign in with OTP first). Real stock is untouched.
+- **Demand:** each colour shows **N waiting** with the split per size, and **already notified** — counts only, no
+  customer details (`demandFor`, new `AlertStore.forProducts` on memory / MySQL / PostgreSQL / MongoDB).
+- **Off (asks first):** the real stock is on sale again and waiting customers get their "back in stock" message at
+  once for sizes that are in stock (alert sweep; the cron sweep catches anything missed).
+- **How:** `ProductRecord.soldOutHold` (admin-only, inside the product document — no migration). The own catalogue
+  builds two views from one read: the store view (held = 0 per size) and the raw view the inventory seeds from and
+  Admin → Inventory lists. `holdInventory` makes the store's inventory answer 0 and refuse reservations for a held
+  product. Product saves / CSV imports keep the switch; the style editor can't send it.
+- **Privacy Notice** (EN + HI) → version `2026-12-04`: product alerts are also counted (numbers only) to plan stock.
+
+**Threat model**
+- Shopper buys a held piece with a crafted request → inventory answers 0, add-to-bag 409, reserve `out_of_stock`
+  (prevent, tested on MySQL end to end). A checkout already holding units when it's switched on is left alone.
+- Hold silently wipes real stock (SKU seeded from a 0) → the inventory reads the raw view (prevent, tested).
+- Switching another style's colour / unknown style / malformed body / unknown field → 422 / 404 (prevent, tested).
+- Stale editor or a race → versions checked in one transaction, 409, nothing written (prevent, tested).
+- Unauthenticated / no rights → 401 / 403, same-origin + rate limit, audited (prevent + detect, tested).
+- Leaking who is waiting → admin gets counts only (prevent, tested). The flag never reaches page props (tested).
+
+**Verification**
+- `pnpm typecheck` ✔ · `pnpm lint` ✔ · `pnpm test` 46 files / 647 tests ✔ (new: `lib/catalog/hold.test.ts`, the
+  `forProducts` contract, and an end-to-end route test on MySQL). First full run had 4 MySQL contract failures
+  ("table doesn't exist" in `alpha_hood_test` while other files ran); the DB suite alone and the full re-run passed.
+- `pnpm build` ✔ with a throwaway `SECRET_BOX_KEY` (`.env.local` has none, and a production build requires it).
+- Not verified: PostgreSQL / MongoDB (no `TEST_POSTGRES_URL` / `TEST_MONGODB_URL` locally); the admin screens were
+  not viewed in a browser (admin sign-in needs the owner's password + authenticator) — smoke: store / admin pages 200,
+  the new endpoint 401 without a session.
+
+## 2026-12-03 — Real pincode check: Shiprocket (Admin → Shipping) + town / state names
+
+**Asked for:** make "Check your pincode" fully functional through Shiprocket (option B), show the town and state;
+everything built so the owner only adds the Shiprocket details.
+
+### Admin → Shipping (new, owner only — `settings.manage`)
+- Shiprocket **API user email + password**, **pickup pincode**, **parcel weight**. Save → **Test** (signs in and checks a
+  real pincode; shows couriers, town, dates, COD) → **Make live** (authenticator code). Changing the live account is
+  tested before it is saved (needs a code too); switching off needs a code. Owners are emailed on every live change,
+  and every save / test / switch is audited (`shipping_provider.*`). A how-to card explains the Shiprocket setup.
+- Password sealed in the database (`providers`, kind `shipping`) and write-only; email shown masked.
+- Files: `lib/shipping/{shiprocket,service,runtime,common,fee}.ts`, `app/api/admin/shipping/{route,test,active}`,
+  `components/admin/shipping.tsx`, nav item, boot in `instrumentation.ts`.
+
+### Delivery checks
+- `lib/shipping/shiprocket.ts`: `POST /v1/external/auth/login` → token (cached in memory, renewed before the 240 h
+  expiry, re-signed once on a 401), `GET /v1/external/courier/serviceability/` with pickup / delivery pincode,
+  weight, `cod=0`. Mapping: serviceable if any courier; date from the recommended courier (else the fastest) in
+  business days with the 2 pm cut-off; express when a courier is ≥ 1 day faster and ≤ 2 days; COD if any courier
+  collects cash; town / state from the courier. Defensive parsing (odd values ignored, text cleaned).
+- `shipping` is resolved at call time (going live applies at once) and cached per pincode for 6 h and per IST day.
+  Without Shiprocket: the demo rules in development, "couldn't check delivery" in production (fail closed). Checkout
+  uses the same adapter, so its delivery date and COD follow too. Shipment / pickup booking through Shiprocket is
+  **not** built yet (fails closed with a clear error).
+- **Town / state:** from Shiprocket, else from the India Post directory — `pnpm geo:import-pincodes <csv>` builds
+  `data/pincodes.json` from the official "All India Pincode Directory" CSV (data.gov.in blocks automated downloads,
+  so the owner downloads it in a browser). PDP shows "Delivering to Pune, Maharashtra" and "Delivery by … to Pune
+  (411045)".
+
+### Security
+- Fixed host `https://apiv2.shiprocket.in` (no URL field → no SSRF), redirects refused, 8 s timeout, 1 MB cap,
+  password never logged / returned / in URLs, token in memory only, Shiprocket's text never shown to shoppers.
+  Public `/api/delivery` keeps its 30/min/IP limit; the cache keeps Shiprocket calls low.
+- Privacy Notice **2026-12-03** (EN + HI): the courier row now says only the pincode (+ our pickup pincode and a
+  weight) goes to Shiprocket for a check — never name, phone or address. Shiprocket's legal entity name: to confirm.
+
+### Verified
+- `pnpm typecheck` ✔, `pnpm lint` ✔, `pnpm test` 46 files / 647 tests ✔ (new `lib/shipping/shipping.test.ts`: fixed
+  host, no redirects, token reuse + re-sign on 401, mapping, no courier, odd fields, wrong credentials, outage, bad
+  pincode before any call, write-only password, can't go live untested, failing live change keeps the old settings;
+  directory CSV parsing; admin routes owner-only + cross-origin refused).
+- Dev server: `/api/delivery` 411045 → Pune, Maharashtra; 744101 → not serviceable; 12345 → 422; `/admin/shipping`
+  200; its API 401 without a session.
+- **Not verified:** a real Shiprocket account (none yet). Shiprocket's JSON field names come from common integrations,
+  not their (JavaScript-only) reference — the admin Test will show any mismatch before going live.
+
 ## 2026-12-02 — Drop products: live stock in Admin → Homepage, up to 6 pieces
 
 **Asked for:** manage the drop's products, their stock and quantity from the admin, and add more products later.

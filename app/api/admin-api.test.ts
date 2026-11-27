@@ -11,6 +11,9 @@ import { rateLimiter } from "@/lib/http/rate-limit";
 import { GET as auditGET } from "./admin/audit/route";
 import { GET as categoriesGET, PUT as categoriesPUT } from "./admin/categories/route";
 import { GET as homepageGET, PUT as homepagePUT } from "./admin/homepage/route";
+import { GET as shippingGET, PUT as shippingPUT } from "./admin/shipping/route";
+import { POST as shippingTestPOST } from "./admin/shipping/test/route";
+import { POST as shippingActivePOST } from "./admin/shipping/active/route";
 import { POST as collectionPreviewPOST } from "./admin/collections/preview/route";
 import { GET as collectionsGET, PUT as collectionsPUT } from "./admin/collections/route";
 import { GET as styleGET, PUT as stylePUT } from "./admin/styles/[styleId]/route";
@@ -478,6 +481,24 @@ describe("categories & collections: authorization (lib/catalog/taxonomy.ts)", ()
     expect((await categoriesGET(req("/api/admin/categories", "GET", undefined, { cookie: owner }))).status).toBe(409);
     expect((await categoriesPUT(req("/api/admin/categories", "PUT", { revision: 0, tree: [] }, { cookie: owner }))).status).toBe(409);
     expect((await collectionPreviewPOST(req("/api/admin/collections/preview", "POST", { builder: {} }, { cookie: owner }))).status).toBe(409);
+  });
+
+  it("shipping (Shiprocket): owner only (settings.manage); cross-origin refused; going live needs an authenticator code", async () => {
+    expect((await shippingGET(req("/api/admin/shipping", "GET"))).status).toBe(401);
+    expect((await shippingPUT(req("/api/admin/shipping", "PUT", { email: "a@b.co" }))).status).toBe(401);
+    for (const role of ["store_manager", "marketing", "support"] as const) {
+      const c = await invite(`${role}-ship-${ip}@example.test`, role);
+      expect((await shippingGET(req("/api/admin/shipping", "GET", undefined, { cookie: c }))).status, role).toBe(403);
+      expect((await shippingPUT(req("/api/admin/shipping", "PUT", { email: "a@b.co" }, { cookie: c }))).status, role).toBe(403);
+      expect((await shippingTestPOST(req("/api/admin/shipping/test", "POST", {}, { cookie: c }))).status, role).toBe(403);
+      expect((await shippingActivePOST(req("/api/admin/shipping/active", "POST", { choice: "shiprocket" }, { cookie: c }))).status, role).toBe(403);
+    }
+    expect((await shippingPUT(req("/api/admin/shipping", "PUT", {}, { cookie: owner, headers: { origin: "https://evil.example" } }))).status).toBe(403);
+    const got = await shippingGET(req("/api/admin/shipping", "GET", undefined, { cookie: owner }));
+    expect(got.status).toBe(200);
+    expect(JSON.stringify(await got.json())).not.toMatch(/password"\s*:/);
+    // No authenticator code → refused before anything changes.
+    expect((await shippingActivePOST(req("/api/admin/shipping/active", "POST", { choice: "shiprocket" }, { cookie: owner }))).status).toBeGreaterThanOrEqual(400);
   });
 
   it("homepage editor: no session → 401; no catalog.read → 403; marketing can't save; cross-origin refused; mock catalogue read-only", async () => {

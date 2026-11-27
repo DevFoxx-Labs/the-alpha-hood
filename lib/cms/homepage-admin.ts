@@ -1,4 +1,6 @@
+import type { AlertStore } from "@/lib/alerts/service";
 import type { CatalogAdminDeps } from "@/lib/catalog/admin";
+import { type Demand, demandFor } from "@/lib/catalog/hold";
 import { revisionOf, write } from "@/lib/catalog/taxonomy";
 import { skuKey } from "@/lib/catalog/store";
 import { ValidationError } from "@/lib/http/guard";
@@ -10,13 +12,13 @@ import { MOCK_DROP_HOMEPAGE, MOCK_HOMEPAGE } from "./mock-home";
  * Admin → Homepage, server side (one service for the API). Reads and saves `homepage` in the catalogue documents
  * with the same optimistic revision as categories / collections (a stale save → 409, nothing lost).
  */
-export async function homepageView(deps: CatalogAdminDeps) {
+export async function homepageView(deps: CatalogAdminDeps, alerts?: AlertStore) {
   const [docs, records, onHand] = await Promise.all([deps.store.getDocs(), deps.store.listRecords(), deps.store.onHand()]);
   const content = docs?.homepage ?? {};
   const picked = new Set(productIdsOf(content));
   // Every colour of each picked style with its live stock per size — the drop's stock at a glance in the editor.
   const byId = new Map(records.map((r) => [r.id, r]));
-  const styles: Record<string, { styleId: string; colours: { id: string; colour: string; sku: string; status: string; sizes: { label: string; stock: number }[] }[] }> = {};
+  const styles: Record<string, { styleId: string; colours: { id: string; colour: string; sku: string; status: string; soldOutHold: boolean; demand: Demand | null; sizes: { label: string; stock: number }[] }[] }> = {};
   for (const id of picked) {
     const r = byId.get(id);
     if (!r) continue;
@@ -28,12 +30,18 @@ export async function homepageView(deps: CatalogAdminDeps) {
         colour: v.colour.name,
         sku: v.sku,
         status: v.status,
+        soldOutHold: v.soldOutHold === true,
+        demand: null,
         sizes: v.sizes.map((s) => ({ label: s.label, stock: Math.max(0, onHand.get(skuKey(v.id, s.label)) ?? s.stock) })),
       })),
     };
   }
+  // "Notify me" sign-ups per colour (counts only) — the demand while a piece is on "Show as sold out".
+  const colourIds = Object.values(styles).flatMap((s) => s.colours.map((c) => c.id));
+  const demand = alerts && colourIds.length ? await demandFor(alerts, colourIds).catch(() => null) : null;
+  if (demand) for (const s of Object.values(styles)) for (const c of s.colours) c.demand = demand[c.id] ?? null;
   return {
-    /** Live stock of every colour of each picked product's style (admin-only view). */
+    /** Live stock of every colour of each picked product's style, its "Show as sold out" switch and sign-ups (admin-only). */
     stock: styles,
     /** Titles of the picked products, for the editor's lists. */
     productTitles: Object.fromEntries(records.filter((r) => picked.has(r.id)).map((r) => [r.id, r.title])),

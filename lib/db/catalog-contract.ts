@@ -228,6 +228,8 @@ import { POST as bulkPOST } from "@/app/api/admin/catalog/bulk/route";
 import { GET as exportGET } from "@/app/api/admin/catalog/export/route";
 import { POST as importPOST } from "@/app/api/admin/catalog/import/route";
 import { GET as styleGET, PUT as stylePUT } from "@/app/api/admin/styles/[styleId]/route";
+import { POST as holdPOST } from "@/app/api/admin/styles/[styleId]/sold-out/route";
+import { POST as alertPOST } from "@/app/api/account/alerts/route";
 
 for (const target of testTargets().filter((t) => t.cfg)) {
   describe(`own-backend store end to end · ${target.name}`, () => {
@@ -355,6 +357,50 @@ for (const target of testTargets().filter((t) => t.cfg)) {
       expect(await bulk.json()).toMatchObject({ products: 1, colours: 2 });
       const actions = (await resolveAudit().list({ limit: 50 })).map((a) => a.action);
       expect(actions).toEqual(expect.arrayContaining(["catalog.export_csv", "catalog.import_csv", "catalog.style.save", "catalog.bulk.archive"]));
+    }, 120_000);
+
+    it("Show as sold out: nobody can buy it, Notify me works and is counted, switching off puts real stock back and notifies", async () => {
+      const admin = await ownerCookie();
+      const { products } = await commerce.listProducts({ limit: 60 });
+      const piece = products.find((x) => x.sizes.some((z) => z.stock > 1))!;
+      const size = piece.sizes.find((z) => z.stock > 1)!.label;
+      const other = products.find((x) => x.styleId !== piece.styleId)!;
+      const realBefore = (await commerce.inventory.snapshot()).find((r) => r.productId === piece.id && r.size === size)!.available;
+      const hold = (body: unknown, cookie?: string, styleId = piece.styleId) => holdPOST(req(`/api/admin/styles/${styleId}/sold-out`, "POST", body, cookie), p({ styleId }));
+
+      // Abuse: no staff session; a colour of another style; a malformed body.
+      expect((await hold({ on: true })).status).toBe(401);
+      expect((await hold({ on: true, ids: [other.id] }, admin)).status).toBe(422);
+      expect((await hold({ on: "yes" }, admin)).status).toBe(422);
+
+      const on = await hold({ on: true, ids: [piece.id] }, admin);
+      expect(on.status).toBe(200);
+      expect((await on.json()).changed).toEqual([piece.id]);
+      // The store shows every size sold out and the server refuses to sell it; the real stock is untouched.
+      const shown = (await (await byIdsGET(req(`/api/products/by-ids?ids=${piece.id}`, "GET"))).json()).products[0];
+      expect(shown.sizes.every((z: { stock: number }) => z.stock === 0)).toBe(true);
+      expect(JSON.stringify(shown)).not.toContain("soldOutHold");
+      expect(await commerce.inventory.available(piece.id, size)).toBe(0);
+      expect((await linePOST(req("/api/cart/lines", "POST", { productId: piece.id, size, quantity: 1 }))).status).toBe(409);
+      await expect(commerce.inventory.reserve(`hold-test-${target.name}`, [{ productId: piece.id, size, quantity: 1 }], 60_000)).rejects.toMatchObject({ code: "out_of_stock" });
+      expect((await commerce.inventory.snapshot()).find((r) => r.productId === piece.id && r.size === size)!.available).toBe(realBefore);
+
+      // A customer asks to be told; Admin sees the count per size (no customer details).
+      const sent = await (await otpSend(req("/api/otp/send", "POST", { phone: "9811122277" }))).json();
+      const session = cookieOf(await otpVerify(req("/api/otp/verify", "POST", { challengeId: sent.challengeId, code: sent.demoCode })), "ah_session")!;
+      expect((await alertPOST(req("/api/account/alerts", "POST", { productId: piece.id, kind: "back_in_stock", size }, session))).status).toBe(201);
+      const view = await (await styleGET(req(`/api/admin/styles/${piece.styleId}`, "GET", undefined, admin), p({ styleId: piece.styleId }))).json();
+      expect(view.style.variants.find((v: { id: string }) => v.id === piece.id).soldOutHold).toBe(true);
+      expect(view.demand[piece.id]).toEqual({ waiting: 1, bySize: { [size]: 1 }, notified: 0 });
+
+      // Switching off: real stock is on sale again and the waiting customer is notified once.
+      const off = await (await hold({ on: false }, admin)).json();
+      expect(off).toMatchObject({ on: false, changed: [piece.id], notified: 1 });
+      expect(await commerce.inventory.available(piece.id, size)).toBe(realBefore);
+      const after = await (await styleGET(req(`/api/admin/styles/${piece.styleId}`, "GET", undefined, admin), p({ styleId: piece.styleId }))).json();
+      expect(after.demand[piece.id]).toMatchObject({ waiting: 0, notified: 1 });
+      const actions = (await resolveAudit().list({ limit: 50 })).map((a) => a.action);
+      expect(actions).toEqual(expect.arrayContaining(["catalog.style.sold_out_on", "catalog.style.sold_out_off"]));
     }, 120_000);
   });
 }

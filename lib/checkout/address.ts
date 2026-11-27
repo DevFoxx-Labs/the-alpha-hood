@@ -1,5 +1,5 @@
 import { ValidationError } from "@/lib/http/guard";
-import { PINCODE_RE } from "@/lib/shipping";
+import { PINCODE_RE } from "@/lib/shipping/common";
 import { asObject, cleanText, normaliseIndianMobile, rejectUnknownFields } from "@/lib/validation";
 
 /** CHK-03 delivery address: strict server validation; state from an allow-list. */
