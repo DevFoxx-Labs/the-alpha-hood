@@ -290,4 +290,28 @@ export const MONGO_MIGRATIONS: MongoMigration[] = [
       if (await db.listCollections({ name: "customer_submissions" }, { nameOnly: true }).hasNext()) await db.collection("customer_submissions").drop();
     },
   },
+  {
+    name: "2026_12_01_016_customer_login",
+    async up(db) {
+      // Email sign-in: UNIQUE verified sign-in email (partial: only documents that have one), and passwords in their
+      // own collection. Phoneless accounts hold `phone: "none:<id>"`, so the existing phone index stays as it is.
+      await db.collection("customers").createIndex({ login_email: 1 }, { name: "customers_login_email_uq", unique: true, partialFilterExpression: { login_email: { $type: "string" } } });
+      await ensureCollection(db, "customer_credentials");
+      // Backfill: an already-verified email becomes the sign-in email; a duplicate address is skipped (first verified wins).
+      const customers = db.collection<{ _id: string; email?: string | null; emailVerifiedAt?: Date | null; erased_at?: Date | null; login_email?: string | null }>("customers");
+      const cursor = customers.find({ emailVerifiedAt: { $type: "date" }, email: { $type: "string" }, erased_at: null, login_email: { $exists: false } }).sort({ emailVerifiedAt: 1 });
+      for await (const d of cursor) {
+        try {
+          await customers.updateOne({ _id: d._id, login_email: { $exists: false } }, { $set: { login_email: d.email!.trim().toLowerCase() } });
+        } catch (e) {
+          if ((e as { code?: number }).code !== 11000) throw e;
+        }
+      }
+    },
+    async down(db) {
+      if (await db.listCollections({ name: "customer_credentials" }, { nameOnly: true }).hasNext()) await db.collection("customer_credentials").drop();
+      await db.collection("customers").dropIndex("customers_login_email_uq").catch(() => undefined);
+      await db.collection("customers").updateMany({}, { $unset: { login_email: "" } });
+    },
+  },
 ];

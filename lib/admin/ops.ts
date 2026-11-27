@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { returnDeps } from "@/lib/account/service";
 import { defaultDeps } from "@/lib/checkout/service";
 import type { Customer } from "@/lib/customers/store";
-import { resolveCustomers } from "@/lib/customers/store";
+import { isErased, resolveCustomers } from "@/lib/customers/store";
 import type { Paise } from "@/lib/format";
 import { capturedAmount, refundedAmount } from "@/lib/orders/lifecycle";
 import { orderPayable } from "@/lib/orders/store";
@@ -20,7 +20,8 @@ export class OpsError extends Error {
   }
 }
 
-export function maskPhone(phone: string): string {
+export function maskPhone(phone: string | null): string {
+  if (!phone) return "(no mobile)";
   return phone.startsWith("erased:") ? "(deleted)" : `${phone.slice(0, 3)} ••••• ${phone.slice(-4)}`;
 }
 
@@ -181,7 +182,7 @@ export function customerRow(c: Customer) {
 
 export async function customerAdminView(id: string) {
   const c = await resolveCustomers().get(id);
-  if (!c || c.phone.startsWith("erased:")) return null;
+  if (!c || isErased(c)) return null;
   const orders = await defaultDeps().orders.listByCustomer(id);
   const returns = await resolveReturns().listByCustomer(id);
   const credit = resolveCredit();
@@ -200,7 +201,7 @@ export async function adjustCredit(role: Role, customerId: string, amount: Paise
   const limit = MONEY_LIMITS[role]?.credit ?? 0;
   if (Math.abs(amount) > limit) throw new OpsError(403, "over_limit", "This adjustment is above your limit — an owner must make it.");
   const c = await resolveCustomers().get(customerId);
-  if (!c || c.phone.startsWith("erased:")) throw new OpsError(404, "not_found", "Customer not found.");
+  if (!c || isErased(c)) throw new OpsError(404, "not_found", "Customer not found.");
   try {
     return await resolveCredit().add({ customerId, amount, reason: "adjustment", reference: `adj:${randomBytes(8).toString("hex")}` });
   } catch (e) {

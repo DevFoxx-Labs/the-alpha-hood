@@ -12,7 +12,7 @@ import { api, ApiError } from "./api";
  * CHK-02 contact: phone + OTP (creates the customer account) and optional email. One-tap sign-up shows the
  * Terms/Privacy notice next to the button (DPDP); the server records it in the consent ledger.
  */
-export function ContactStep({ customer, onVerified }: { customer: { phone: string; email: string | null } | null; onVerified: () => void }) {
+export function ContactStep({ customer, onVerified }: { customer: { phone: string | null; email: string | null } | null; onVerified: () => void }) {
   const id = useId();
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -29,7 +29,8 @@ export function ContactStep({ customer, onVerified }: { customer: { phone: strin
     return () => window.clearTimeout(t);
   }, [cooldown]);
 
-  if (customer) {
+  // Signed in without a mobile number (email / Google account): the code below adds it to this account.
+  if (customer?.phone) {
     return (
       <CheckoutStep number={1} title="Contact" done>
         <DoneLine>
@@ -81,7 +82,8 @@ export function ContactStep({ customer, onVerified }: { customer: { phone: strin
         }}
         className="flex flex-col gap-4"
       >
-        <div className="grid gap-4 sm:grid-cols-2">
+        {customer ? <p className="text-[13px] text-ink-2">Add your mobile number to your account — we use it for delivery updates and the courier.</p> : null}
+        <div className={customer ? "grid gap-4" : "grid gap-4 sm:grid-cols-2"}>
           <div className="flex flex-col gap-1.5">
             <label htmlFor={`${id}-phone`} className="text-[12px] font-bold uppercase tracking-[0.06em]">
               Mobile number
@@ -101,12 +103,14 @@ export function ContactStep({ customer, onVerified }: { customer: { phone: strin
               />
             </div>
           </div>
+          {customer ? null : (
           <div className="flex flex-col gap-1.5">
             <label htmlFor={`${id}-email`} className="text-[12px] font-bold uppercase tracking-[0.06em]">
               Email <span className="font-normal normal-case tracking-normal text-ink-2">(optional, for the invoice)</span>
             </label>
             <Input id={`${id}-email`} type="email" autoComplete="email" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
+          )}
         </div>
 
         {challenge ? (

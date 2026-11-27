@@ -765,5 +765,63 @@ export function sqlMigrations(d: Driver): Record<string, Migration> {
         await db.schema.dropTable("customer_submissions").ifExists().execute();
       },
     },
+
+    "2026_12_01_016_customer_login": {
+      async up(db: AnyDb) {
+        // Email sign-in. Additive only: a nullable UNIQUE column (NULLs never collide in MySQL or PostgreSQL) and a
+        // new table. Accounts started by email or Google keep the `phone` column NOT NULL + UNIQUE by holding
+        // `none:<customer id>` until a mobile number is verified (the same convention as `erased:<id>`).
+        if (!(await hasColumn(db, d, "customers", "login_email"))) {
+          await db.schema.alterTable("customers").addColumn("login_email", "varchar(254)").execute();
+        }
+        await createIndex(db, d, "customers_login_email_uq", "customers", ["login_email"], true);
+
+        // Password hashes live apart from `customers`, so no customer read (admin search, export) can carry one.
+        await db.schema
+          .createTable("customer_credentials")
+          .ifNotExists()
+          .addColumn("customer_id", "varchar(64)", (col) => col.primaryKey())
+          .addColumn("password_hash", "varchar(255)", (col) => col.notNull())
+          .addColumn("updated_at", c.ts, (col) => col.notNull())
+          .modifyEnd(mysqlTable(d))
+          .execute();
+
+        // Backfill (batched, resumable): an email the customer already verified becomes their sign-in email. If two
+        // customers verified the same address, the first to verify keeps it; the other row is skipped (no error).
+        const q = db as unknown as Kysely<{ customers: { id: string; email: string | null; email_verified_at: Date | null; erased_at: Date | null; login_email: string | null } }>;
+        let skipped = new Set<string>();
+        for (;;) {
+          const rows = await q
+            .selectFrom("customers")
+            .select(["id", "email"])
+            .where("email_verified_at", "is not", null)
+            .where("erased_at", "is", null)
+            .where("email", "is not", null)
+            .where("login_email", "is", null)
+            .$call((b) => (skipped.size ? b.where("id", "not in", [...skipped]) : b))
+            .orderBy("email_verified_at")
+            .limit(500)
+            .execute();
+          if (rows.length === 0) break;
+          for (const r of rows) {
+            try {
+              await q.updateTable("customers").set({ login_email: r.email!.trim().toLowerCase() }).where("id", "=", r.id).where("login_email", "is", null).execute();
+            } catch (e) {
+              const code = (e as { code?: string }).code;
+              if (code !== "ER_DUP_ENTRY" && code !== "23505") throw e;
+              skipped = new Set([...skipped, r.id]);
+            }
+          }
+        }
+      },
+      async down(db: AnyDb) {
+        await db.schema.dropTable("customer_credentials").ifExists().execute();
+        if (await hasColumn(db, d, "customers", "login_email")) {
+          if (d === "mysql") await sql`DROP INDEX customers_login_email_uq ON customers`.execute(db).catch(() => undefined);
+          else await sql`DROP INDEX IF EXISTS customers_login_email_uq`.execute(db);
+          await db.schema.alterTable("customers").dropColumn("login_email").execute();
+        }
+      },
+    },
   };
 }

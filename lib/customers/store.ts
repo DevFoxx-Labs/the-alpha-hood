@@ -4,16 +4,24 @@ import { dbStores } from "@/lib/db";
 import { BackendUnavailableError, devSingleton, type Env, mockDataAllowed } from "@/lib/mock-guard";
 
 /**
- * Customers created at checkout by phone OTP (CHK-02 — "saves a customer account"). Platform customers
- * replace this store (Shopify customer / Medusa customer). Refused in production without a database.
+ * Customers (ACC-01). An account starts from a verified mobile number (phone OTP, CHK-02), a verified email (email
+ * code / password sign-up) or a Google account (Google-verified email). Refused in production without a database.
+ *
+ * Identifiers that sign someone in are always verified ones and each belongs to one customer only (UNIQUE):
+ * - `phone`: verified by an SMS code. null = this account has no mobile yet (started by email or Google). Erased
+ *   accounts read as `erased:<id>`.
+ * - `loginEmail`: verified by an email code or by Google. `email` is the contact address — it may be a newer,
+ *   still-unverified address; it replaces `loginEmail` only once verified.
  */
 export interface Customer {
   id: string;
-  phone: string;
+  phone: string | null;
   name: string | null;
   email: string | null;
   /** True once the customer proved they own `email` (a code sent to it, or a Google-verified address). */
   emailVerified: boolean;
+  /** Verified email that signs this customer in (email code / password). null = none. */
+  loginEmail: string | null;
   createdAt: string;
   addresses: Address[];
   orderCount: number;
@@ -25,11 +33,38 @@ export interface Customer {
 
 export const MAX_ADDRESSES = 10;
 
+/** The verified email is already the sign-in email of another customer (UNIQUE). */
+export class EmailInUseError extends Error {
+  constructor() {
+    super("This email address is already used by another account.");
+    this.name = "EmailInUseError";
+  }
+}
+
+/** Placeholder held in the phone column (NOT NULL UNIQUE) by accounts without a mobile number yet. */
+export const NO_PHONE_PREFIX = "none:";
+export const isErased = (c: Pick<Customer, "phone">) => !!c.phone?.startsWith("erased:");
+
 export interface CustomerStore {
   findOrCreateByPhone(phone: string, now?: Date): Promise<{ customer: Customer; created: boolean }>;
+  /** Email-first sign-up: one customer per verified sign-in email even under a race (UNIQUE). `email` must be verified. */
+  findOrCreateByEmail(email: string, now?: Date): Promise<{ customer: Customer; created: boolean }>;
   get(id: string): Promise<Customer | null>;
   findByPhone(phone: string): Promise<Customer | null>;
-  /** Sets the email; `verified` only when ownership was just proved. Any change resets it to unverified. */
+  /** The customer whose VERIFIED sign-in email this is (never matches an unverified contact address). */
+  findByLoginEmail(email: string): Promise<Customer | null>;
+  /**
+   * Gives an account without a mobile number the phone just verified by SMS. False when the account already has a
+   * number or the number belongs to another customer (UNIQUE) — nothing changes then.
+   */
+  attachPhone(id: string, phone: string): Promise<boolean>;
+  /**
+   * Sets the contact email.
+   * - `verified` (ownership just proved): it also becomes the sign-in email — throws EmailInUseError if it is
+   *   another customer's sign-in email.
+   * - not verified: stored as unverified; the old verified sign-in email keeps working until the new one is verified.
+   * - null: removes the contact AND the sign-in email (callers make sure another sign-in method is left).
+   */
   setEmail(id: string, email: string | null, verified?: boolean): Promise<void>;
   setName(id: string, name: string | null): Promise<void>;
   addAddress(id: string, address: AddressInput): Promise<Address>;
@@ -49,28 +84,42 @@ export interface CustomerStore {
   recordRto(id: string): Promise<void>;
 }
 
+export function newCustomerRecord(phone: string | null, now: Date, email: string | null = null): Customer {
+  return {
+    id: `cus_${randomToken(12)}`,
+    phone,
+    name: null,
+    email,
+    emailVerified: !!email,
+    loginEmail: email,
+    createdAt: now.toISOString(),
+    addresses: [],
+    orderCount: 0,
+    couponUses: {},
+    codBlocked: false,
+    rtoCount: 0,
+  };
+}
+
 export function createMemoryCustomerStore(): CustomerStore {
   const byId = new Map<string, Customer>();
   const byPhone = new Map<string, string>();
+  const byLogin = new Map<string, string>();
   return {
     async findOrCreateByPhone(phone, now = new Date()) {
       const existing = byPhone.get(phone);
       if (existing) return { customer: byId.get(existing)!, created: false };
-      const customer: Customer = {
-        id: `cus_${randomToken(12)}`,
-        phone,
-        name: null,
-        email: null,
-        emailVerified: false,
-        createdAt: now.toISOString(),
-        addresses: [],
-        orderCount: 0,
-        couponUses: {},
-        codBlocked: false,
-        rtoCount: 0,
-      };
+      const customer = newCustomerRecord(phone, now);
       byId.set(customer.id, customer);
       byPhone.set(phone, customer.id);
+      return { customer, created: true };
+    },
+    async findOrCreateByEmail(email, now = new Date()) {
+      const existing = byLogin.get(email);
+      if (existing) return { customer: byId.get(existing)!, created: false };
+      const customer = newCustomerRecord(null, now, email);
+      byId.set(customer.id, customer);
+      byLogin.set(email, customer.id);
       return { customer, created: true };
     },
     async get(id) {
@@ -80,12 +129,32 @@ export function createMemoryCustomerStore(): CustomerStore {
       const id = byPhone.get(phone);
       return id ? (byId.get(id) ?? null) : null;
     },
+    async findByLoginEmail(email) {
+      const id = byLogin.get(email);
+      return id ? (byId.get(id) ?? null) : null;
+    },
+    async attachPhone(id, phone) {
+      const c = byId.get(id);
+      if (!c || c.phone !== null || byPhone.has(phone)) return false;
+      c.phone = phone;
+      byPhone.set(phone, id);
+      return true;
+    },
     async setEmail(id, email, verified = false) {
       const c = byId.get(id);
-      if (c) {
-        c.email = email;
-        c.emailVerified = !!email && verified;
+      if (!c) return;
+      if (email && verified) {
+        const owner = byLogin.get(email);
+        if (owner && owner !== id) throw new EmailInUseError();
+        if (c.loginEmail) byLogin.delete(c.loginEmail);
+        byLogin.set(email, id);
+        c.loginEmail = email;
+      } else if (!email && c.loginEmail) {
+        byLogin.delete(c.loginEmail);
+        c.loginEmail = null;
       }
+      c.email = email;
+      c.emailVerified = !!email && (verified || email === c.loginEmail);
     },
     async setName(id, name) {
       const c = byId.get(id);
@@ -119,11 +188,14 @@ export function createMemoryCustomerStore(): CustomerStore {
     async erase(id, now = new Date()) {
       const c = byId.get(id);
       if (!c) return;
-      byPhone.delete(c.phone);
-      c.phone = `erased:${now.toISOString()}`;
+      if (c.phone) byPhone.delete(c.phone);
+      if (c.loginEmail) byLogin.delete(c.loginEmail);
+      void now;
+      c.phone = `erased:${id}`;
       c.name = null;
       c.email = null;
       c.emailVerified = false;
+      c.loginEmail = null;
       c.addresses = [];
     },
     async addAddress(id, address) {
@@ -139,11 +211,11 @@ export function createMemoryCustomerStore(): CustomerStore {
     async search(query, limit = 50) {
       const q = query.trim().toLowerCase().slice(0, 80);
       const digits = q.replace(/\D/g, "");
-      const all = [...byId.values()].filter((c) => !c.phone.startsWith("erased:"));
+      const all = [...byId.values()].filter((c) => !isErased(c));
       const hits = q
         ? all.filter(
             (c) =>
-              (digits.length >= 4 && c.phone.includes(digits)) ||
+              (digits.length >= 4 && !!c.phone?.includes(digits)) ||
               (c.name ?? "").toLowerCase().includes(q) ||
               (c.email ?? "").includes(q) ||
               c.id === q,
@@ -177,8 +249,11 @@ export function resolveCustomers(env: Env = process.env): CustomerStore {
   };
   return {
     findOrCreateByPhone: fail,
+    findOrCreateByEmail: fail,
     get: fail,
     findByPhone: fail,
+    findByLoginEmail: fail,
+    attachPhone: fail,
     setEmail: fail,
     setName: fail,
     addAddress: fail,
@@ -193,13 +268,19 @@ export function resolveCustomers(env: Env = process.env): CustomerStore {
   };
 }
 
-/** What the browser may see about the signed-in customer. */
+/** What the browser may see about the signed-in customer. `phone` is masked; null = no mobile number yet. */
 export function publicCustomer(c: Customer) {
   return {
-    phone: `+91 ${"•".repeat(6)}${c.phone.slice(-4)}`,
+    phone: c.phone && !isErased(c) ? `+91 ${"•".repeat(6)}${c.phone.slice(-4)}` : null,
     name: c.name,
     email: c.email,
     emailVerified: c.emailVerified,
+    loginEmail: c.loginEmail,
     addresses: c.addresses,
   };
+}
+
+/** Short label for staff screens and greetings: name, else masked phone, else email. */
+export function customerLabel(c: Pick<Customer, "name" | "phone" | "email">): string {
+  return c.name ?? (c.phone && !c.phone.startsWith("erased:") ? c.phone : null) ?? c.email ?? "Customer";
 }

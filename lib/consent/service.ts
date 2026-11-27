@@ -151,7 +151,14 @@ export function publicHistory(records: ConsentRecord[]) {
  */
 export async function recordAccountConsent(
   ledger: ConsentLedger,
-  input: { userId: string; visitorId: string | null; ctx: RequestContext; now?: Date },
+  input: {
+    userId: string;
+    visitorId: string | null;
+    ctx: RequestContext;
+    now?: Date;
+    /** "checkbox" = the sign-up form's unticked box was ticked (validated on the server); default: the one-tap notice. */
+    method?: "checkbox" | "signup_notice";
+  },
 ): Promise<ConsentRecord> {
   const [record] = await ledger.append(
     [
@@ -161,7 +168,7 @@ export async function recordAccountConsent(
         subscriber_id: null,
         purpose: "terms_privacy",
         status: "granted",
-        method: "signup_notice",
+        method: input.method ?? "signup_notice",
         source: input.ctx.source,
         notice_version: noticeVersion(["terms", "privacy"]),
         ip_address: input.ctx.ip,

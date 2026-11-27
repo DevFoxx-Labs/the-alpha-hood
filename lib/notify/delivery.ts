@@ -80,7 +80,7 @@ async function deliverOne(deps: DeliveryDeps, m: ClaimedMessage): Promise<Delive
       continue;
     }
     const customer = await deps.customers.get(m.customerId);
-    if (!customer || !SMS_PHONE_RE.test(customer.phone)) {
+    if (!customer?.phone || !SMS_PHONE_RE.test(customer.phone)) {
       results.sms = "skipped";
       continue;
     }

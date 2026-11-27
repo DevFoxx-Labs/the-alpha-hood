@@ -27,6 +27,8 @@ export interface CustomersTable {
   email: string | null;
   /** Set when the customer proved they own `email`; NULL = not verified. */
   email_verified_at: Date | null;
+  /** UNIQUE when set: the verified email that signs this customer in (email code / password). NULL = none. */
+  login_email?: string | null;
   created_at: Date;
   order_count: number;
   /** JSON object: coupon code → uses. */
@@ -365,6 +367,14 @@ export interface CustomerIdentitiesTable {
   created_at: Date;
 }
 
+/** Customer passwords — kept out of `customers`, so no customer read can ever carry a hash. */
+export interface CustomerCredentialsTable {
+  customer_id: string;
+  /** `scrypt$<salt hex>$<key hex>` (lib/admin/crypto.ts). */
+  password_hash: string;
+  updated_at: Date;
+}
+
 export interface CustomerSubmissionsTable {
   id: string;
   kind: string;
@@ -378,6 +388,7 @@ export interface CustomerSubmissionsTable {
 }
 
 export interface Database {
+  customer_credentials: CustomerCredentialsTable;
   customer_submissions: CustomerSubmissionsTable;
   customer_identities: CustomerIdentitiesTable;
   providers: ProvidersTable;

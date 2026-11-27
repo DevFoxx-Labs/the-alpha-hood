@@ -1,24 +1,27 @@
 import { NextResponse } from "next/server";
-import { createSession, customerIdFromRequest, setSessionCookie } from "@/lib/auth/session";
+import { customerIdFromRequest } from "@/lib/auth/session";
+import { completeSignIn } from "@/lib/auth/sign-in";
 import { finishSignIn, isSocialProvider, LINK_COOKIE, OAUTH_COOKIE, OAUTH_TTL_MS, sealPendingLink, SocialError } from "@/lib/auth/social";
 import { resolveSocialIdentities } from "@/lib/auth/social-identities";
 import { signInEnabled } from "@/lib/checkout/flags";
 import { readCookie } from "@/lib/consent/cookie";
-import { resolveCustomers } from "@/lib/customers/store";
+import { isErased, resolveCustomers } from "@/lib/customers/store";
 import { clientIp, jsonError } from "@/lib/http/guard";
 import { rateLimiter } from "@/lib/http/rate-limit";
-import { securityEvent } from "@/lib/security/log";
-import { checkDevice, setDeviceCookie } from "@/lib/security/devices";
-import { alertNewCustomerDevice } from "@/lib/security/sign-in-alerts";
+import { maskEmail, securityEvent } from "@/lib/security/log";
 
 /**
  * GET /api/auth/social/<provider>/callback — Google / Facebook send the browser back here.
  * 1. The state cookie must match (else: refused — login CSRF). The cookie is cleared whatever happens.
  * 2. Linked social account → signed in to its customer.
- * 3. Not linked + already signed in → linked to the signed-in customer (their mobile is already verified).
- * 4. Not linked + signed out → a sealed 10-minute "pending link" cookie and back to /account, where verifying the
- *    mobile number with a code finishes the sign-in and links the two (POST /api/otp/verify). The social account
- *    never creates or opens a customer account on its own: the account belongs to the verified mobile number.
+ * 3. Not linked + already signed in → linked to the signed-in customer.
+ * 4. Not linked + signed out, Google with a Google-VERIFIED email that no account signs in with yet → a new account
+ *    (its sign-in email is that address; the one-tap Terms/Privacy notice next to the button is recorded).
+ *    If an account already signs in with that email, nothing is linked: the person signs in to it first and links
+ *    Google in Settings. A social sign-in never matches or opens an existing account by email.
+ * 5. Otherwise (Facebook — its email is never trusted — or Google without a verified email) → a sealed 10-minute
+ *    "pending link" cookie and back to /account, where verifying the mobile number finishes the sign-in and links
+ *    the two (POST /api/otp/verify).
  * Failures go back to /account with a short reason only — never the provider's error text.
  */
 function back(request: Request, path: string) {
@@ -43,15 +46,9 @@ export async function GET(request: Request, { params }: RouteContext<"/api/auth/
     if (linked) {
       if (signedIn && signedIn !== linked.customerId) return back(request, "/account/settings?social=other_account");
       const customer = await resolveCustomers().get(linked.customerId);
-      if (!customer) return back(request, "/account?social=error");
+      if (!customer || isErased(customer)) return back(request, "/account?social=error");
       const res = back(request, profile.next);
-      if (!signedIn) {
-        setSessionCookie(res, await createSession(customer.id));
-        const device = await checkDevice("customer", customer.id, request);
-        setDeviceCookie(res, device);
-        if (device.isNew) await alertNewCustomerDevice(customer.id, request.headers.get("user-agent"));
-      }
-      securityEvent("login", { customer: customer.id, kind: `social_${provider}` });
+      if (!signedIn) await completeSignIn(request, res, { customerId: customer.id, created: false, method: provider, ip });
       return res;
     }
 
@@ -59,6 +56,25 @@ export async function GET(request: Request, { params }: RouteContext<"/api/auth/
       const ok = await identities.link({ provider, subject: profile.subject, customerId: signedIn, email: profile.email, createdAt: new Date().toISOString() });
       securityEvent("login", { customer: signedIn, kind: `social_${provider}_linked`, ok });
       return back(request, ok ? "/account/settings?social=linked" : "/account/settings?social=other_account");
+    }
+
+    if (provider === "google" && profile.email) {
+      const customers = resolveCustomers();
+      if (await customers.findByLoginEmail(profile.email)) {
+        securityEvent("social_signup_blocked", { kind: "email_in_use", email: maskEmail(profile.email) });
+        return back(request, "/account?social=email_in_use");
+      }
+      // Race-safe: the sign-in email is UNIQUE, so two parallel callbacks can't create two accounts for one address.
+      const { customer, created } = await customers.findOrCreateByEmail(profile.email);
+      if (!created) return back(request, "/account?social=email_in_use");
+      if (profile.name) await customers.setName(customer.id, profile.name);
+      const ok = await identities.link({ provider, subject: profile.subject, customerId: customer.id, email: profile.email, createdAt: new Date().toISOString() });
+      // Lost a race with a parallel callback for the same Google account: sign in to the account that won.
+      const owner = ok ? customer.id : (await identities.find(provider, profile.subject))?.customerId;
+      if (!owner) return back(request, "/account?social=error");
+      const res = back(request, profile.next);
+      await completeSignIn(request, res, { customerId: owner, created: ok, method: "google", ip, consent: "signup_notice" });
+      return res;
     }
 
     const res = back(request, `/account?link=${provider}`);

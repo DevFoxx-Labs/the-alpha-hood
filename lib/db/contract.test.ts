@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createSession, customerIdFromRequest, revokeAllSessions } from "@/lib/auth/session";
 import { OTP_MAX_ATTEMPTS, OtpError, sendOtp, verifyOtp } from "@/lib/auth/otp";
-import { MAX_ADDRESSES } from "@/lib/customers/store";
+import { EmailInUseError, MAX_ADDRESSES } from "@/lib/customers/store";
 import { DbConfigError, readDbConfig, assertDestructiveAllowed, describeTarget } from "./config";
 import { type StoresUnderTest, testTargets } from "./testing";
 
@@ -105,6 +105,63 @@ for (const target of testTargets()) {
       const again = await s.customers.findOrCreateByPhone("+919000004321");
       expect(again.created).toBe(true);
       expect(again.customer.id).not.toBe(customer.id);
+    });
+
+    it("customers (ACC-01): one account per verified sign-in email under a race; unverified emails never sign in", async () => {
+      const email = "race.signup@example.com";
+      const results = await Promise.all(Array.from({ length: 5 }, () => s.customers.findOrCreateByEmail(email)));
+      expect(new Set(results.map((r) => r.customer.id)).size).toBe(1);
+      expect(results.filter((r) => r.created)).toHaveLength(1);
+      const id = results[0].customer.id;
+      const fresh = (await s.customers.get(id))!;
+      expect(fresh).toMatchObject({ phone: null, email, emailVerified: true, loginEmail: email });
+      expect((await s.customers.findByLoginEmail(email))?.id).toBe(id);
+
+      // A phone account that merely TYPES this address (unverified) can't take it over or sign in with it.
+      const { customer: typer } = await s.customers.findOrCreateByPhone("+919000005001");
+      await s.customers.setEmail(typer.id, email);
+      expect((await s.customers.get(typer.id))!).toMatchObject({ email, emailVerified: false, loginEmail: null });
+      expect((await s.customers.findByLoginEmail(email))?.id).toBe(id);
+      // …and verifying it while another account signs in with it is refused (UNIQUE).
+      await expect(s.customers.setEmail(typer.id, email, true)).rejects.toBeInstanceOf(EmailInUseError);
+
+      // Changing to a new, unverified address keeps the verified sign-in email working until the new one is verified.
+      await s.customers.setEmail(id, "new.address@example.com");
+      expect((await s.customers.get(id))!).toMatchObject({ email: "new.address@example.com", emailVerified: false, loginEmail: email });
+      await s.customers.setEmail(id, "new.address@example.com", true);
+      expect((await s.customers.get(id))!).toMatchObject({ emailVerified: true, loginEmail: "new.address@example.com" });
+      expect(await s.customers.findByLoginEmail(email)).toBeNull();
+    });
+
+    it("customers (ACC-01): a phoneless account gets a verified phone once; never someone else's", async () => {
+      const { customer } = await s.customers.findOrCreateByEmail("phoneless@example.com");
+      const { customer: owner } = await s.customers.findOrCreateByPhone("+919000005101");
+      // Search must not match the internal "no phone" placeholder.
+      expect((await s.customers.search(customer.id.slice(-6))).some((c) => c.id === customer.id && c.phone !== null)).toBe(false);
+      expect(await s.customers.attachPhone(customer.id, "+919000005101")).toBe(false); // owned by another customer
+      expect(await s.customers.attachPhone(owner.id, "+919000005102")).toBe(false); // already has a phone
+      const tries = await Promise.all([s.customers.attachPhone(customer.id, "+919000005103"), s.customers.attachPhone(customer.id, "+919000005104")]);
+      expect(tries.filter(Boolean)).toHaveLength(1);
+      const now = (await s.customers.get(customer.id))!;
+      expect(["+919000005103", "+919000005104"]).toContain(now.phone);
+      expect((await s.customers.findByPhone(now.phone!))?.id).toBe(customer.id);
+      // Erasure frees the sign-in email too.
+      await s.customers.erase(customer.id);
+      expect(await s.customers.findByLoginEmail("phoneless@example.com")).toBeNull();
+      expect((await s.customers.findOrCreateByEmail("phoneless@example.com")).created).toBe(true);
+    });
+
+    it("credentials: password hash stored apart, replaced, deleted", async () => {
+      expect(await s.credentials.get("cus_pw1")).toBeNull();
+      await Promise.all([s.credentials.set("cus_pw1", "scrypt$aa$bb"), s.credentials.set("cus_pw1", "scrypt$aa$bb")]);
+      await s.credentials.set("cus_pw1", "scrypt$cc$dd", new Date("2026-12-01T10:00:00.000Z"));
+      expect(await s.credentials.get("cus_pw1")).toEqual({ hash: "scrypt$cc$dd", updatedAt: "2026-12-01T10:00:00.000Z" });
+      await s.credentials.delete("cus_pw1");
+      expect(await s.credentials.get("cus_pw1")).toBeNull();
+      // No customer read carries a password field.
+      const { customer } = await s.customers.findOrCreateByPhone("+919000005201");
+      await s.credentials.set(customer.id, "scrypt$ee$ff");
+      expect(JSON.stringify(await s.customers.get(customer.id))).not.toContain("scrypt");
     });
 
     it("sessions: stored by hash, expire, revoke one / all", async () => {

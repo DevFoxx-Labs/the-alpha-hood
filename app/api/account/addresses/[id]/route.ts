@@ -20,7 +20,7 @@ export async function PATCH(request: Request, { params }: RouteContext<"/api/acc
     const customers = resolveCustomers();
     const me = await customers.get(auth.customerId);
     if (!me) return jsonError(401, "unauthenticated", "Please sign in again.");
-    const address = await customers.updateAddress(me.id, id, parseAddress(guard.body, me.phone));
+    const address = await customers.updateAddress(me.id, id, parseAddress(guard.body, me.phone ?? undefined));
     if (!address) return jsonError(404, "not_found", "Address not found.");
     return privateJson({ address });
   } catch (error) {

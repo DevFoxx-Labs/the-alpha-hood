@@ -1,35 +1,26 @@
 import { randomToken } from "@/lib/auth/secrets";
 import type { Address, AddressInput } from "@/lib/checkout/address";
-import { type Customer, type CustomerStore, MAX_ADDRESSES } from "@/lib/customers/store";
+import { type Customer, type CustomerStore, EmailInUseError, MAX_ADDRESSES, newCustomerRecord, NO_PHONE_PREFIX } from "@/lib/customers/store";
 import { isMongoDuplicate, type MongoConn } from "../mongo";
 import { fromJson, isUniqueViolation, type SqlDb, sqlTx, toBool, toIso } from "../sql";
 
 /**
  * Customers on SQL / MongoDB. Same behaviour as the memory store (contract-tested):
- * - one customer per verified phone (UNIQUE), find-or-create is race-safe (insert, on duplicate read back);
+ * - one customer per verified phone and per verified sign-in email (UNIQUE); find-or-create is race-safe
+ *   (insert, on duplicate read back);
+ * - an account without a mobile holds `none:<id>` in the NOT NULL UNIQUE phone column (read as null);
  * - address cap enforced inside a transaction that locks the customer row;
  * - counters are atomic updates; coupon usage is updated under the row lock;
- * - erasure (DPDP) blanks contact data and addresses; the phone is freed for a new sign-up.
+ * - erasure (DPDP) blanks contact data, sign-in email and addresses; phone and email are freed for a new sign-up.
  */
 const MAX_SEARCH = 100;
-const newCustomer = (phone: string, now: Date): Customer => ({
-  id: `cus_${randomToken(12)}`,
-  phone,
-  name: null,
-  email: null,
-  emailVerified: false,
-  createdAt: now.toISOString(),
-  addresses: [],
-  orderCount: 0,
-  couponUses: {},
-  codBlocked: false,
-  rtoCount: 0,
-});
 const likeEscape = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+const phoneOut = (stored: string): string | null => (stored.startsWith(NO_PHONE_PREFIX) ? null : stored);
+const phoneIn = (c: Customer) => c.phone ?? `${NO_PHONE_PREFIX}${c.id}`;
 
 // ── SQL (MySQL + PostgreSQL) ──────────────────────────────────────────────────────────────────────
 
-type CustomerRow = { id: string; phone: string; name: string | null; email: string | null; email_verified_at: Date | null; created_at: Date; order_count: number; coupon_uses: unknown; cod_blocked: boolean | number; rto_count: number };
+type CustomerRow = { id: string; phone: string; name: string | null; email: string | null; email_verified_at: Date | null; login_email?: string | null; created_at: Date; order_count: number; coupon_uses: unknown; cod_blocked: boolean | number; rto_count: number };
 type AddressRow = Address & { customer_id: string; position: number };
 
 type AddressDbRow = Omit<AddressRow, "location" | "isDefault" | "forSomeoneElse" | "alternatePhone" | "instructions"> & {
@@ -93,10 +84,11 @@ export function createSqlCustomerStore(db: SqlDb): CustomerStore {
       .execute()) as unknown as AddressDbRow[];
     return rows.map((r) => ({
       id: r.id,
-      phone: r.phone,
+      phone: phoneOut(r.phone),
       name: r.name,
       email: r.email,
-      emailVerified: !!r.email && !!r.email_verified_at,
+      emailVerified: !!r.email && (!!r.email_verified_at || r.email === r.login_email),
+      loginEmail: r.login_email ?? null,
       createdAt: toIso(r.created_at),
       addresses: addresses.filter((a) => a.customer_id === r.id).map(toAddress),
       orderCount: Number(r.order_count),
@@ -105,24 +97,40 @@ export function createSqlCustomerStore(db: SqlDb): CustomerStore {
       rtoCount: Number(r.rto_count),
     }));
   };
-  const one = async (where: "id" | "phone", value: string, q: SqlDb = db) => {
+  const one = async (where: "id" | "phone" | "login_email", value: string, q: SqlDb = db) => {
     const row = await q.selectFrom("customers").selectAll().where(where, "=", value).executeTakeFirst();
     return row ? (await hydrate([row as CustomerRow], q))[0] : null;
   };
   const set = async (id: string, patch: Record<string, unknown>) => {
     await db.updateTable("customers").set(patch).where("id", "=", id).execute();
   };
+  const insert = async (c: Customer, now: Date) => {
+    await db
+      .insertInto("customers")
+      .values({
+        id: c.id,
+        phone: phoneIn(c),
+        name: null,
+        email: c.email,
+        email_verified_at: c.loginEmail ? now : null,
+        login_email: c.loginEmail,
+        created_at: now,
+        order_count: 0,
+        coupon_uses: "{}",
+        cod_blocked: false,
+        rto_count: 0,
+        erased_at: null,
+      })
+      .execute();
+  };
 
   return {
     async findOrCreateByPhone(phone, now = new Date()) {
       const existing = await one("phone", phone);
       if (existing) return { customer: existing, created: false };
-      const c = newCustomer(phone, now);
+      const c = newCustomerRecord(phone, now);
       try {
-        await db
-          .insertInto("customers")
-          .values({ id: c.id, phone, name: null, email: null, email_verified_at: null, created_at: now, order_count: 0, coupon_uses: "{}", cod_blocked: false, rto_count: 0, erased_at: null })
-          .execute();
+        await insert(c, now);
         return { customer: c, created: true };
       } catch (e) {
         // Two sign-ins for the same phone at once: the UNIQUE index lets exactly one create it.
@@ -130,9 +138,44 @@ export function createSqlCustomerStore(db: SqlDb): CustomerStore {
         return { customer: (await one("phone", phone))!, created: false };
       }
     },
+    async findOrCreateByEmail(email, now = new Date()) {
+      const existing = await one("login_email", email);
+      if (existing) return { customer: existing, created: false };
+      const c = newCustomerRecord(null, now, email);
+      try {
+        await insert(c, now);
+        return { customer: c, created: true };
+      } catch (e) {
+        if (!isUniqueViolation(e)) throw e;
+        return { customer: (await one("login_email", email))!, created: false };
+      }
+    },
     get: (id) => one("id", id),
     findByPhone: (phone) => one("phone", phone),
-    setEmail: (id, email, verified = false) => set(id, { email, email_verified_at: email && verified ? new Date() : null }),
+    findByLoginEmail: (email) => one("login_email", email),
+    async attachPhone(id, phone) {
+      try {
+        // Conditional update: only an account that still holds its own "no phone" placeholder.
+        const r = await db.updateTable("customers").set({ phone }).where("id", "=", id).where("phone", "=", `${NO_PHONE_PREFIX}${id}`).executeTakeFirst();
+        return Number(r.numUpdatedRows) === 1;
+      } catch (e) {
+        if (isUniqueViolation(e)) return false;
+        throw e;
+      }
+    },
+    async setEmail(id, email, verified = false) {
+      if (email && verified) {
+        try {
+          await set(id, { email, email_verified_at: new Date(), login_email: email });
+        } catch (e) {
+          if (isUniqueViolation(e)) throw new EmailInUseError();
+          throw e;
+        }
+        return;
+      }
+      // Unverified: the sign-in email stays until the new address is verified. Removing the email removes both.
+      await set(id, email ? { email, email_verified_at: null } : { email: null, email_verified_at: null, login_email: null });
+    },
     setName: (id, name) => set(id, { name }),
     async addAddress(id, address: AddressInput) {
       return sqlTx(db, async (trx) => {
@@ -191,7 +234,7 @@ export function createSqlCustomerStore(db: SqlDb): CustomerStore {
     async erase(id, now = new Date()) {
       await sqlTx(db, async (trx) => {
         await trx.deleteFrom("customer_addresses").where("customer_id", "=", id).execute();
-        await trx.updateTable("customers").set({ phone: `erased:${id}`, name: null, email: null, email_verified_at: null, erased_at: now }).where("id", "=", id).execute();
+        await trx.updateTable("customers").set({ phone: `erased:${id}`, name: null, email: null, email_verified_at: null, login_email: null, erased_at: now }).where("id", "=", id).execute();
       });
     },
     async recordOrder(id, couponCode) {
@@ -215,7 +258,7 @@ export function createSqlCustomerStore(db: SqlDb): CustomerStore {
         const like = `%${likeEscape(q)}%`;
         sel = sel.where((eb) =>
           eb.or([
-            ...(digits.length >= 4 ? [eb("phone", "like", `%${likeEscape(digits)}%`)] : []),
+            ...(digits.length >= 4 ? [eb.and([eb("phone", "like", `%${likeEscape(digits)}%`), eb("phone", "not like", `${NO_PHONE_PREFIX}%`)])] : []),
             eb(eb.fn("lower", ["name"]), "like", like),
             eb(eb.fn("lower", ["email"]), "like", like),
             eb("id", "=", q),
@@ -234,14 +277,15 @@ export function createSqlCustomerStore(db: SqlDb): CustomerStore {
 
 // ── MongoDB (addresses embedded in the customer document) ─────────────────────────────────────────
 
-type CustomerDoc = Omit<Customer, "id" | "createdAt" | "emailVerified"> & { _id: string; created_at: Date; erased_at: Date | null; emailVerifiedAt?: Date | null };
+type CustomerDoc = Omit<Customer, "id" | "createdAt" | "emailVerified" | "loginEmail" | "phone"> & { _id: string; phone: string; created_at: Date; erased_at: Date | null; emailVerifiedAt?: Date | null; login_email?: string | null };
 
 const fromDoc = (d: CustomerDoc): Customer => ({
   id: d._id,
-  phone: d.phone,
+  phone: phoneOut(d.phone),
   name: d.name,
   email: d.email,
-  emailVerified: !!d.email && !!d.emailVerifiedAt,
+  emailVerified: !!d.email && (!!d.emailVerifiedAt || d.email === d.login_email),
+  loginEmail: d.login_email ?? null,
   createdAt: toIso(d.created_at),
   addresses: d.addresses ?? [],
   orderCount: d.orderCount ?? 0,
@@ -269,30 +313,47 @@ export function createMongoCustomerStore(conn: Promise<MongoConn>): CustomerStor
   const set = async (id: string, patch: Partial<CustomerDoc>) => {
     await (await col()).updateOne({ _id: id }, { $set: patch });
   };
+  const insert = async (fresh: Customer, now: Date) => {
+    await (await col()).insertOne({
+      _id: fresh.id,
+      phone: phoneIn(fresh),
+      name: null,
+      email: fresh.email,
+      ...(fresh.loginEmail ? { login_email: fresh.loginEmail, emailVerifiedAt: now } : {}),
+      addresses: [],
+      orderCount: 0,
+      couponUses: {},
+      codBlocked: false,
+      rtoCount: 0,
+      created_at: now,
+      erased_at: null,
+    });
+  };
   return {
     async findOrCreateByPhone(phone, now = new Date()) {
       const c = await col();
       const existing = await c.findOne({ phone });
       if (existing) return { customer: fromDoc(existing), created: false };
-      const fresh = newCustomer(phone, now);
+      const fresh = newCustomerRecord(phone, now);
       try {
-        await c.insertOne({
-          _id: fresh.id,
-          phone,
-          name: null,
-          email: null,
-          addresses: [],
-          orderCount: 0,
-          couponUses: {},
-          codBlocked: false,
-          rtoCount: 0,
-          created_at: now,
-          erased_at: null,
-        });
+        await insert(fresh, now);
         return { customer: fresh, created: true };
       } catch (e) {
         if (!isMongoDuplicate(e)) throw e;
         return { customer: fromDoc((await c.findOne({ phone }))!), created: false };
+      }
+    },
+    async findOrCreateByEmail(email, now = new Date()) {
+      const c = await col();
+      const existing = await c.findOne({ login_email: email });
+      if (existing) return { customer: fromDoc(existing), created: false };
+      const fresh = newCustomerRecord(null, now, email);
+      try {
+        await insert(fresh, now);
+        return { customer: fresh, created: true };
+      } catch (e) {
+        if (!isMongoDuplicate(e)) throw e;
+        return { customer: fromDoc((await c.findOne({ login_email: email }))!), created: false };
       }
     },
     async get(id) {
@@ -303,7 +364,33 @@ export function createMongoCustomerStore(conn: Promise<MongoConn>): CustomerStor
       const d = await (await col()).findOne({ phone });
       return d ? fromDoc(d) : null;
     },
-    setEmail: (id, email, verified = false) => set(id, { email, emailVerifiedAt: email && verified ? new Date() : null }),
+    async findByLoginEmail(email) {
+      const d = await (await col()).findOne({ login_email: email });
+      return d ? fromDoc(d) : null;
+    },
+    async attachPhone(id, phone) {
+      try {
+        const r = await (await col()).updateOne({ _id: id, phone: `${NO_PHONE_PREFIX}${id}` }, { $set: { phone } });
+        return r.modifiedCount === 1;
+      } catch (e) {
+        if (isMongoDuplicate(e)) return false;
+        throw e;
+      }
+    },
+    async setEmail(id, email, verified = false) {
+      const c = await col();
+      if (email && verified) {
+        try {
+          await c.updateOne({ _id: id }, { $set: { email, emailVerifiedAt: new Date(), login_email: email } });
+        } catch (e) {
+          if (isMongoDuplicate(e)) throw new EmailInUseError();
+          throw e;
+        }
+        return;
+      }
+      if (email) await c.updateOne({ _id: id }, { $set: { email, emailVerifiedAt: null } });
+      else await c.updateOne({ _id: id }, { $set: { email: null, emailVerifiedAt: null }, $unset: { login_email: "" } });
+    },
     setName: (id, name) => set(id, { name }),
     async addAddress(id, address) {
       const c = await col();
@@ -343,7 +430,7 @@ export function createMongoCustomerStore(conn: Promise<MongoConn>): CustomerStor
       return rewriteAddresses(id, (list) => (list.some((a) => a.id === addressId) ? { list: list.map((a) => ({ ...a, isDefault: a.id === addressId })), result: true } : null), false);
     },
     async erase(id, now = new Date()) {
-      await set(id, { phone: `erased:${id}`, name: null, email: null, emailVerifiedAt: null, addresses: [], erased_at: now });
+      await (await col()).updateOne({ _id: id }, { $set: { phone: `erased:${id}`, name: null, email: null, emailVerifiedAt: null, addresses: [], erased_at: now }, $unset: { login_email: "" } });
     },
     async recordOrder(id, couponCode) {
       await (await col()).updateOne({ _id: id }, { $inc: { orderCount: 1, ...(couponCode ? { [`couponUses.${couponCode}`]: 1 } : {}) } });
@@ -353,7 +440,7 @@ export function createMongoCustomerStore(conn: Promise<MongoConn>): CustomerStor
       const digits = q.replace(/\D/g, "");
       const rx = (s: string) => new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
       const filter = q
-        ? { erased_at: null, $or: [...(digits.length >= 4 ? [{ phone: rx(digits) }] : []), { name: rx(q) }, { email: rx(q) }, { _id: q }] }
+        ? { erased_at: null, $or: [...(digits.length >= 4 ? [{ $and: [{ phone: rx(digits) }, { phone: { $not: /^none:/ } }] }] : []), { name: rx(q) }, { email: rx(q) }, { _id: q }] }
         : { erased_at: null };
       return (await (await col()).find(filter).sort({ created_at: -1 }).limit(Math.min(limit, MAX_SEARCH)).toArray()).map(fromDoc);
     },

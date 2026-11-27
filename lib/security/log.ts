@@ -23,10 +23,26 @@ export type SecurityEvent =
   | "provider_changed"
   | "new_device_sign_in"
   | "email_provider_test"
-  | "sms_provider_test";
+  | "sms_provider_test"
+  | "login_failed"
+  | "login_limited"
+  | "email_code_verified"
+  | "password_set"
+  | "password_change_failed"
+  | "password_breach_check_unavailable"
+  | "phone_attached"
+  | "social_signup_blocked";
 
-export function maskPhone(phone: string): string {
+export function maskPhone(phone: string | null | undefined): string {
+  if (!phone) return "none";
   return phone.length > 4 ? `${"*".repeat(Math.max(0, phone.length - 4))}${phone.slice(-4)}` : "****";
+}
+
+/** `a•••@example.com` — enough to tell accounts apart in a log, not enough to contact anyone. */
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  if (at < 1) return "***";
+  return `${email[0]}•••${email.slice(at)}`;
 }
 
 export function securityEvent(event: SecurityEvent, data: Record<string, string | number | boolean | null | undefined> = {}) {

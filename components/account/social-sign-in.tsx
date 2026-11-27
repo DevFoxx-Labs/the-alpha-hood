@@ -2,9 +2,6 @@
 
 import { Facebook01Icon, GoogleIcon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
-import { api, ApiError } from "@/components/checkout/api";
-import { showMessageToast } from "@/components/store/toast";
-import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 
 /**
@@ -13,9 +10,9 @@ import { Icon } from "@/components/ui/icon";
  * First time from a signed-out browser, the person then verifies their mobile number once (the account is
  * phone-based); after that one tap is enough.
  */
-type Provider = "google" | "facebook";
-const LABEL: Record<Provider, string> = { google: "Google", facebook: "Facebook" };
-const ICON = { google: GoogleIcon, facebook: Facebook01Icon } as const;
+export type Provider = "google" | "facebook";
+export const LABEL: Record<Provider, string> = { google: "Google", facebook: "Facebook" };
+export const ICON = { google: GoogleIcon, facebook: Facebook01Icon } as const;
 
 let providersPromise: Promise<Provider[]> | null = null;
 function loadProviders(): Promise<Provider[]> {
@@ -43,18 +40,20 @@ export function useSocialProviders() {
 const NOTICE: Record<string, string> = {
   cancelled: "Sign-in was cancelled.",
   expired: "That sign-in took too long. Please try again.",
-  error: "We couldn't sign you in with that account. Please try again or use your mobile number.",
+  error: "We couldn't sign you in with that account. Please try again or use your mobile number or email.",
   busy: "Too many attempts. Please wait a few minutes.",
+  email_in_use: "An account already uses this Google email. Sign in with your email below (password or a code), then link Google in Settings.",
 };
 
 /** Messages from the callback (`?social=…`) and the "verify your mobile to finish" step (`?link=…`). */
-export function useSocialNotice(): { link: Provider | null; notice: string | null } {
-  const [state, setState] = useState<{ link: Provider | null; notice: string | null }>({ link: null, notice: null });
+export function useSocialNotice(): { link: Provider | null; notice: string | null; code: string | null } {
+  const [state, setState] = useState<{ link: Provider | null; notice: string | null; code: string | null }>({ link: null, notice: null, code: null });
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const link = q.get("link");
     const social = q.get("social");
-    queueMicrotask(() => setState({ link: link === "google" || link === "facebook" ? link : null, notice: social && NOTICE[social] ? NOTICE[social] : null }));
+    const known = social && NOTICE[social] ? social : null;
+    queueMicrotask(() => setState({ link: link === "google" || link === "facebook" ? link : null, notice: known ? NOTICE[known] : null, code: known }));
   }, []);
   return state;
 }
@@ -78,64 +77,5 @@ export function SocialButtons({ next = "/account" }: { next?: string }) {
         </a>
       ))}
     </div>
-  );
-}
-
-/** Account → Settings: linked social accounts, link more, unlink. */
-export function SignInMethods({ box, h2 }: { box: string; h2: string }) {
-  const [data, setData] = useState<{ linked: { provider: Provider; linkedAt: string }[]; available: Provider[] } | null>(null);
-  const [busy, setBusy] = useState<Provider | null>(null);
-  const load = () =>
-    api<{ linked: { provider: Provider; linkedAt: string }[]; available: Provider[] }>("/api/account/social")
-      .then(setData)
-      .catch(() => setData({ linked: [], available: [] }));
-  useEffect(() => {
-    void load();
-    const social = new URLSearchParams(window.location.search).get("social");
-    if (social === "linked") showMessageToast("Linked. You can now sign in with one tap.");
-    if (social === "other_account") showMessageToast("That account is already linked to a different customer account.");
-  }, []);
-  if (!data || (!data.linked.length && !data.available.length)) return null;
-  const linked = new Set(data.linked.map((l) => l.provider));
-  const providers = [...new Set<Provider>([...data.available, ...data.linked.map((l) => l.provider)])];
-
-  const unlink = async (p: Provider) => {
-    setBusy(p);
-    try {
-      await api("/api/account/social", { method: "DELETE", body: { provider: p } });
-      showMessageToast(`${LABEL[p]} unlinked. Sign in with your mobile number from now on, or link it again.`);
-      await load();
-    } catch (e) {
-      showMessageToast(e instanceof ApiError ? e.message : "Couldn't unlink. Try again.");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  return (
-    <section className={box}>
-      <h2 className={h2}>Sign-in methods</h2>
-      <p className="mb-4 text-[13px] text-ink-2">Your mobile number always works. Linked accounts let you sign in with one tap.</p>
-      <ul className="divide-y divide-line">
-        {providers.map((p) => (
-          <li key={p} className="flex items-center justify-between gap-3 py-3">
-            <span className="flex items-center gap-2.5 text-[14px] font-semibold">
-              <Icon icon={ICON[p]} size={18} />
-              {LABEL[p]}
-              {linked.has(p) ? <span className="text-[12px] font-normal text-ink-2">Linked</span> : null}
-            </span>
-            {linked.has(p) ? (
-              <Button variant="outline" size="sm" loading={busy === p} onClick={() => void unlink(p)}>
-                Unlink
-              </Button>
-            ) : data.available.includes(p) ? (
-              <Button variant="outline" size="sm" asChild>
-                <a href={`/api/auth/social/${p}/start?next=${encodeURIComponent("/account/settings")}`}>Link</a>
-              </Button>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

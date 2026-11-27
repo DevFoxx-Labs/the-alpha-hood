@@ -26,6 +26,7 @@ import { createMemoryMediaStore } from "@/lib/catalog/media";
 import { createMemorySettingsStore } from "@/lib/settings/store";
 import { createMemoryProviderStore } from "@/lib/providers/store";
 import { createMemorySocialIdentityStore } from "@/lib/auth/social-identities";
+import { createMemoryCredentialStore } from "@/lib/auth/passwords";
 import { createMemorySubmissionStore } from "@/lib/submissions/store";
 import { noMaintenance } from "./stores/maintenance";
 import { createMemoryCreditLedger } from "@/lib/wallet/store-credit";
@@ -96,6 +97,7 @@ export function testTargets(): Target[] {
           settings: createMemorySettingsStore(),
           providers: createMemoryProviderStore(),
           socialIdentities: createMemorySocialIdentityStore(),
+          credentials: createMemoryCredentialStore(),
           submissions: createMemorySubmissionStore(),
           maintenance: noMaintenance,
         };
@@ -142,6 +144,7 @@ export function testTargets(): Target[] {
           settings: s.settings,
           providers: s.providers,
           socialIdentities: s.socialIdentities,
+          credentials: s.credentials,
           submissions: s.submissions,
           maintenance: s.maintenance,
         };

@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     const people = new Map<string, { name: string | null; phone: string }>();
     for (const id of new Set(rows.map((r) => r.customerId))) {
       const c = await customers.get(id);
-      people.set(id, { name: c?.name ?? null, phone: c ? maskContact(c.phone) : "—" });
+      people.set(id, { name: c?.name ?? null, phone: c?.phone ? maskContact(c.phone) : c?.email ? maskContact(c.email) : "—" });
     }
     return privateJson({ status, messages: rows.map((s) => ({ ...publicFeedback(s), customerId: s.customerId, customer: people.get(s.customerId) })) });
   } catch (error) {

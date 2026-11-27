@@ -256,6 +256,21 @@ Items only the owner can do. Never ticked off without the owner's confirmation.
 - [ ] Lawyer: Privacy Notice 2026-11-30 (addresses for someone else, location, reviews, feedback, map providers).
 - [ ] Production: run migrations `2026_11_30_014` and `2026_11_30_015` through the deploy pipeline.
 
+## 2026-12-02 (sign-in: email + password, email code, Google sign-up, mobile OTP)
+- [ ] **SMS provider** (mobile codes): Admin → SMS providers → add the provider with its DLT `otp` template → Test →
+  Make live. Until then mobile sign-in answers "unavailable" on the live store.
+- [ ] **Email provider** (email codes, forgot password): Admin → Email providers → add the mailbox → send a test →
+  Make live. Until then the Email tab's code / sign-up / reset answer "unavailable"; password sign-in still works for
+  accounts that already have a password.
+- [ ] Google sign-in: the OAuth client from the 2026-11-29 list (redirect `https://<live-site>/api/auth/social/google/callback`).
+- [ ] Host secrets (once, not in the admin): `OTP_PEPPER` (≥ 32 random characters) and `SECRET_BOX_KEY`; optional
+  `PASSWORD_BREACH_CHECK=off` only if outbound calls to api.pwnedpasswords.com are blocked.
+- [ ] Turn on Bot Protection (Turnstile) before launch — it guards code sends and password sign-in.
+- [ ] Lawyer: Privacy Notice 2026-12-02 (sign-in email, password hash, Google sign-up, breached-password check).
+- [ ] Production: run migration `2026_12_01_016_customer_login` through the deploy pipeline (additive; backfills
+  already-verified emails as sign-in emails).
+- [ ] Before launch: pentest the sign-in flows (part of the High-tier pentest in docs/known-gaps.md).
+
 ## 2026-12-01 (review photos, store replies, review / feedback emails)
 - [ ] Lawyer: Privacy Notice 2026-12-01 (review photos, public store replies, review / feedback emails).
 - [ ] Tell moderators what a review photo may not show (other people's faces, addresses, phone numbers, nudity).

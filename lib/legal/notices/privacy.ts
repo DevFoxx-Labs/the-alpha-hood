@@ -7,8 +7,8 @@ import type { Notice } from "../types";
  */
 export const PRIVACY_NOTICE: Notice = {
   slug: "privacy",
-  version: "2026-12-01",
-  lastUpdated: "2026-12-01",
+  version: "2026-12-02",
+  lastUpdated: "2026-12-02",
   text: {
     en: {
       title: "Privacy Notice",
@@ -42,6 +42,7 @@ export const PRIVACY_NOTICE: Notice = {
               head: ["Personal data", "Purpose", "Basis"],
               rows: [
                 ["Mobile number (verified by OTP), name, email (optional)", "Create and secure your account, sign you in, place and update orders", "Your consent when you sign up or check out"],
+                ["Sign-in email (verified with a code or by Google) and, only if you set one, your password — stored only as a one-way scrypt hash that nobody, including our staff, can read back", "Sign you in by email, reset a forgotten password, keep your account secure", "Your consent when you create the account or set a password"],
                 ["Delivery addresses: receiver's name and mobile (yours or someone you order for), alternate mobile, address, pincode, delivery instructions and, if you place one, a map pin", "Deliver orders, help the courier find the door, check serviceability, delivery dates and Cash on Delivery eligibility. If you save an address for someone else, please tell them", "Your consent when you save an address or check out"],
                 ["Your location — only when you tap “Use my current location” or place a pin on the map", "Suggest the address fields and pin the delivery spot. Your browser asks you first; we never track your location", "Your consent (the browser prompt and your tap)"],
                 ["Product reviews you write (rating, title, text, fit, size bought) and up to 3 photos you add", "Shown on the product page after a check, with your first name and last initial and a “Verified buyer” badge. Photos stay private (only you and our moderators see them) until the review is approved; location and camera details are removed when you upload. We may post a public reply under your review and email you when it is published, not published (with the reason) or replied to. You can edit or delete a review any time — its public copy and photos come off the page straight away", "Your consent when you submit a review"],
@@ -88,7 +89,8 @@ export const PRIVACY_NOTICE: Notice = {
                 ["SMS, email and WhatsApp providers", "OTPs and order updates; offers only if you opted in", "To be confirmed before launch"],
                 ["Error monitoring", "Find and fix technical faults: the error text, the page path and the release. No payment data, cookies, IP addresses or phone numbers", "Sentry (used once switched on)"],
                 ["Bot protection", "Confirm that a request for a sign-in code comes from a person, not a script. The provider sees your IP address and browser details", "Cloudflare Turnstile (used once switched on)"],
-                ["Google sign-in", "Only if you choose \"Continue with Google\": we receive your Google account ID, name and verified email to sign you in. You can unlink it in Account → Settings", "Google LLC (used once switched on)"],
+                ["Google sign-in", "Only if you choose \"Continue with Google\": we receive your Google account ID, name and verified email to create your account or sign you in. You can unlink it in Account → Settings while you have another way to sign in", "Google LLC (used once switched on)"],
+                ["Breached-password check", "When you set a password, the first 5 characters of a one-way hash of it are sent to check it against public breach lists. Your password, email and IP address are never sent", "Have I Been Pwned — Pwned Passwords (Superlative Security Pty Ltd)"],
                 ["Facebook sign-in", "Only if you choose \"Continue with Facebook\": we receive your Facebook account ID and name to sign you in. You can unlink it in Account → Settings", "Meta Platforms Ireland Ltd (used once switched on)"],
                 ["Maps (OpenStreetMap / MapTiler)", "Show the map in the address form. Your browser loads map images from them (they see your IP address); only when you open the map", "OpenStreetMap Foundation; MapTiler AG (if switched on)"],
                 ["Address suggestions (OpenStreetMap Nominatim / Google Geocoding)", "Turn a map pin into area, city, state and pincode. Sent from our server with only the pin — never your name, phone or IP address", "OpenStreetMap Foundation; Google LLC (if switched on)"],
@@ -137,6 +139,7 @@ export const PRIVACY_NOTICE: Notice = {
                 ["Consent records (what you agreed to, when and to which version)", "As long as needed to prove consent — up to 7 years after you withdraw or close your account."],
                 ["Privacy requests and grievances", "3 years after the request is closed."],
                 ["Security and access logs", "At least 1 year, as the DPDP Rules require, then deleted."],
+                ["Password hash and sign-in email", "While your account is active; deleted at once when you delete your account."],
                 ["Visitor ID and consent cookies", "12 months and 6 months respectively (see the Cookie Policy)."],
                 ["Analytics and advertising data", "Google Analytics keeps event data for 14 months. Google Ads and Meta keep it under their own terms. Withdrawing consent stops new data at once; past data can be deleted on request."],
               ],
@@ -286,6 +289,7 @@ export const PRIVACY_NOTICE: Notice = {
               head: ["व्यक्तिगत डेटा", "उद्देश्य", "आधार"],
               rows: [
                 ["मोबाइल नंबर (OTP से सत्यापित), नाम, ईमेल (वैकल्पिक)", "आपका खाता बनाना और सुरक्षित रखना, साइन-इन, ऑर्डर देना और अपडेट भेजना", "साइन-अप या चेकआउट के समय आपकी सहमति"],
+                ["साइन-इन ईमेल (कोड से या Google द्वारा सत्यापित) और, केवल अगर आप बनाएँ तो, आपका पासवर्ड — केवल एकतरफ़ा scrypt हैश के रूप में रखा जाता है, जिसे कोई भी, हमारे कर्मचारी भी, वापस पढ़ नहीं सकता", "ईमेल से साइन-इन, भूला हुआ पासवर्ड रीसेट करना, आपका खाता सुरक्षित रखना", "खाता बनाते या पासवर्ड सेट करते समय आपकी सहमति"],
                 ["डिलीवरी पते: पाने वाले का नाम और मोबाइल (आपका या जिसके लिए आप ऑर्डर करते हैं), दूसरा मोबाइल, पता, पिनकोड, डिलीवरी निर्देश और, अगर आप लगाएँ, मैप पिन", "ऑर्डर पहुँचाना, कूरियर को दरवाज़ा ढूँढने में मदद, सेवा-क्षेत्र, डिलीवरी की तारीख और कैश ऑन डिलीवरी की पात्रता जाँचना। किसी और का पता सहेजें तो कृपया उन्हें बताएँ", "पता सहेजते या चेकआउट करते समय आपकी सहमति"],
                 ["आपकी लोकेशन — केवल तब जब आप “मेरी मौजूदा लोकेशन” दबाएँ या मैप पर पिन लगाएँ", "पते के खाने सुझाना और डिलीवरी की जगह पिन करना। पहले आपका ब्राउज़र पूछता है; हम आपकी लोकेशन कभी ट्रैक नहीं करते", "आपकी सहमति (ब्राउज़र की अनुमति और आपका टैप)"],
                 ["आपके लिखे प्रोडक्ट रिव्यू (रेटिंग, शीर्षक, टेक्स्ट, फ़िट, खरीदा गया साइज़) और आपकी जोड़ी गई अधिकतम 3 फ़ोटो", "जाँच के बाद प्रोडक्ट पेज पर, आपके पहले नाम और उपनाम के पहले अक्षर और “Verified buyer” के साथ दिखाए जाते हैं। रिव्यू स्वीकृत होने तक फ़ोटो निजी रहती हैं (केवल आप और हमारे मॉडरेटर देख सकते हैं); अपलोड करते समय लोकेशन और कैमरे की जानकारी हटा दी जाती है। हम आपके रिव्यू के नीचे सार्वजनिक जवाब दे सकते हैं और रिव्यू प्रकाशित होने, प्रकाशित न होने (कारण सहित) या जवाब मिलने पर आपको ईमेल करते हैं। आप रिव्यू कभी भी बदल या हटा सकते हैं — उसकी सार्वजनिक कॉपी और फ़ोटो तुरंत पेज से हट जाती हैं", "रिव्यू भेजते समय आपकी सहमति"],
@@ -332,7 +336,8 @@ export const PRIVACY_NOTICE: Notice = {
                 ["SMS, ईमेल और WhatsApp प्रदाता", "OTP और ऑर्डर अपडेट; ऑफ़र केवल तब जब आपने सहमति दी हो", "लॉन्च से पहले तय किया जाएगा"],
                 ["एरर मॉनिटरिंग", "तकनीकी खराबियाँ ढूँढना और ठीक करना: एरर का टेक्स्ट, पेज का पाथ और रिलीज़। भुगतान डेटा, कुकीज़, IP पता या फ़ोन नंबर नहीं", "Sentry (चालू होने पर उपयोग)"],
                 ["बॉट से सुरक्षा", "यह पक्का करना कि साइन-इन कोड का अनुरोध किसी व्यक्ति ने किया है, स्क्रिप्ट ने नहीं। प्रदाता को आपका IP पता और ब्राउज़र की जानकारी दिखती है", "Cloudflare Turnstile (चालू होने पर उपयोग)"],
-                ["Google साइन-इन", "केवल तब जब आप \"Google से जारी रखें\" चुनें: आपको साइन-इन करने के लिए हमें आपका Google खाता ID, नाम और सत्यापित ईमेल मिलता है। आप इसे खाता → सेटिंग्स में हटा सकते हैं", "Google LLC (चालू होने पर उपयोग)"],
+                ["Google साइन-इन", "केवल तब जब आप \"Google से जारी रखें\" चुनें: आपका खाता बनाने या साइन-इन करने के लिए हमें आपका Google खाता ID, नाम और सत्यापित ईमेल मिलता है। साइन-इन का कोई और तरीका होने पर आप इसे खाता → सेटिंग्स में हटा सकते हैं", "Google LLC (चालू होने पर उपयोग)"],
+                ["लीक हुए पासवर्ड की जाँच", "जब आप पासवर्ड सेट करते हैं, उसके एकतरफ़ा हैश के पहले 5 अक्षर सार्वजनिक लीक-सूचियों से मिलान के लिए भेजे जाते हैं। आपका पासवर्ड, ईमेल और IP पता कभी नहीं भेजा जाता", "Have I Been Pwned — Pwned Passwords (Superlative Security Pty Ltd)"],
                 ["Facebook साइन-इन", "केवल तब जब आप \"Facebook से जारी रखें\" चुनें: आपको साइन-इन करने के लिए हमें आपका Facebook खाता ID और नाम मिलता है। आप इसे खाता → सेटिंग्स में हटा सकते हैं", "Meta Platforms Ireland Ltd (चालू होने पर उपयोग)"],
                 ["मैप (OpenStreetMap / MapTiler)", "पते के फ़ॉर्म में मैप दिखाना। आपका ब्राउज़र उनसे मैप की तस्वीरें लेता है (उन्हें आपका IP पता दिखता है); केवल जब आप मैप खोलें", "OpenStreetMap Foundation; MapTiler AG (चालू होने पर)"],
                 ["पते के सुझाव (OpenStreetMap Nominatim / Google Geocoding)", "मैप पिन से इलाका, शहर, राज्य और पिनकोड बनाना। हमारे सर्वर से केवल पिन भेजा जाता है — आपका नाम, फ़ोन या IP पता कभी नहीं", "OpenStreetMap Foundation; Google LLC (चालू होने पर)"],
@@ -381,6 +386,7 @@ export const PRIVACY_NOTICE: Notice = {
                 ["सहमति के रिकॉर्ड (आपने क्या, कब और किस संस्करण पर सहमति दी)", "सहमति प्रमाणित करने के लिए जितना आवश्यक हो — सहमति वापस लेने या खाता बंद करने के बाद अधिकतम 7 वर्ष।"],
                 ["गोपनीयता अनुरोध और शिकायतें", "अनुरोध बंद होने के 3 वर्ष बाद तक।"],
                 ["सुरक्षा और एक्सेस लॉग", "DPDP नियमों के अनुसार कम से कम 1 वर्ष, फिर हटा दिए जाते हैं।"],
+                ["पासवर्ड हैश और साइन-इन ईमेल", "जब तक आपका खाता सक्रिय है; खाता हटाते ही तुरंत हटा दिए जाते हैं।"],
                 ["विज़िटर ID और सहमति कुकीज़", "क्रमशः 12 महीने और 6 महीने (कुकी नीति देखें)।"],
                 ["एनालिटिक्स और विज्ञापन डेटा", "Google Analytics घटना डेटा 14 महीने तक रखता है। Google Ads और Meta इसे अपनी शर्तों के अनुसार रखते हैं। सहमति वापस लेते ही नया डेटा तुरंत रुक जाता है; पुराना डेटा अनुरोध पर हटाया जा सकता है।"],
               ],

@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Address } from "@/lib/checkout/address-types";
 import { cn } from "@/lib/utils";
-import { OtpSignIn } from "./otp-sign-in";
+import { SignInPanel } from "./sign-in-panel";
 
 export interface Me {
-  customer: { phone: string; name: string | null; email: string | null; emailVerified?: boolean; addresses: Address[] };
+  /** `phone` is masked; null = no mobile number yet (account started by email or Google). */
+  customer: { phone: string | null; name: string | null; email: string | null; emailVerified?: boolean; loginEmail?: string | null; addresses: Address[] };
   storeCredit: { balance: number; history: { amount: number; reason: string; createdAt: string }[] };
 }
 
@@ -38,7 +39,7 @@ const NAV = [
 ];
 
 /**
- * ACC-02 account shell: loads the signed-in customer, shows phone OTP sign-in when signed out (ACC-01),
+ * ACC-02 account shell: loads the signed-in customer, shows sign-in (mobile, email or Google — ACC-01) when signed out,
  * and the account navigation. All data comes from no-store APIs; nothing personal is server-rendered.
  */
 export function AccountFrame({ title, children }: { title: string; children: React.ReactNode }) {
@@ -84,8 +85,8 @@ export function AccountFrame({ title, children }: { title: string; children: Rea
         <div className="mx-auto grid max-w-[880px] items-center gap-8 py-6 lg:grid-cols-[1fr_360px] lg:gap-14">
           <div className="max-w-[420px]">
             <h1 className="type-section">Sign in</h1>
-            <p className="mb-6 mt-2 text-[14px] text-ink-2">Use your mobile number — new here? We&apos;ll create your account.</p>
-            <OtpSignIn onSignedIn={reload} />
+            <p className="mb-6 mt-2 text-[14px] text-ink-2">Use your mobile number, email or Google — new here? We&apos;ll create your account.</p>
+            <SignInPanel onSignedIn={reload} />
           </div>
           {/* MASCOT_PROMPTS #5 "Welcome salute" — desktop only, so the form stays first on phones. */}
           <Mascot name="alpha-05-welcome" sizes="360px" blend className="hidden lg:block" />

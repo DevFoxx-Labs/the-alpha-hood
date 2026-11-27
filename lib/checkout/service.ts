@@ -46,7 +46,8 @@ export class CheckoutError extends Error {
       | "total_changed"
       | "order_not_found"
       | "not_retryable"
-      | "payment_unavailable",
+      | "payment_unavailable"
+      | "phone_required",
     message: string,
     public readonly status: number,
     public readonly details?: Record<string, unknown>,
@@ -192,6 +193,9 @@ export async function placeOrder(deps: CheckoutDeps, input: PlaceInput): Promise
       throw new CheckoutError("cart_changed", "Some items in your bag changed. Please review your bag.", 409);
     }
     const customer = (await deps.customers.get(input.customerId))!;
+    // CHK-02 / CHK-07: every order belongs to an OTP-verified mobile (delivery updates, COD risk controls). Accounts
+    // started by email or Google add one in the contact step first.
+    if (!customer.phone || customer.phone.startsWith("erased:")) throw new CheckoutError("phone_required", "Verify your mobile number to place your order.", 409);
     const address = customer.addresses.find((a) => a.id === input.addressId)!;
     if (!q.promise?.serviceable) throw new CheckoutError("not_serviceable", "We don't deliver to this pincode yet.", 422);
     if (input.speed === "express" && q.speed !== "express") {

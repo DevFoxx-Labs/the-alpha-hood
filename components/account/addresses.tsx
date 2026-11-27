@@ -96,7 +96,7 @@ export function AddressesView() {
   const { me, reload } = useMe();
   const [editing, setEditing] = useState<{ address: Address | null } | null>(null);
   const list = [...me.customer.addresses].sort((x, y) => Number(!!y.isDefault) - Number(!!x.isDefault));
-  const self = { name: me.customer.name ?? "", phone: me.customer.phone };
+  const self = { name: me.customer.name ?? "", phone: me.customer.phone ?? "" };
 
   if (editing) {
     return (

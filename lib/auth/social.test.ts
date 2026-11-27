@@ -9,6 +9,8 @@ import { POST as otpVerify } from "@/app/api/otp/verify/route";
 import { rateLimiter } from "@/lib/http/rate-limit";
 import { finishSignIn, LINK_COOKIE, OAUTH_COOKIE, openPendingLink, safeNext, sealPendingLink, SocialError, startSignIn } from "./social";
 import { resolveSocialIdentities } from "./social-identities";
+import { resolveLedger } from "@/lib/consent/ledger";
+import { resolveCustomers } from "@/lib/customers/store";
 
 // `connection()` only works inside a Next.js request; outside one (tests) it is a no-op here.
 vi.mock("next/server", async (importOriginal) => ({ ...(await importOriginal<typeof import("next/server")>()), connection: async () => undefined }));
@@ -139,12 +141,12 @@ describe("social sign-in routes", () => {
   });
 
   /** Runs start → (fake Google) → callback and returns the callback response. */
-  async function googleSignIn(sub: string, cookie = "") {
+  async function googleSignIn(sub: string, cookie = "", over: Record<string, unknown> = {}) {
     const start = await startGET(req("/api/auth/social/google/start?next=/account/orders"), p({ provider: "google" }));
     expect(start.status).toBe(303);
     const to = new URL(start.headers.get("location")!);
     const oauth = cookieOf(start, OAUTH_COOKIE)!;
-    vi.stubGlobal("fetch", google(to.searchParams.get("nonce")!, { sub }).fetcher);
+    vi.stubGlobal("fetch", google(to.searchParams.get("nonce")!, { sub, ...over }).fetcher);
     const cb = await callbackGET(req(`/api/auth/social/google/callback?state=${to.searchParams.get("state")}&code=4%2F0AbCdEfGhIjKl`, { cookie: [oauth, cookie].filter(Boolean).join("; ") }), p({ provider: "google" }));
     vi.unstubAllGlobals();
     return cb;
@@ -165,9 +167,9 @@ describe("social sign-in routes", () => {
     expect(await (await providersGET()).json()).toEqual({ providers: [] });
   });
 
-  it("first time: no session, no account — verify the mobile once, then the Google account is linked and signs straight in", async () => {
+  it("Google without a verified email: verify the mobile once, then the Google account is linked and signs straight in", async () => {
     const sub = `1${Date.now()}`;
-    const first = await googleSignIn(sub);
+    const first = await googleSignIn(sub, "", { email_verified: false });
     expect(first.headers.get("location")).toBe("http://localhost:3000/account?link=google");
     expect(cookieOf(first, "ah_session")).toBeUndefined(); // the social account alone never opens an account
     const pending = cookieOf(first, LINK_COOKIE)!;
@@ -178,9 +180,9 @@ describe("social sign-in routes", () => {
     expect(await verified.json()).toMatchObject({ ok: true, linked: "google" });
     expect(cookieOf(verified, LINK_COOKIE)).toBe(`${LINK_COOKIE}=`); // cleared
     const link = await resolveSocialIdentities().find("google", sub);
-    expect(link).toMatchObject({ provider: "google", email: "buyer@gmail.com" });
+    expect(link).toMatchObject({ provider: "google", email: null });
 
-    const again = await googleSignIn(sub);
+    const again = await googleSignIn(sub, "", { email_verified: false });
     expect(again.headers.get("location")).toBe("http://localhost:3000/account/orders");
     expect(cookieOf(again, "ah_session")).toBeTruthy();
     expect(cookieOf(again, OAUTH_COOKIE)).toBe(`${OAUTH_COOKIE}=`);
@@ -203,6 +205,39 @@ describe("social sign-in routes", () => {
     expect(await resolveSocialIdentities().find("google", sub)).toBeNull();
     expect((await unlinkDELETE(req("/api/account/social", { method: "DELETE", body: { provider: "google" } }))).status).toBe(401);
     expect((await unlinkDELETE(req("/api/account/social", { method: "DELETE", body: { provider: "x" }, cookie: session }))).status).toBe(422);
+  });
+
+  it("ACC-01 Google sign-up: a Google-verified email creates the account (consent recorded); next time signs straight in", async () => {
+    const sub = `3${Date.now()}`;
+    const email = `g${sub}@gmail.com`;
+    const first = await googleSignIn(sub, "", { email });
+    expect(first.headers.get("location")).toBe("http://localhost:3000/account/orders");
+    const session = cookieOf(first, "ah_session")!;
+    expect(session).toBeTruthy();
+    const me = await (await socialAccountGET(req("/api/account/social", { cookie: session }))).json();
+    expect(me.methods).toEqual({ phone: null, email, password: false });
+    const link = (await resolveSocialIdentities().find("google", sub))!;
+    expect((await resolveLedger().listByUser(link.customerId)).map((r) => [r.purpose, r.status, r.method])).toEqual([["terms_privacy", "granted", "signup_notice"]]);
+    // Google + its verified email are two ways in. Remove the email → Google is the last one and can't be unlinked.
+    const { PATCH: mePATCH } = await import("@/app/api/account/me/route");
+    expect((await mePATCH(req("/api/account/me", { method: "PATCH", body: { email: "" }, cookie: session }))).status).toBe(200);
+    const last = await unlinkDELETE(req("/api/account/social", { method: "DELETE", body: { provider: "google" }, cookie: session }));
+    expect(last.status).toBe(409);
+    expect((await last.json()).error.code).toBe("last_method");
+    const again = await googleSignIn(sub, "", { email });
+    expect(cookieOf(again, "ah_session")).toBeTruthy();
+    expect((await resolveSocialIdentities().find("google", sub))!.customerId).toBe(link.customerId);
+  });
+
+  it("account takeover: a Google account never opens an existing account that signs in with the same email", async () => {
+    const email = `victim${Date.now()}@example.com`;
+    const { customer: victim } = await resolveCustomers().findOrCreateByEmail(email);
+    const sub = `4${Date.now()}`;
+    const res = await googleSignIn(sub, "", { email });
+    expect(res.headers.get("location")).toBe("http://localhost:3000/account?social=email_in_use");
+    expect(cookieOf(res, "ah_session")).toBeUndefined();
+    expect(await resolveSocialIdentities().find("google", sub)).toBeNull();
+    expect(await resolveSocialIdentities().listFor(victim.id)).toEqual([]);
   });
 
   it("a forged callback (no cookie, wrong state) never signs anyone in", async () => {

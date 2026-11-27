@@ -9,11 +9,13 @@ import { useHumanCheck } from "@/components/security/human-check";
 import { SocialButtons, useSocialNotice } from "./social-sign-in";
 
 /**
- * ACC-01 phone OTP sign-in / sign-up (no passwords). `orderNumber` switches to ORD-03 track mode, where a code
- * is sent only if the phone belongs to that order (the response is the same either way).
+ * ACC-01 phone OTP sign-in / sign-up. `orderNumber` switches to ORD-03 track mode, where a code is sent only if
+ * the phone belongs to that order (the response is the same either way). `social={false}` when the host
+ * (SignInPanel) shows the social buttons and callback messages itself. Signed in to an account without a mobile,
+ * the verified number is added to that account (Settings → "Add mobile number").
  * The Terms/Privacy notice sits next to the button (DPDP one-tap sign-up); the server records it.
  */
-export function OtpSignIn({ onSignedIn, orderNumber, submitLabel = "Continue" }: { onSignedIn: () => void; orderNumber?: string; submitLabel?: string }) {
+export function OtpSignIn({ onSignedIn, orderNumber, submitLabel = "Continue", social: withSocial = true }: { onSignedIn: () => void; orderNumber?: string; submitLabel?: string; social?: boolean }) {
   const id = useId();
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -72,12 +74,12 @@ export function OtpSignIn({ onSignedIn, orderNumber, submitLabel = "Continue" }:
       }}
       className="flex flex-col gap-4"
     >
-      {!orderNumber && social.link ? (
+      {withSocial && !orderNumber && social.link ? (
         <p role="status" className="border border-ink bg-white px-3 py-2.5 text-[13px] leading-[1.5]">
           <b>Almost there.</b> Verify your mobile number once to finish signing in with {social.link === "google" ? "Google" : "Facebook"}. We&apos;ll link the two, so next time one tap is enough.
         </p>
       ) : null}
-      {!orderNumber && social.notice ? (
+      {withSocial && !orderNumber && social.notice ? (
         <p role="alert" className="text-[13px] font-semibold text-accent">
           {social.notice}
         </p>
@@ -144,7 +146,7 @@ export function OtpSignIn({ onSignedIn, orderNumber, submitLabel = "Continue" }:
       <Button type="submit" loading={busy} disabled={challenge ? code.length !== 6 : phone.length !== 10} className="w-full">
         {challenge ? "Verify" : submitLabel}
       </Button>
-      {!orderNumber && !challenge && !social.link ? <SocialButtons /> : null}
+      {withSocial && !orderNumber && !challenge && !social.link ? <SocialButtons /> : null}
       <p className="text-[12px] leading-[1.5] text-ink-2">
         By continuing you agree to our{" "}
         <Link href="/legal/terms" target="_blank" className="underline underline-offset-2">

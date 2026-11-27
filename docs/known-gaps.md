@@ -190,8 +190,22 @@
 - 🟡 No Playwright e2e yet (flows covered by route-level tests + a CDP script for now).
 
 ## Accounts, orders & returns (M6)
-- 🟠 Only phone OTP sign-in exists; email OTP and Google (ACC-01) need an email provider / OAuth client — each new path
-  must record `terms_privacy` in the consent ledger like OTP sign-up does.
+- ✅ (2026-12-02) ACC-01 done: phone OTP, email code, email + password and Google sign-up all exist and record
+  `terms_privacy`. Remaining sign-in gaps:
+  - 🟠 Contract tests for the new customer / credential behaviour ran on memory + MySQL only; run them on PostgreSQL
+    and MongoDB (`TEST_POSTGRES_URL`, `TEST_MONGODB_URL`) before switching engines.
+  - 🟠 Brute-force limits are per address + per IP + global; there is no progressive delay or CAPTCHA-after-N-failures
+    beyond the Turnstile switch. Turn Turnstile on (Admin → Settings → Bot Protection) before launch.
+  - 🟠 Password sign-in is single-factor. Customers who want more can use email/SMS codes only; there is no optional
+    TOTP / passkey for customers yet.
+  - 🟡 "Change email" keeps the old verified sign-in email until the new one is verified, but the old address is not
+    notified of the change. Add an email to the old address once the email provider is live.
+  - 🟡 The breached-password check fails open (service down → only the local rules apply). Logged as
+    `password_breach_check_unavailable`.
+  - 🟡 Password reset reveals "no account" (404) only AFTER a valid code for that address was entered, i.e. only to
+    the address owner — accepted.
+  - 🟡 Accounts started by email / Google have no mobile until checkout or Settings; SMS order updates and COD need it
+    (enforced: `phone_required`).
 - 🟠 No list of active sessions/devices and no new-device alerts yet.
 - 🟠 COD refunds to UPI are queued (`payout_pending`) — needs the gateway payout API + ops approval (M7). UPI IDs must be
   encrypted at rest once a database exists.

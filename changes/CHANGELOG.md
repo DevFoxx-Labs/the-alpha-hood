@@ -1,5 +1,87 @@
 # Change log
 
+## 2026-12-02 — ACC-01 complete: email + password, email code, Google sign-up, mobile OTP (all three ways in)
+
+**Asked for:** email/password login, Gmail (Google) login and mobile-number login/sign-up, production grade (rate
+limits, no auth/authz holes, each user sees only their own data). The owner should only have to set the SMS and
+email providers.
+
+### What a customer can do now (`/account`, signed out)
+- **Mobile number** tab: SMS code → signs in, or creates the account (unchanged flow, now through the shared sign-in).
+- **Email** tab: sign in with **password**; **create an account** (name optional, email, password, an unticked Terms +
+  Privacy checkbox → a 6-digit code to the email); **email me a sign-in code** (passwordless; creates the account on
+  first use with the one-tap notice); **forgot password** (code + new password).
+- **Continue with Google**: a Google-verified email now creates the account directly (before: a mobile had to be
+  verified first). Google without a verified email, and Facebook, still finish by verifying the mobile.
+- **Account → Settings → Sign-in & security**: add a mobile number (SMS code, attached to this account), set a
+  password (code to the sign-in email), change password (current one required), link / unlink Google / Facebook.
+- **Checkout**: an account started by email or Google adds its mobile in the Contact step; placing an order without
+  a verified mobile is refused on the server (`phone_required`, CHK-02 / CHK-07).
+
+### How it is built
+- `lib/auth/email-auth.ts` — the one service for email code / password / reset / change (`AuthError`).
+- `lib/auth/passwords.ts` — scrypt hashes (reuses `lib/admin/crypto.ts`), NIST 800-63B policy (8–128, no composition
+  rules, common / own-email refused), breached-password check via Pwned Passwords k-anonymity (production only,
+  `PASSWORD_BREACH_CHECK=on|off`, fails open after 2.5 s), constant-time dummy compare for unknown accounts.
+- `lib/auth/sign-in.ts` — `completeSignIn()`: every path (phone, email code, password, Google, Facebook) gets the same
+  fresh session, device cookie, new-device alert, consent row on account creation, and optional "sign out others".
+- Customers: `phone` may now be null (accounts started by email / Google), new verified `loginEmail` (UNIQUE), new
+  store methods `findOrCreateByEmail`, `findByLoginEmail`, `attachPhone`; `setEmail(…, verified)` moves the sign-in
+  email only when the new address is verified, and throws `EmailInUseError` if another account signs in with it.
+- Passwords live in their own store (`customer_credentials`), never on the customer record; erased on account deletion.
+- Routes: `POST /api/auth/email/send`, `POST /api/auth/email/verify`, `POST /api/auth/password`,
+  `POST /api/account/password`; changed: `/api/otp/verify` (attach mobile), social callback (Google sign-up),
+  `/api/account/social` (methods + last-method guard), `/api/account/me` (last-method guard).
+- UI: `components/account/sign-in-panel.tsx`, `email-sign-in.tsx`, `sign-in-methods.tsx` (Hugeicons only).
+- Migration `2026_12_01_016_customer_login` (SQL + MongoDB): nullable UNIQUE `customers.login_email` +
+  `customer_credentials`; batched, resumable backfill of already-verified emails (a duplicate address keeps the first
+  verified owner and is skipped). Phoneless accounts hold `none:<id>` in the NOT NULL UNIQUE phone column (read as null).
+
+### Threat model (High tier: authentication)
+- Assets: customer accounts (orders, addresses, store credit, Hood Coins), personal data, email / SMS credits.
+- Actors: guest, another customer, credential stuffer, email bomber, someone who knows a victim's email, a tampered
+  client.
+
+| Abuse case | Defence (layer) | Test |
+|---|---|---|
+| Account enumeration via send / login / reset | Same response for every address; one 401 message; dummy scrypt compare (prevent) | `no enumeration`, `same 401` |
+| Password brute force / credential stuffing | 10/10 min per IP, 8/15 min per address (also for unknown addresses), 300/10 min global, Turnstile when on, breach list (prevent) + `login_failed` / `login_limited` events (detect) | `brute force` |
+| 6-digit code guessing | 5 tries then locked, 5 min, single use (prevent) | `lock the challenge` |
+| Code for address A used on address B | HMAC covers `email-auth:<address key>` → wrong code, not consumed (prevent) | `bound to its address` |
+| Email bombing a victim | 30 s cooldown, 5/h, 10/day per address, 5/10 min + 20/day per IP, Turnstile (prevent) | `email bombing` |
+| Takeover by typing a victim's email into a profile | Only verified `loginEmail` signs in; UNIQUE; owner can still sign up (prevent) | `UNVERIFIED email`, contract test |
+| Takeover via a Google account with the victim's email | Social sign-in never matches an existing account by email → `email_in_use` (prevent) | `account takeover` |
+| Stolen session changes the password | Current password required, 5/15 min per account (prevent) | `change password` |
+| Old sessions after a reset / change | All other sessions revoked, fresh token (recover) | `forgot password`, `change password` |
+| Mass assignment (`customerId`, `role`, `verified`) | `rejectUnknownFields` on every route (prevent) | `unknown fields` |
+| CSRF / login CSRF | Same-origin check on every POST; OAuth `state` + PKCE + nonce (prevent) | `cross-site`, social tests |
+| Reading another customer's data | Every account route derives the customer from the session; no client IDs (prevent) | `each session sees only its own` |
+| Locking yourself out | Last-way-in guard on unlink and email removal (prevent) | `last way in`, Google unlink |
+| Race: two sign-ups for one email | UNIQUE `login_email`, insert-then-read-back (prevent) | contract test (memory + MySQL) |
+| Order without verified mobile (COD fraud) | `phone_required` in `placeOrder` (prevent) | `checkout refuses` |
+| Password hash leak | scrypt + random salt, separate table, never in any response / export (prevent) | `credentials` contract, `scrypt` checks |
+| Feature abused | `signInEnabled()` fail-closed flag → 503 on every route (recover) | `sign-in switched off` |
+
+### Legal (DPDP)
+- Privacy Notice **2026-12-02** (EN + HI): sign-in email + password hash (purpose, basis), Google sign-in now creates
+  accounts, the breached-password check as a processor (only 5 hash characters leave), retention of the hash.
+- Sign-up by email records `terms_privacy` with method **checkbox** (server-validated, must be exactly `true`);
+  email-code and Google sign-up record **signup_notice** (one-tap notice next to the button).
+- No new cookies.
+
+### Verified
+- `pnpm typecheck` ✔, `pnpm lint` ✔, `pnpm test` **41 files / 591 tests ✔** (was 560; +31 new, no regressions),
+  contract tests on **memory + local MySQL** (`alpha_hood_test`) incl. the new migration down/up ✔.
+- `pnpm build` ✔ (196 pages + the 4 new routes) — with `SECRET_BOX_KEY` / `OTP_PEPPER` set in the shell. Without
+  them, a build against `.env.local`'s database fails closed on `/products/[handle]/opengraph-image` (sealed
+  settings need the key) — pre-existing, by design; add `SECRET_BOX_KEY` to `.env.local` for local production builds.
+- Migration `2026_12_01_016` applied to local `alpha_hood_dev`; live smoke on the dev server: sign-up (A, B),
+  Terms required, password sign-in, HttpOnly + SameSite=Lax cookie, A/B see only their own data, no hash in
+  responses, identical 401 for wrong password / unknown email, logout revokes — 12/12 ✔.
+- Not verified: the visual check at 1440 / 390 / 360 px (the browser extension was not connected); PostgreSQL /
+  MongoDB contract runs (no `TEST_POSTGRES_URL` / `TEST_MONGODB_URL` locally); real Google, SMS and email providers
+  (need the owner's keys).
+
 ## 2026-12-01 — Review photos, store replies to reviews, customer emails for reviews and feedback
 
 **Asked for:** feedback stays answered by the admin team; add store replies to reviews, photos in reviews, and tell

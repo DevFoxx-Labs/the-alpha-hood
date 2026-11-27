@@ -20,7 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { useMe } from "./account-frame";
 import { dateLabel } from "./labels";
 import { EmailVerify } from "./email-verify";
-import { SignInMethods } from "./social-sign-in";
+import { SignInMethods } from "./sign-in-methods";
 
 interface Prefs {
   marketing_email: boolean;
@@ -96,7 +96,7 @@ export function SettingsView() {
       <section className={box}>
         <h2 className={h2}>Profile</h2>
         <form onSubmit={saveProfile} className="grid max-w-[520px] gap-3">
-          <p className="text-[13px] text-ink-2">Mobile {me.customer.phone} (verified — used to sign in)</p>
+          <p className="text-[13px] text-ink-2">{me.customer.phone ? <>Mobile {me.customer.phone} (verified — used to sign in)</> : <>No mobile number yet — add one under Sign-in &amp; security.</>}</p>
           <label htmlFor={`${id}-name`} className="text-[12px] font-bold uppercase tracking-[0.06em]">
             Name
           </label>
@@ -112,7 +112,7 @@ export function SettingsView() {
         </form>
       </section>
 
-      <SignInMethods box={box} h2={h2} />
+      <SignInMethods box={box} h2={h2} onChanged={() => void reload()} />
 
       <section className={box}>
         <h2 className={h2}>Notifications</h2>
@@ -122,7 +122,7 @@ export function SettingsView() {
             {([
               ["whatsapp_updates", "Order updates on WhatsApp", "Order, delivery, return and back-in-stock updates on WhatsApp too. No offers."],
               ["marketing_whatsapp", "Offers on WhatsApp", "New drops, sales and offers on WhatsApp."],
-              ["marketing_sms", "Offers by SMS", `New drops, sales and offers by SMS to ${me.customer.phone}.`],
+              ["marketing_sms", "Offers by SMS", me.customer.phone ? `New drops, sales and offers by SMS to ${me.customer.phone}.` : "Add a mobile number to turn this on."],
               ["marketing_email", "Offers by email", me.customer.email ? "New drops, sales and offers by email." : "Add an email above to turn this on."],
             ] as const).map(([key, title, text]) => (
               <li key={key} className="flex items-center justify-between gap-4 py-3">

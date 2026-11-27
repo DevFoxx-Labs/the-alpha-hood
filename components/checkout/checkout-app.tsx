@@ -28,7 +28,7 @@ import { ContactStep } from "./contact-step";
 interface State {
   enabled: boolean;
   codEnabled: boolean;
-  customer: { phone: string; name?: string | null; email: string | null; addresses: Address[] } | null;
+  customer: { phone: string | null; name?: string | null; email: string | null; addresses: Address[] } | null;
   cart: PublicCartView;
 }
 
@@ -219,7 +219,9 @@ export function CheckoutApp() {
       ]
     : [];
   const toPay = quote?.payable ?? pricing.total;
-  const disabledReason = !state.customer
+  // An account started by email or Google adds a verified mobile in the contact step first (CHK-02).
+  const verified = !!state.customer?.phone;
+  const disabledReason = !verified
     ? "Verify your phone number to continue."
     : !addressId
       ? "Add a delivery address to continue."
@@ -288,7 +290,7 @@ export function CheckoutApp() {
             speed={speed}
             onSpeed={setSpeed}
             shippingFee={pricing.shipping}
-            disabled={!state.customer}
+            disabled={!verified}
           />
           <WalletStep
             choice={wallet}
@@ -296,7 +298,7 @@ export function CheckoutApp() {
             wallet={quote?.wallet ?? null}
             tenders={quote?.tenders ?? null}
             error={walletError}
-            disabled={!state.customer || placing}
+            disabled={!verified || placing}
           />
           <CheckoutStep number={4} title="Payment" aside="All transactions are encrypted">
             <PaymentMethods

@@ -106,8 +106,8 @@ export function AccountOverview() {
       <section className="grid gap-3 sm:grid-cols-3">
         <div className="border border-line p-4">
           <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-2">Signed in as</p>
-          <p className="mt-1 text-[14px] font-semibold">{me.customer.name ?? me.customer.phone}</p>
-          {me.customer.name ? <p className="text-[12px] text-ink-2">{me.customer.phone}</p> : null}
+          <p className="mt-1 break-all text-[14px] font-semibold">{me.customer.name ?? me.customer.phone ?? me.customer.email}</p>
+          {me.customer.name && (me.customer.phone ?? me.customer.email) ? <p className="break-all text-[12px] text-ink-2">{me.customer.phone ?? me.customer.email}</p> : null}
         </div>
         <div className="border border-line p-4">
           <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-2">Store credit</p>

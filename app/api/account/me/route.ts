@@ -1,3 +1,4 @@
+import { methodCount, signInMethods } from "@/lib/auth/email-auth";
 import { publicCustomer, resolveCustomers } from "@/lib/customers/store";
 import { clientIp, guardPublicWrite, jsonError } from "@/lib/http/guard";
 import { commerceErrorResponse, privateJson, requireAccount } from "@/lib/http/commerce-http";
@@ -40,8 +41,17 @@ export async function PATCH(request: Request) {
       const email = input.email === "" ? null : normaliseEmail(input.email);
       if (input.email !== "" && !email) return jsonError(422, "invalid_input", "Enter a valid email address.");
       const current = await customers.get(auth.customerId);
-      // Re-saving the same address keeps it verified; a new address must be confirmed again.
-      if (current?.email !== email) await customers.setEmail(auth.customerId, email);
+      if (current?.email !== email) {
+        // Removing the email also removes it as a sign-in method: refused if it is the only way in.
+        if (!email && current?.loginEmail) {
+          const methods = await signInMethods(auth.customerId);
+          if (methods && methodCount(methods) <= 1) {
+            return jsonError(409, "last_method", "You sign in with this email. Add your mobile number or link Google before removing it.");
+          }
+        }
+        // A new address is stored unverified; the verified sign-in email keeps working until the new one is confirmed.
+        await customers.setEmail(auth.customerId, email);
+      }
     }
     const customer = await customers.get(auth.customerId);
     return privateJson({ customer: customer ? publicCustomer(customer) : null });
