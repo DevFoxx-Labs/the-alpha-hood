@@ -211,6 +211,12 @@
   edits the hero, campaign band and SEO block. Still built-in only: promo band, collection tiles, offer tiles,
   trending tabs, Shop the Look, new arrivals, Alpha Club band, announcements, header / menu / footer. Next step: an
   "own" CMS provider that serves every block from Admin → Homepage (with the offers set to real running offers).
+- 🟠 (2026-12-02) **Ambassador / limited-edition commerce rules not built yet** (only the homepage sections are):
+  no per-customer purchase limit, no prepaid-only (COD off) rule for signed / limited pieces, no numbered pieces
+  ("No. 37 / 100") on orders and invoices, no drop launch time / countdown, and no separate return policy for signed
+  items (the Refund Policy must say it — lawyer). Decide these before the first drop.
+- 🟡 (2026-12-02) Ambassador / limited sections: no video loop (GymYardHQ's `SceneVideo`) — needs a video upload
+  pipeline. Animations not checked in a browser yet.
 - 🟡 (2026-12-02) Homepage editor: no live preview before saving, no draft / publish step, and no per-slide click
   tracking. Uploaded hero images go through the product photo rules (JPEG / PNG, 600–6000 px).
 - 🟡 (2026-12-02) PDP-10 guest "Notify me": the form isn't checked visually at 1440 / 390 / 360 px yet, and product

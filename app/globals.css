@@ -335,6 +335,104 @@
   }
 }
 
+/*
+ * ───────────── Ambassador band + Limited-edition finale (homepage) ─────────────
+ * Ported from the GymYardHQ hero and download finale. CSS only, scroll-driven (view timelines), transform / opacity
+ * only (no animated blur: our performance rule for big display text). Without scroll timelines or with reduced motion
+ * everything simply shows in its final place.
+ *
+ * Ambassador (view timeline --amb): the two giant lines sweep in from opposite sides as the band enters and split
+ * apart again as it leaves; the copy rises first, the product cards a little slower, the scene zooms slowest.
+ * Line 1 turns to "glass" over the subject on wide screens (fill fades, an outline takes over).
+ * Limited (view timeline --ltd, section 260vh, sticky stage): line 1 sweeps in behind the art, the scene slides in
+ * from the right, the cut-out swings in from the left (sparks burst), line 2 sweeps in front, then the CTA.
+ * Not inside a cascade layer (as in GymYardHQ): these rules must beat Tailwind utilities on the same elements
+ * (e.g. `relative` vs the sticky stage), and unlayered CSS always does.
+ */
+@keyframes amb-in-l {
+  from { opacity: 0; transform: translateX(-35%) scale(0.9); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes amb-in-r {
+  from { opacity: 0; transform: translateX(35%) scale(0.9); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes amb-out-l { to { opacity: 0.4; transform: translateX(-30%); } }
+@keyframes amb-out-r { to { opacity: 0.4; transform: translateX(30%); } }
+@keyframes amb-rise { from { opacity: 0; transform: translateY(32px); } to { opacity: 1; transform: none; } }
+@keyframes amb-copy-out { to { opacity: 0; transform: translateY(-16vh) scale(0.96); } }
+@keyframes amb-cards-out { to { transform: translateY(-9vh); } }
+@keyframes amb-bg { from { transform: scale(1.08); } 50% { transform: none; } to { transform: translateY(8vh) scale(1.12); } }
+@keyframes amb-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+@keyframes ltd-line1 { from { opacity: 0; transform: translateX(-35%) scale(0.9); } to { opacity: 1; transform: none; } }
+@keyframes ltd-line2 { from { opacity: 0; transform: translateX(35%) scale(0.9); } to { opacity: 1; transform: none; } }
+@keyframes ltd-duo { from { opacity: 0; transform: translateX(-45%) rotate(-6deg); } to { opacity: 1; transform: none; } }
+@keyframes ltd-scene { from { opacity: 0; transform: translateX(35%) scale(0.9); } to { opacity: 1; transform: none; } }
+@keyframes ltd-cta { from { opacity: 0; transform: translateX(30%); } to { opacity: 1; transform: none; } }
+
+/* Firecracker burst (sparks fly out along --rot, fade), 1.6 s cycle. */
+@keyframes burst-spark {
+  0%, 40% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--rot)) translateY(0) scale(0); }
+  43% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--rot)) translateY(calc(var(--dist) * -0.35)) scale(1.15); }
+  56% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--rot)) translateY(calc(var(--dist) * -0.9)) scale(0.9) rotate(45deg); }
+  68%, 100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--rot)) translateY(calc(var(--dist) * -1.1)) scale(0) rotate(90deg); }
+}
+@keyframes burst-flash {
+  0%, 39% { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+  42% { opacity: 0.9; transform: translate(-50%, -50%) scale(1); }
+  54%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.6); }
+}
+.sparkle-star { clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); }
+.burst-spark,
+.burst-flash { opacity: 0; }
+.burst-flash { background: radial-gradient(circle, rgb(255 255 255 / 0.95) 0%, color-mix(in oklab, var(--color-volt) 55%, transparent) 35%, transparent 70%); }
+
+/* Line 1 turns to glass where it crosses the subject (wide screens). */
+@media (min-width: 1024px) {
+  .amb-ghost { mask-image: linear-gradient(to right, #000 0%, #000 52%, rgb(0 0 0 / 0.14) 64%, rgb(0 0 0 / 0.14) 100%); }
+  .amb-ghost-stroke { mask-image: linear-gradient(to right, transparent 0%, transparent 52%, #000 64%, #000 100%); }
+}
+
+.amb { view-timeline-name: --amb; }
+.ltd { view-timeline-name: --ltd; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .amb-float { animation: amb-float 5s ease-in-out infinite; }
+  .burst-spark { animation: burst-spark 1.6s cubic-bezier(0.25, 1, 0.5, 1) infinite; animation-delay: var(--lag, 0ms); }
+  .burst-flash { animation: burst-flash 1.6s ease-out infinite; }
+
+  @supports (animation-timeline: view()) {
+    .amb-in-l, .amb-in-r, .amb-rise, .amb-out-l, .amb-out-r, .amb-copy-out, .amb-cards-out, .amb-bg {
+      animation-timeline: --amb;
+      animation-fill-mode: both;
+      animation-timing-function: linear;
+    }
+    /* in while it enters (staggered by --d, a % of the range), out while it leaves */
+    .amb-in-l { animation-name: amb-in-l; animation-range: entry calc(10% + var(--d, 0%)) cover calc(42% + var(--d, 0%)); }
+    .amb-in-r { animation-name: amb-in-r; animation-range: entry calc(10% + var(--d, 0%)) cover calc(42% + var(--d, 0%)); }
+    .amb-rise { animation-name: amb-rise; animation-range: entry calc(40% + var(--d, 0%)) cover calc(48% + var(--d, 0%)); }
+    .amb-out-l { animation-name: amb-out-l; animation-range: exit 0% exit 90%; }
+    .amb-out-r { animation-name: amb-out-r; animation-range: exit 0% exit 90%; }
+    .amb-copy-out { animation-name: amb-copy-out; animation-range: exit 0% exit 80%; }
+    .amb-cards-out { animation-name: amb-cards-out; animation-range: exit 0% exit 100%; }
+    .amb-bg { animation-name: amb-bg; animation-range: cover 0% cover 100%; transform-origin: 70% 40%; }
+
+    .ltd { height: 260vh; }
+    .ltd-stage { position: sticky; top: 0; }
+    .ltd-line1, .ltd-line2, .ltd-duo, .ltd-scene, .ltd-cta {
+      animation-timeline: --ltd;
+      animation-fill-mode: both;
+      animation-timing-function: linear;
+    }
+    .ltd-line1 { animation-name: ltd-line1; animation-range: entry 55% contain 25%; }
+    .ltd-scene { animation-name: ltd-scene; animation-range: entry 45% contain 25%; }
+    .ltd-duo { animation-name: ltd-duo; animation-range: contain 10% contain 40%; }
+    .ltd-line2 { animation-name: ltd-line2; animation-range: contain 20% contain 50%; }
+    .ltd-cta { animation-name: ltd-cta; animation-range: contain 40% contain 65%; }
+  }
+}
+
 /* Search inputs: the overlay has its own close button — hide the native clear "×". */
 @layer base {
   input[type="search"]::-webkit-search-cancel-button,

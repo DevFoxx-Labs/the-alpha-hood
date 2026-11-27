@@ -53,6 +53,41 @@ export type HomeBlock = Targeting & { id: string } & (
         tiles: { title: string; tagline: string; href: string; fill: string; look: FigureLook; image?: TileImage }[];
       }
     | {
+        /**
+         * Brand-ambassador exclusives (signed pieces). Full-bleed scene with two giant headline lines sweeping in from
+         * opposite sides (the GymYardHQ hero, set for a mid-page band). Images: `/api/media/…` or a built-in path.
+         */
+        type: "ambassador";
+        eyebrow: string;
+        line1: string;
+        line2: string;
+        text: string;
+        ambassadorName: string;
+        cta: { label: string; href: string };
+        desktopImage: string;
+        mobileImage: string;
+        alt: string;
+        /** Hand-picked products (≤ 4). Empty = none shown. */
+        productIds: string[];
+      }
+    | {
+        /** Limited-edition drop: pinned full-height stage, line 1 behind the art, line 2 in front (GymYardHQ finale). */
+        type: "limited_edition";
+        eyebrow: string;
+        line1: string;
+        line2: string;
+        text: string;
+        cta: { label: string; href: string };
+        /** Pieces in the edition ("Edition of 100"); null = not shown. */
+        editionSize: number | null;
+        /** Cut-out (transparent PNG) on the left, e.g. the ambassador holding the piece. */
+        cutoutImage: string;
+        cutoutAlt: string;
+        /** Scene on the right (desktop). */
+        sceneImage: string;
+        productIds: string[];
+      }
+    | {
         /** Editorial band: art on one side, headline + CTA on the other (MASCOT_PROMPTS §7 collection launch). */
         type: "campaign_band";
         kicker: string;

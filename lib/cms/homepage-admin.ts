@@ -2,7 +2,7 @@ import type { CatalogAdminDeps } from "@/lib/catalog/admin";
 import { revisionOf, write } from "@/lib/catalog/taxonomy";
 import { ValidationError } from "@/lib/http/guard";
 import { asObject } from "@/lib/validation";
-import { BUILTIN_IMAGES, builtInContent, type HomepageContent, HOMEPAGE_LIMITS, mediaIdsOf, parseHomepage } from "./homepage";
+import { BUILTIN_IMAGES, builtInContent, type HomepageContent, HOMEPAGE_LIMITS, mediaIdsOf, parseHomepage, productIdsOf } from "./homepage";
 import { MOCK_HOMEPAGE } from "./mock-home";
 
 /**
@@ -10,9 +10,12 @@ import { MOCK_HOMEPAGE } from "./mock-home";
  * with the same optimistic revision as categories / collections (a stale save → 409, nothing lost).
  */
 export async function homepageView(deps: CatalogAdminDeps) {
-  const docs = await deps.store.getDocs();
+  const [docs, records] = await Promise.all([deps.store.getDocs(), deps.store.listRecords()]);
   const content = docs?.homepage ?? {};
+  const picked = new Set(productIdsOf(content));
   return {
+    /** Titles of the picked products, for the editor's lists. */
+    productTitles: Object.fromEntries(records.filter((r) => picked.has(r.id)).map((r) => [r.id, r.title])),
     revision: docs?.revision ?? 0,
     /** What is saved (a missing part = the built-in content is shown). */
     content,
@@ -33,6 +36,11 @@ export async function saveHomepage(deps: CatalogAdminDeps, body: unknown): Promi
     const found = deps.media ? await deps.media.existing(ids) : new Set<string>();
     if (ids.some((id) => !found.has(id))) throw new ValidationError("A photo wasn't found — upload it again.");
   }
+  const picked = productIdsOf(homepage);
+  if (picked.length) {
+    const known = new Set((await deps.store.listRecords()).map((r) => r.id));
+    if (picked.some((id) => !known.has(id))) throw new ValidationError("A picked product isn't in the catalogue any more. Pick it again.");
+  }
   const revision = await write(deps, current, { homepage }, expected);
   return {
     revision,
@@ -40,6 +48,8 @@ export async function saveHomepage(deps: CatalogAdminDeps, body: unknown): Promi
       heroSlides: homepage.hero?.length ?? -1,
       campaign: homepage.campaign ? (homepage.campaign.enabled ? 1 : 0) : -1,
       seoLinks: homepage.seo ? homepage.seo.groups.reduce((n, g) => n + g.links.length, 0) : -1,
+      ambassador: homepage.ambassador ? (homepage.ambassador.enabled ? homepage.ambassador.productIds.length : 0) : -1,
+      limited: homepage.limited ? (homepage.limited.enabled ? homepage.limited.productIds.length : 0) : -1,
     },
   };
 }

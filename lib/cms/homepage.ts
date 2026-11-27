@@ -14,7 +14,7 @@ import type { Device, FigureLook, HeroSlide, HomeBlock } from "./types";
  * own media store (`/api/media/med_…`, checked to exist) or one of the built-in brand images (allow-list). Nothing
  * here is ever fetched from a URL an admin typed.
  */
-export const HOMEPAGE_LIMITS = { slides: 6, headlineLines: 3, seoGroups: 3, seoLinks: 24, seoParagraphs: 3 } as const;
+export const HOMEPAGE_LIMITS = { slides: 6, headlineLines: 3, seoGroups: 3, seoLinks: 24, seoParagraphs: 3, ambassadorProducts: 4, limitedProducts: 3, editionMax: 100_000 } as const;
 
 export interface StoredHeroSlide {
   id: string;
@@ -55,10 +55,42 @@ export interface StoredSeo {
   text: string[];
 }
 
+export interface StoredAmbassador {
+  enabled: boolean;
+  eyebrow: string;
+  line1: string;
+  line2: string;
+  text: string;
+  ambassadorName: string;
+  cta: { label: string; href: string };
+  desktopImage: string;
+  mobileImage: string;
+  alt: string;
+  productIds: string[];
+}
+
+export interface StoredLimited {
+  enabled: boolean;
+  eyebrow: string;
+  line1: string;
+  line2: string;
+  text: string;
+  cta: { label: string; href: string };
+  editionSize: number | null;
+  cutoutImage: string;
+  cutoutAlt: string;
+  sceneImage: string;
+  productIds: string[];
+}
+
 export interface HomepageContent {
   hero?: StoredHeroSlide[];
   campaign?: StoredCampaign;
   seo?: StoredSeo;
+  /** Brand-ambassador exclusives band. */
+  ambassador?: StoredAmbassador;
+  /** Limited-edition drop (pinned finale). */
+  limited?: StoredLimited;
 }
 
 // ── Images ─────────────────────────────────────────────────────────────────────────────────────────
@@ -74,7 +106,14 @@ const builtinBg = new Map<string, string | null>(Object.values(MASCOT).map((m) =
 
 /** Media ids used by the content (to check they exist before saving). */
 export function mediaIdsOf(c: HomepageContent): string[] {
-  const paths = [...(c.hero ?? []).flatMap((s) => [s.desktopImage, s.mobileImage]), c.campaign?.image ?? null];
+  const paths = [
+    ...(c.hero ?? []).flatMap((s) => [s.desktopImage, s.mobileImage]),
+    c.campaign?.image ?? null,
+    c.ambassador?.desktopImage ?? null,
+    c.ambassador?.mobileImage ?? null,
+    c.limited?.cutoutImage ?? null,
+    c.limited?.sceneImage ?? null,
+  ];
   return paths.map((p) => (p ? MEDIA_RE.exec(p)?.[1] : undefined)).filter((x): x is string => !!x);
 }
 
@@ -205,12 +244,71 @@ export function parseSeo(raw: unknown): StoredSeo {
   };
 }
 
+const PRODUCT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+function productIds(v: unknown, where: string, max: number): string[] {
+  if (!Array.isArray(v) || v.length > max) throw new ValidationError(`${where}: pick up to ${max} products.`);
+  const seen = new Set<string>();
+  for (const id of v) {
+    if (typeof id !== "string" || !PRODUCT_ID_RE.test(id)) throw new ValidationError(`${where}: a picked product is invalid. Pick it again.`);
+    if (seen.has(id)) throw new ValidationError(`${where}: a product is picked twice.`);
+    seen.add(id);
+  }
+  return v as string[];
+}
+
+/** One giant display line (fits the full width at the size the band uses). */
+const bigLine = (v: unknown, where: string) => text(v, where, 2, 16);
+
+export function parseAmbassador(raw: unknown): StoredAmbassador {
+  const o = asObject(raw);
+  rejectUnknownFields(o, ["enabled", "eyebrow", "line1", "line2", "text", "ambassadorName", "cta", "desktopImage", "mobileImage", "alt", "productIds"]);
+  return {
+    enabled: o.enabled !== false,
+    eyebrow: text(o.eyebrow, "Ambassador small line", 0, 50),
+    line1: bigLine(o.line1, "Ambassador headline line 1"),
+    line2: bigLine(o.line2, "Ambassador headline line 2"),
+    text: text(o.text, "Ambassador text", 0, 240),
+    ambassadorName: text(o.ambassadorName, "Ambassador name", 2, 40),
+    cta: cta(o.cta, "Ambassador"),
+    desktopImage: imagePath(o.desktopImage, "Ambassador desktop image", false),
+    mobileImage: imagePath(o.mobileImage, "Ambassador mobile image", false),
+    alt: text(o.alt, "Ambassador image description", 4, 140),
+    productIds: productIds(o.productIds ?? [], "Ambassador products", HOMEPAGE_LIMITS.ambassadorProducts),
+  };
+}
+
+export function parseLimited(raw: unknown): StoredLimited {
+  const o = asObject(raw);
+  rejectUnknownFields(o, ["enabled", "eyebrow", "line1", "line2", "text", "cta", "editionSize", "cutoutImage", "cutoutAlt", "sceneImage", "productIds"]);
+  let editionSize: number | null = null;
+  if (o.editionSize !== null && o.editionSize !== undefined && o.editionSize !== "") {
+    if (typeof o.editionSize !== "number" || !Number.isSafeInteger(o.editionSize) || o.editionSize < 1 || o.editionSize > HOMEPAGE_LIMITS.editionMax) throw new ValidationError(`Limited edition: pieces must be a whole number from 1 to ${HOMEPAGE_LIMITS.editionMax}.`);
+    editionSize = o.editionSize;
+  }
+  return {
+    enabled: o.enabled !== false,
+    eyebrow: text(o.eyebrow, "Limited edition small line", 0, 50),
+    line1: bigLine(o.line1, "Limited edition headline line 1"),
+    line2: bigLine(o.line2, "Limited edition headline line 2"),
+    text: text(o.text, "Limited edition text", 0, 240),
+    cta: cta(o.cta, "Limited edition"),
+    editionSize,
+    cutoutImage: imagePath(o.cutoutImage, "Limited edition cut-out", false),
+    cutoutAlt: text(o.cutoutAlt, "Limited edition cut-out description", 4, 140),
+    sceneImage: imagePath(o.sceneImage, "Limited edition scene", false),
+    productIds: productIds(o.productIds ?? [], "Limited edition products", HOMEPAGE_LIMITS.limitedProducts),
+  };
+}
+
+/** Product ids the content points at (checked against the catalogue before saving). */
+export const productIdsOf = (c: HomepageContent) => [...(c.ambassador?.productIds ?? []), ...(c.limited?.productIds ?? [])];
+
 /**
- * The admin's save body `{ hero?, campaign?, seo? }`: each part is either the new content or `null` (go back to the
- * built-in content). Parts left out keep what is stored.
+ * The admin's save body `{ hero?, campaign?, seo?, ambassador?, limited? }`: each part is either the new content or
+ * `null` (go back to the built-in content). Parts left out keep what is stored.
  */
 export function parseHomepage(body: Record<string, unknown>, current: HomepageContent | undefined): HomepageContent {
-  rejectUnknownFields(body, ["revision", "hero", "campaign", "seo"]);
+  rejectUnknownFields(body, ["revision", "hero", "campaign", "seo", "ambassador", "limited"]);
   const next: HomepageContent = { ...(current ?? {}) };
   if (body.hero !== undefined) {
     if (body.hero === null) delete next.hero;
@@ -225,6 +323,14 @@ export function parseHomepage(body: Record<string, unknown>, current: HomepageCo
     if (body.seo === null) delete next.seo;
     else next.seo = parseSeo(body.seo);
   }
+  if (body.ambassador !== undefined) {
+    if (body.ambassador === null) delete next.ambassador;
+    else next.ambassador = parseAmbassador(body.ambassador);
+  }
+  if (body.limited !== undefined) {
+    if (body.limited === null) delete next.limited;
+    else next.limited = parseLimited(body.limited);
+  }
   return next;
 }
 
@@ -237,7 +343,23 @@ export function builtInContent(blocks: HomeBlock[]): Required<HomepageContent> {
   const hero = blocks.find((b) => b.type === "hero");
   const campaign = blocks.find((b) => b.type === "campaign_band");
   const seo = blocks.find((b) => b.type === "seo");
+  const amb = blocks.find((b) => b.type === "ambassador");
+  const ltd = blocks.find((b) => b.type === "limited_edition");
+  const strip = <T extends { type: string; id: string }>(b: T) => {
+    const { type: _t, id: _i, ...rest } = b;
+    void _t;
+    void _i;
+    return rest;
+  };
   return {
+    ambassador:
+      amb?.type === "ambassador"
+        ? { enabled: true, ...(strip(amb) as Omit<StoredAmbassador, "enabled">) }
+        : { enabled: false, eyebrow: "", line1: "Signed by", line2: "our ambassador", text: "", ambassadorName: "Ambassador", cta: { label: "Shop now", href: "/collections/new-in" }, desktopImage: MASCOT_HERO["hood-up"].desktop, mobileImage: MASCOT_HERO["hood-up"].mobile, alt: "Brand ambassador", productIds: [] },
+    limited:
+      ltd?.type === "limited_edition"
+        ? { enabled: true, ...(strip(ltd) as Omit<StoredLimited, "enabled">) }
+        : { enabled: false, eyebrow: "", line1: "Limited", line2: "Edition.", text: "", cta: { label: "Shop the drop", href: "/collections/new-in" }, editionSize: null, cutoutImage: MASCOT["alpha-01-hero-stance"].src, cutoutAlt: "Limited edition", sceneImage: MASCOT["scene-25-lookbook"].src, productIds: [] },
     hero:
       hero?.type === "hero"
         ? hero.slides.map((s) => ({
@@ -307,6 +429,16 @@ export function applyHomepage(blocks: HomeBlock[], content: HomepageContent | nu
     }
     if (block.type === "seo" && content.seo) {
       out.push({ ...block, heading: content.seo.heading, groups: content.seo.groups, text: content.seo.text });
+      continue;
+    }
+    if (block.type === "ambassador" && content.ambassador) {
+      const { enabled, ...rest } = content.ambassador;
+      if (enabled) out.push({ ...block, ...rest });
+      continue;
+    }
+    if (block.type === "limited_edition" && content.limited) {
+      const { enabled, ...rest } = content.limited;
+      if (enabled) out.push({ ...block, ...rest });
       continue;
     }
     out.push(block);

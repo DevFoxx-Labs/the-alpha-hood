@@ -1,5 +1,62 @@
 # Change log
 
+## 2026-12-02 — Homepage: brand-ambassador signed exclusives + limited-edition drop (GymYardHQ designs)
+
+**Asked for:** two admin-customisable homepage sections only for the brand ambassador's exclusive, autographed,
+high-priced pieces and for limited editions — with the design, animation and appeal of the GymYardHQ home page's
+hero and the section above its footer.
+
+### Sections (built-in DEMO in development; Admin → Homepage replaces them)
+- **Brand ambassador — signed exclusives** (`components/home/ambassador-band.tsx`, below Shop by category): the
+  GymYardHQ hero, as a mid-page band. Full-bleed photo (16:7 desktop, subject right; 4:5 mobile, subject low), black
+  blends, small line with a volt dot, two giant Anton lines that sweep in from opposite sides as the band enters
+  and split apart as it leaves, line 1 turning to "glass" (fill fades, outline takes over) over the subject on desktop,
+  the copy + "✍ Hand-signed by …" + volt CTA rising on the dark side, two signed pieces floating between copy and
+  subject, the scene zooming slowest, and a row of every signed piece under it.
+- **Limited edition drop** (`components/home/limited-finale.tsx`, above the trust strip / SEO block, i.e. just above
+  the footer as in GymYardHQ): the download finale — volt, pinned, full height (260 vh, sticky stage). Line 1 sweeps in
+  behind the art, the scene slides in from the right, the cut-out swings in from the left with the firecracker
+  sparkles, line 2 sweeps in front, then the CTA with "Edition of N" and "N left" (real stock of the picked products).
+- Product cards (`signature-pieces.tsx`): photo, name, price (from the product), "✍ Signed by …", "Only N left" /
+  "Sold out" from real stock.
+- Motion (`app/globals.css`, `.amb-*` / `.ltd-*` / sparkles): CSS scroll timelines, transform / opacity only, static
+  without scroll-timeline support or with reduced motion.
+
+### Admin → Homepage
+- Two new cards (Customise / Use built-in / show on–off): ambassador's name, small line, two headline lines (≤ 16
+  characters each), text, button, desktop + mobile photo (upload or built-in), alt text, up to 4 signed pieces
+  (product picker); limited edition: small line, two lines, text, edition size, button, cut-out PNG, scene, up to
+  3 pieces. Stored in `homepage.ambassador` / `homepage.limited` (catalogue documents — no migration).
+
+### Differences from GymYardHQ (deliberate)
+- **No animated blur** on the giant lines: the project performance rule forbids animating `filter: blur()` on big
+  display text. Everything else (directions, ranges, depth, ghost line, pinning, sparkles) is the same.
+- **Brand type and colours:** Anton + volt / black instead of GymYardHQ's wide font + lime / ink.
+- **Scroll-triggered instead of load-triggered entrance** for the ambassador band (it is mid-page, so a load-in would
+  finish before anyone sees it); its exit uses the band's own timeline instead of the page top.
+- **No looping video** (GymYardHQ's `SceneVideo`): admins can upload photos only; a video upload pipeline is a gap.
+
+### Security
+- Same server rules as the rest of the homepage content: same-site links only, images from our media store (must
+  exist) or built-ins, plain text with caps, unknown fields refused, picked products must exist in the catalogue,
+  ≤ 4 / ≤ 3 products, edition size 1–100,000, prices never taken from here (they come from the product), `catalog.write`
+  + audit + optimistic revision.
+
+### Verified
+- `pnpm typecheck` ✔, ESLint ✔, `pnpm test` 43 files / 617 tests ✔ (4 new tests; the block-order test updated for
+  the two new blocks). Dev server: home 200 with both sections, "Hand-signed by Alpha", six "Signed by" cards,
+  "Edition of 100".
+- Not verified: the animations in a browser (extension not connected).
+
+### Fix (same day): "the GymYardHQ animation effect doesn't show"
+- The dev server kept serving a stylesheet compiled before the animation CSS existed (Turbopack didn't rebuild
+  `globals.css`); Tailwind compiles the block correctly (checked with Tailwind's API).
+- Two real bugs too: (1) the rules sat in `@layer components`, so Tailwind's `relative` utility beat
+  `.ltd-stage { position: sticky }` — the limited section could never pin. Moved the block out of the layer, as in
+  GymYardHQ (unlayered CSS beats every layer); checked in the served stylesheet. (2) The floating signed pieces had
+  two animations on one element (`amb-rise` + `amb-float`); the shorthand cancelled the scroll timeline. Split onto
+  two elements.
+
 ## 2026-12-02 — Admin → Homepage (hero, campaign band, SEO block), Shop all categories, category slider, Alpha Club sign-in
 
 **Asked for:** admin can customise the hero carousel; choose which categories show on the homepage and which on

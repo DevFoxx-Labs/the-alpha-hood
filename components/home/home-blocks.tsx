@@ -1,6 +1,8 @@
 import { ProductCard } from "@/components/store/product-card";
 import { ArrowLink, CampaignBand, CollectionTile, OfferTile, PromoBand } from "@/components/store/merch-tiles";
 import { CategorySlider } from "./category-slider";
+import { AmbassadorBand } from "./ambassador-band";
+import { LimitedFinale } from "./limited-finale";
 import { SectionHeader } from "@/components/store/section-header";
 import { deviceClass } from "@/lib/cms/schedule";
 import type { ResolvedHomeBlock } from "@/lib/storefront";
@@ -93,6 +95,12 @@ function Block({ resolved }: { resolved: ResolvedHomeBlock }) {
         </section>
       );
     }
+
+    case "ambassador":
+      return <AmbassadorBand block={block} products={"products" in resolved ? resolved.products : []} />;
+
+    case "limited_edition":
+      return <LimitedFinale block={block} products={"products" in resolved ? resolved.products : []} />;
 
     case "shop_the_look": {
       if (!("look" in resolved) || !resolved.look) return null;

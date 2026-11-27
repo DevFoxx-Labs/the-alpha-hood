@@ -46,6 +46,21 @@ export const MOCK_HOMEPAGE: HomeBlock[] = [
   },
   { id: "categories", type: "category_rail", lead: "Shop by", title: "Category", viewAllHref: "/men" },
   {
+    // DEMO: the mascot stands in for the brand ambassador until the real shoot (Admin → Homepage replaces it).
+    id: "ambassador",
+    type: "ambassador",
+    eyebrow: "Brand ambassador · Signed collection",
+    line1: "Signed by",
+    line2: "the alpha.",
+    text: "Exclusive pieces, each hand-signed by our ambassador and made in small numbers. Once they're gone, they're gone.",
+    ambassadorName: "Alpha",
+    cta: { label: "Shop the signed collection", href: "/collections/bestsellers" },
+    desktopImage: MASCOT_HERO["hood-up"].desktop,
+    mobileImage: MASCOT_HERO["hood-up"].mobile,
+    alt: "The brand ambassador in a black hoodie",
+    productIds: [],
+  },
+  {
     id: "promo",
     type: "promo_band",
     left: "Last call\non bestsellers",
@@ -110,6 +125,21 @@ export const MOCK_HOMEPAGE: HomeBlock[] = [
     cta: { label: "Join the club", href: "/alpha-club" },
   },
   { id: "wear-the-hood", type: "ugc_grid", title: "#WearTheHood", text: "Real fits from the pack. Share yours from your account after delivery." },
+  {
+    // DEMO art; Admin → Homepage sets the real limited drop.
+    id: "limited-edition",
+    type: "limited_edition",
+    eyebrow: "Limited edition · Numbered & signed",
+    line1: "Limited",
+    line2: "Edition.",
+    text: "A small run, numbered and signed by our ambassador, with a certificate of authenticity. When the last one sells, it's over.",
+    cta: { label: "Shop the drop", href: "/collections/new-in" },
+    editionSize: 100,
+    cutoutImage: MASCOT["alpha-01-hero-stance"].src,
+    cutoutAlt: "The ambassador holding the limited-edition piece",
+    sceneImage: MASCOT["scene-25-lookbook"].src,
+    productIds: [],
+  },
   { id: "trust", type: "trust_strip" },
   {
     id: "seo",

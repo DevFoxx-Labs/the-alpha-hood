@@ -4,9 +4,10 @@ import { Add01Icon, ArrowDown01Icon, ArrowUp01Icon, Delete02Icon, ImageUpload01I
 import type { IconSvgElement } from "@hugeicons/react";
 import Image from "next/image";
 import { useEffect, useId, useState } from "react";
-import type { HomepageContent, StoredCampaign, StoredHeroSlide, StoredSeo } from "@/lib/cms/homepage";
+import type { HomepageContent, StoredAmbassador, StoredCampaign, StoredHeroSlide, StoredLimited, StoredSeo } from "@/lib/cms/homepage";
 import { cn } from "@/lib/utils";
 import { adminApi, notify, useAdmin } from "./admin-shell";
+import { ProductPicker } from "./taxonomy";
 import { AButton, AIcon, AInput, ALabel, ASelect, ATextarea, Card, Confirm, ErrorState, FormDialog, PageHeader, StatusBadge } from "./ui";
 
 /**
@@ -19,7 +20,8 @@ interface View {
   content: HomepageContent;
   builtIn: Required<HomepageContent>;
   builtInImages: string[];
-  limits: { slides: number; headlineLines: number; seoGroups: number; seoLinks: number; seoParagraphs: number };
+  productTitles: Record<string, string>;
+  limits: { slides: number; headlineLines: number; seoGroups: number; seoLinks: number; seoParagraphs: number; ambassadorProducts: number; limitedProducts: number; editionMax: number };
 }
 
 const errText = (e: unknown, fallback = "Something went wrong.") => (e instanceof Error ? e.message : fallback);
@@ -157,6 +159,9 @@ export function HomepageScreen() {
   const [hero, setHero] = useState<StoredHeroSlide[] | null>(null);
   const [campaign, setCampaign] = useState<StoredCampaign | null>(null);
   const [seo, setSeo] = useState<StoredSeo | null>(null);
+  const [ambassador, setAmbassador] = useState<StoredAmbassador | null>(null);
+  const [limited, setLimited] = useState<StoredLimited | null>(null);
+  const [titles, setTitles] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<{ index: number | null; slide: StoredHeroSlide } | null>(null);
@@ -172,6 +177,9 @@ export function HomepageScreen() {
         setHero(v.content.hero ?? null);
         setCampaign(v.content.campaign ?? null);
         setSeo(v.content.seo ?? null);
+        setAmbassador(v.content.ambassador ?? null);
+        setLimited(v.content.limited ?? null);
+        setTitles(v.productTitles);
         setDirty(false);
         setError(null);
       })
@@ -185,12 +193,14 @@ export function HomepageScreen() {
   const editHero = change(setHero);
   const editCampaign = change(setCampaign);
   const editSeo = change(setSeo);
+  const editAmbassador = change(setAmbassador);
+  const editLimited = change(setLimited);
 
   async function save() {
     if (!view) return;
     setSaving(true);
     try {
-      await adminApi("/api/admin/homepage", { method: "PUT", body: { revision: view.revision, hero, campaign, seo } });
+      await adminApi("/api/admin/homepage", { method: "PUT", body: { revision: view.revision, hero, campaign, seo, ambassador, limited } });
       notify("success", "Homepage saved — the store shows it within a few seconds");
       reload();
     } catch (e) {
@@ -206,7 +216,7 @@ export function HomepageScreen() {
 
   return (
     <div className="space-y-5 pb-20">
-      <PageHeader title="Homepage" description="The hero carousel, the campaign band and the SEO links on the home page. Categories on the homepage are set in Categories → Homepage category rail." />
+      <PageHeader title="Homepage" description="The hero carousel, the brand-ambassador and limited-edition sections, the campaign band and the SEO links on the home page. Categories on the homepage are set in Categories → Homepage category rail." />
 
       {/* ── Hero ── */}
       <Card
@@ -261,6 +271,58 @@ export function HomepageScreen() {
             </li>
           ))}
         </ul>
+      </Card>
+
+      {/* ── Brand ambassador exclusives ── */}
+      <Card
+        title="Brand ambassador — signed exclusives"
+        action={
+          canEdit ? (
+            ambassador === null ? (
+              <AButton size="sm" onClick={() => editAmbassador({ ...view.builtIn.ambassador })}>
+                Customise
+              </AButton>
+            ) : (
+              <AButton size="sm" variant="ghost" onClick={() => editAmbassador(null)}>
+                Use built-in
+              </AButton>
+            )
+          ) : undefined
+        }
+      >
+        <p className="mb-3 text-sm text-muted-foreground">
+          A full-screen band below the categories: your ambassador&apos;s photo, two giant headline lines that sweep in from both sides, and the signed pieces you pick.
+          {ambassador === null ? " Showing the built-in demo (the mascot) — customise it before launch." : ""}
+        </p>
+        {ambassador !== null ? (
+          <AmbassadorFields value={ambassador} onChange={editAmbassador} builtIns={view.builtInImages} titles={titles} onTitles={(t) => setTitles((x) => ({ ...x, ...t }))} max={view.limits.ambassadorProducts} disabled={!canEdit} />
+        ) : null}
+      </Card>
+
+      {/* ── Limited edition ── */}
+      <Card
+        title="Limited edition drop"
+        action={
+          canEdit ? (
+            limited === null ? (
+              <AButton size="sm" onClick={() => editLimited({ ...view.builtIn.limited })}>
+                Customise
+              </AButton>
+            ) : (
+              <AButton size="sm" variant="ghost" onClick={() => editLimited(null)}>
+                Use built-in
+              </AButton>
+            )
+          ) : undefined
+        }
+      >
+        <p className="mb-3 text-sm text-muted-foreground">
+          The pinned, full-screen yellow section near the bottom of the page: line 1 behind the art, line 2 in front, a cut-out with sparks and the call to action. &ldquo;Pieces left&rdquo; is the real stock of the picked products.
+          {limited === null ? " Showing the built-in demo — customise it before launch." : ""}
+        </p>
+        {limited !== null ? (
+          <LimitedFields value={limited} onChange={editLimited} builtIns={view.builtInImages} titles={titles} onTitles={(t) => setTitles((x) => ({ ...x, ...t }))} max={view.limits.limitedProducts} editionMax={view.limits.editionMax} disabled={!canEdit} />
+        ) : null}
       </Card>
 
       {/* ── Campaign band ── */}
@@ -543,6 +605,106 @@ function SeoFields({ value, onChange, limits, disabled }: { value: StoredSeo; on
           }}
         />
       </Field>
+    </fieldset>
+  );
+}
+
+// ── Brand ambassador fields ──────────────────────────────────────────────────────────────────────
+
+function BigLines({ id, line1, line2, onChange }: { id: string; line1: string; line2: string; onChange: (l1: string, l2: string) => void }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Field id={`${id}-l1`} label="Headline line 1" help="Up to 16 characters. Shown very large; sweeps in from the left.">
+        <AInput id={`${id}-l1`} value={line1} maxLength={16} onChange={(e) => onChange(e.target.value, line2)} />
+      </Field>
+      <Field id={`${id}-l2`} label="Headline line 2" help="Up to 16 characters. Sweeps in from the right.">
+        <AInput id={`${id}-l2`} value={line2} maxLength={16} onChange={(e) => onChange(line1, e.target.value)} />
+      </Field>
+    </div>
+  );
+}
+
+function CtaFields({ id, value, onChange, help }: { id: string; value: { label: string; href: string }; onChange: (v: { label: string; href: string }) => void; help: string }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Field id={`${id}-cl`} label="Button text">
+        <AInput id={`${id}-cl`} value={value.label} maxLength={30} onChange={(e) => onChange({ ...value, label: e.target.value })} />
+      </Field>
+      <Field id={`${id}-ch`} label="Button link" help={help}>
+        <AInput id={`${id}-ch`} value={value.href} maxLength={200} onChange={(e) => onChange({ ...value, href: e.target.value })} />
+      </Field>
+    </div>
+  );
+}
+
+function AmbassadorFields({ value, onChange, builtIns, titles, onTitles, max, disabled }: { value: StoredAmbassador; onChange: (v: StoredAmbassador) => void; builtIns: string[]; titles: Record<string, string>; onTitles: (t: Record<string, string>) => void; max: number; disabled: boolean }) {
+  const id = useId();
+  const set = (patch: Partial<StoredAmbassador>) => onChange({ ...value, ...patch });
+  return (
+    <fieldset disabled={disabled} className="grid gap-4 lg:grid-cols-2">
+      <div className="space-y-4">
+        <Check id={`${id}-on`} checked={value.enabled} onChange={(v) => set({ enabled: v })} label="Show this section on the homepage" />
+        <Field id={`${id}-n`} label="Ambassador's name" help='Shown as "Hand-signed by …" and on every signed piece.'>
+          <AInput id={`${id}-n`} value={value.ambassadorName} maxLength={40} onChange={(e) => set({ ambassadorName: e.target.value })} />
+        </Field>
+        <Field id={`${id}-e`} label="Small line above" help="e.g. Brand ambassador · Signed collection (optional, up to 50)">
+          <AInput id={`${id}-e`} value={value.eyebrow} maxLength={50} onChange={(e) => set({ eyebrow: e.target.value })} />
+        </Field>
+        <BigLines id={id} line1={value.line1} line2={value.line2} onChange={(line1, line2) => set({ line1, line2 })} />
+        <Field id={`${id}-t`} label="Text" help="Up to 240 characters.">
+          <ATextarea id={`${id}-t`} rows={3} value={value.text} maxLength={240} onChange={(e) => set({ text: e.target.value })} />
+        </Field>
+        <CtaFields id={id} value={value.cta} onChange={(cta) => set({ cta })} help="A page on this store, e.g. /collections/signed" />
+      </div>
+      <div className="space-y-4">
+        <ImagePicker id={`${id}-d`} label="Desktop photo" value={value.desktopImage} onChange={(v) => v && set({ desktopImage: v })} builtIns={builtIns} allowNone={false} aspect="h-12 w-24" help="Wide, about 16:7 (e.g. 1920 × 840), the ambassador on the right half — the text sits on the left." />
+        <ImagePicker id={`${id}-m`} label="Mobile photo" value={value.mobileImage} onChange={(v) => v && set({ mobileImage: v })} builtIns={builtIns} allowNone={false} aspect="h-16 w-12" help="Tall, about 4:5 (e.g. 1080 × 1350), the ambassador in the lower half." />
+        <Field id={`${id}-a`} label="Photo description (alt text)">
+          <AInput id={`${id}-a`} value={value.alt} maxLength={140} onChange={(e) => set({ alt: e.target.value })} />
+        </Field>
+        <div className="space-y-1.5">
+          <ALabel>Signed pieces (up to {max})</ALabel>
+          <ProductPicker ids={value.productIds} titles={titles} onTitles={onTitles} onChange={(productIds) => set({ productIds })} max={max} />
+          <p className="text-xs text-muted-foreground">Their price, stock and photos come from the product. Set the high price on the product itself.</p>
+        </div>
+      </div>
+    </fieldset>
+  );
+}
+
+// ── Limited edition fields ───────────────────────────────────────────────────────────────────────
+
+function LimitedFields({ value, onChange, builtIns, titles, onTitles, max, editionMax, disabled }: { value: StoredLimited; onChange: (v: StoredLimited) => void; builtIns: string[]; titles: Record<string, string>; onTitles: (t: Record<string, string>) => void; max: number; editionMax: number; disabled: boolean }) {
+  const id = useId();
+  const set = (patch: Partial<StoredLimited>) => onChange({ ...value, ...patch });
+  return (
+    <fieldset disabled={disabled} className="grid gap-4 lg:grid-cols-2">
+      <div className="space-y-4">
+        <Check id={`${id}-on`} checked={value.enabled} onChange={(v) => set({ enabled: v })} label="Show this section on the homepage" />
+        <Field id={`${id}-e`} label="Small line" help="e.g. Limited edition · Numbered & signed (optional, up to 50)">
+          <AInput id={`${id}-e`} value={value.eyebrow} maxLength={50} onChange={(e) => set({ eyebrow: e.target.value })} />
+        </Field>
+        <BigLines id={id} line1={value.line1} line2={value.line2} onChange={(line1, line2) => set({ line1, line2 })} />
+        <Field id={`${id}-t`} label="Text" help="Up to 240 characters.">
+          <ATextarea id={`${id}-t`} rows={3} value={value.text} maxLength={240} onChange={(e) => set({ text: e.target.value })} />
+        </Field>
+        <Field id={`${id}-s`} label="Pieces in the edition (optional)" help={`Shown as "Edition of …" (1–${editionMax.toLocaleString("en-IN")}). Leave empty to hide.`}>
+          <AInput id={`${id}-s`} type="number" inputMode="numeric" min={1} max={editionMax} value={value.editionSize ?? ""} onChange={(e) => set({ editionSize: e.target.value === "" ? null : Number(e.target.value) })} />
+        </Field>
+        <CtaFields id={id} value={value.cta} onChange={(cta) => set({ cta })} help="A page on this store, e.g. /collections/limited" />
+      </div>
+      <div className="space-y-4">
+        <ImagePicker id={`${id}-c`} label="Cut-out (left)" value={value.cutoutImage} onChange={(v) => v && set({ cutoutImage: v })} builtIns={builtIns.filter((b) => !b.includes("/hero-"))} allowNone={false} aspect="h-20 w-16" help="A PNG with a transparent background, e.g. the ambassador holding the piece (portrait, about 4:5)." />
+        <Field id={`${id}-ca`} label="Cut-out description (alt text)">
+          <AInput id={`${id}-ca`} value={value.cutoutAlt} maxLength={140} onChange={(e) => set({ cutoutAlt: e.target.value })} />
+        </Field>
+        <ImagePicker id={`${id}-sc`} label="Scene (right, desktop)" value={value.sceneImage} onChange={(v) => v && set({ sceneImage: v })} builtIns={builtIns} allowNone={false} aspect="h-20 w-16" help="A product or campaign photo; it fades into the yellow on its left edge." />
+        <div className="space-y-1.5">
+          <ALabel>Limited pieces (up to {max})</ALabel>
+          <ProductPicker ids={value.productIds} titles={titles} onTitles={onTitles} onChange={(productIds) => set({ productIds })} max={max} />
+          <p className="text-xs text-muted-foreground">&ldquo;Pieces left&rdquo; adds up their real stock — set the stock to the edition size in Inventory.</p>
+        </div>
+      </div>
     </fieldset>
   );
 }

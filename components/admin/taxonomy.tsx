@@ -1013,7 +1013,7 @@ function ConditionRow({ c, tree, titles, onTitles, onChange, onRemove }: { c: Co
   );
 }
 
-function ProductPicker({ ids, titles, onTitles, onChange }: { ids: string[]; titles: Record<string, string>; onTitles: (t: Record<string, string>) => void; onChange: (ids: string[]) => void }) {
+export function ProductPicker({ ids, titles, onTitles, onChange, max = 200 }: { ids: string[]; titles: Record<string, string>; onTitles: (t: Record<string, string>) => void; onChange: (ids: string[]) => void; max?: number }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<{ id: string; title: string; sku: string; status: string }[] | null>(null);
   useEffect(() => {
@@ -1053,7 +1053,7 @@ function ProductPicker({ ids, titles, onTitles, onChange }: { ids: string[]; tit
                 <AButton
                   size="sm"
                   variant="outline"
-                  disabled={ids.includes(r.id) || ids.length >= 200}
+                  disabled={ids.includes(r.id) || ids.length >= max}
                   onClick={() => {
                     onTitles({ [r.id]: r.title });
                     onChange([...ids, r.id]);

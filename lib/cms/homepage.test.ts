@@ -6,7 +6,7 @@ import { seedDemoCatalog } from "@/lib/catalog/seed";
 import { createMemoryCatalogStore } from "@/lib/catalog/store";
 import { parseShopAll, saveCategories, saveCollections, shopAllCategories, taxonomyView } from "@/lib/catalog/taxonomy";
 import { createMemoryReviewStore } from "@/lib/reviews/store";
-import { applyHomepage, BUILTIN_IMAGES, builtInContent, INTERNAL_HREF_RE, parseCampaign, parseHeroSlides, parseSeo } from "./homepage";
+import { applyHomepage, BUILTIN_IMAGES, builtInContent, INTERNAL_HREF_RE, parseAmbassador, parseCampaign, parseHeroSlides, parseLimited, parseSeo } from "./homepage";
 import { homepageView, saveHomepage } from "./homepage-admin";
 import { MOCK_HOMEPAGE } from "./mock-home";
 
@@ -150,6 +150,49 @@ describe("saving (catalogue documents, optimistic revision)", () => {
     v = await homepageView(deps);
     expect(v.content.hero?.[0].id).toBe("drop");
     expect((await taxonomyView(deps)).shopAll).toEqual([t.tree[1].handle, t.tree[0].handle]);
+  });
+});
+
+describe("brand ambassador + limited edition sections", () => {
+  const base = builtInContent(MOCK_HOMEPAGE);
+
+  it("built-in demo sections exist, in the stored shape, and validate", () => {
+    expect(base.ambassador.enabled).toBe(true);
+    expect(base.limited.enabled).toBe(true);
+    expect(parseAmbassador(base.ambassador).ambassadorName).toBe(base.ambassador.ambassadorName);
+    expect(parseLimited(base.limited).editionSize).toBe(100);
+  });
+
+  it("same rules as the rest: same-site links, own / built-in images, plain text, caps; products ≤ 4 / ≤ 3, no repeats", () => {
+    expect(() => parseAmbassador({ ...base.ambassador, cta: { label: "Buy now", href: "https://evil.example" } })).toThrow();
+    expect(() => parseAmbassador({ ...base.ambassador, desktopImage: "https://evil.example/a.jpg" })).toThrow();
+    expect(() => parseAmbassador({ ...base.ambassador, line1: "x".repeat(17) })).toThrow();
+    expect(() => parseAmbassador({ ...base.ambassador, ambassadorName: "" })).toThrow();
+    expect(() => parseAmbassador({ ...base.ambassador, productIds: ["a", "b", "c", "d", "e"] })).toThrow(/up to 4/);
+    expect(() => parseAmbassador({ ...base.ambassador, productIds: ["a", "a"] })).toThrow(/twice/);
+    expect(() => parseAmbassador({ ...base.ambassador, productIds: ["../x"] })).toThrow();
+    expect(() => parseAmbassador({ ...base.ambassador, price: 1 })).toThrow(); // never a price from here
+    expect(() => parseLimited({ ...base.limited, productIds: ["a", "b", "c", "d"] })).toThrow(/up to 3/);
+    for (const bad of [0, -5, 1.5, "100", 100_001]) expect(() => parseLimited({ ...base.limited, editionSize: bad }), String(bad)).toThrow();
+    expect(parseLimited({ ...base.limited, editionSize: null }).editionSize).toBeNull();
+  });
+
+  it("switched off → not on the page; customised → admin text and picks replace the demo", () => {
+    const off = applyHomepage(MOCK_HOMEPAGE, { ambassador: { ...base.ambassador, enabled: false }, limited: { ...base.limited, enabled: false } });
+    expect(off.some((b) => b.type === "ambassador" || b.type === "limited_edition")).toBe(false);
+    const on = applyHomepage(MOCK_HOMEPAGE, { ambassador: { ...base.ambassador, ambassadorName: "Real Star", productIds: ["p1"] } });
+    const amb = on.find((b) => b.type === "ambassador");
+    expect(amb?.type === "ambassador" && [amb.ambassadorName, amb.productIds]).toEqual(["Real Star", ["p1"]]);
+  });
+
+  it("saving: picked products must be in the catalogue; real ones save", async () => {
+    const v = await homepageView(deps);
+    await expect(saveHomepage(deps, { revision: v.revision, ambassador: { ...base.ambassador, productIds: ["not_a_product"] } })).rejects.toThrow(/isn't in the catalogue/);
+    const real = (await deps.store.listRecords()).slice(0, 2).map((r) => r.id);
+    await saveHomepage(deps, { revision: v.revision, ambassador: { ...base.ambassador, productIds: real }, limited: { ...base.limited, productIds: [real[0]] } });
+    const after = await homepageView(deps);
+    expect(after.content.ambassador?.productIds).toEqual(real);
+    expect(Object.keys(after.productTitles).sort()).toEqual([...real].sort());
   });
 });
 

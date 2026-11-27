@@ -47,8 +47,10 @@ export type ResolvedHomeBlock =
   | { block: Extract<HomeBlock, { type: "category_rail" }>; categories: Category[] }
   | { block: Extract<HomeBlock, { type: "product_tabs" }>; tabs: { id: string; label: string; products: Product[] }[] }
   | { block: Extract<HomeBlock, { type: "product_grid" }>; products: Product[] }
+  | { block: Extract<HomeBlock, { type: "ambassador" }>; products: Product[] }
+  | { block: Extract<HomeBlock, { type: "limited_edition" }>; products: Product[] }
   | { block: Extract<HomeBlock, { type: "shop_the_look" }>; look: Look | null; products: Product[] }
-  | { block: Exclude<HomeBlock, { type: "category_rail" | "product_tabs" | "product_grid" | "shop_the_look" }> };
+  | { block: Exclude<HomeBlock, { type: "category_rail" | "product_tabs" | "product_grid" | "shop_the_look" | "ambassador" | "limited_edition" }> };
 
 export async function getHomePage(): Promise<ResolvedHomeBlock[] | null> {
   "use cache";
@@ -76,6 +78,18 @@ export async function getHomePage(): Promise<ResolvedHomeBlock[] | null> {
         }
         case "product_grid":
           return { block, products: (await commerce.listProducts({ sort: block.sort, limit: block.limit })).products };
+        case "ambassador":
+        case "limited_edition": {
+          const max = block.type === "ambassador" ? 4 : 3;
+          // Admin's picks, in their order; picks that are gone / archived drop out.
+          let products = (await Promise.all(block.productIds.map((id) => commerce.getProductById(id)))).filter((p): p is Product => !!p);
+          // Built-in DEMO block (no admin content yet): show the priciest pieces so the layout can be seen in development.
+          const customised = block.type === "ambassador" ? !!docs?.homepage?.ambassador : !!docs?.homepage?.limited;
+          if (!customised && products.length === 0) {
+            products = (await commerce.listProducts({ limit: 60 })).products.sort((a, b) => b.price - a.price).slice(block.type === "ambassador" ? 0 : 4, (block.type === "ambassador" ? 0 : 4) + max);
+          }
+          return block.type === "ambassador" ? { block, products: products.slice(0, max) } : { block, products: products.slice(0, max) };
+        }
         case "shop_the_look": {
           const look = findLook(block.lookId);
           const products = look ? (await Promise.all(look.productIds.map((id) => commerce.getProductById(id)))).filter((p): p is Product => !!p) : [];
