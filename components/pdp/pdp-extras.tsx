@@ -1,7 +1,8 @@
 "use client";
 
-import { DiscountTag01Icon, Notification03Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, DiscountTag01Icon, Notification03Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/components/checkout/api";
 import { ProductGrid } from "@/components/home/product-grid";
@@ -11,6 +12,9 @@ import { showMessageToast } from "@/components/store/toast";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EmailSignIn } from "@/components/account/email-sign-in";
+import { OtpSignIn } from "@/components/account/otp-sign-in";
 import type { Product } from "@/lib/commerce/types";
 import { useExperiment } from "@/lib/experiments/client";
 
@@ -45,55 +49,134 @@ export function SizeAdvice({ productId, onPick }: { productId: string; onPick: (
 }
 
 /**
- * PDP-10 "Notify me" for a sold-out size and "Price drop alert". Signed-in only: a guest is sent to sign in
- * (we message the verified phone on file — no new contact data asked here).
+ * PDP-10 "Notify me" when a sold-out size is back, and "Price drop alert".
+ * - Signed in: one tap; we message the verified mobile / email on the account.
+ * - Guest: a mobile number or email right here, confirmed with a 6-digit code (so nobody can sign up someone
+ *   else's number or email for messages). The code signs them in — a free account is created on first use, with
+ *   the Terms / Privacy notice next to the button — and the alert is set on it; they manage it in Account → Alerts.
+ * `startRef` lets the Sold out buttons elsewhere on the page start the back-in-stock flow.
  */
-export function ProductAlerts({ product, soldOutSizes }: { product: Pick<Product, "id" | "handle">; soldOutSizes: string[] }) {
-  const [size, setSize] = useState(soldOutSizes[0] ?? "");
-  const [busy, setBusy] = useState<string | null>(null);
-  const [done, setDone] = useState<Record<string, boolean>>({});
+type AlertKind = "back_in_stock" | "price_drop";
 
-  const create = async (kind: "back_in_stock" | "price_drop") => {
+export function ProductAlerts({
+  product,
+  soldOutSizes,
+  startRef,
+}: {
+  product: Pick<Product, "id" | "handle">;
+  soldOutSizes: string[];
+  startRef?: React.RefObject<(() => void) | null>;
+}) {
+  const router = useRouter();
+  const [size, setSize] = useState(soldOutSizes[0] ?? "");
+  const [busy, setBusy] = useState<AlertKind | null>(null);
+  const [done, setDone] = useState<Record<string, boolean>>({});
+  const [guest, setGuest] = useState<{ kind: AlertKind; size: string } | null>(null);
+  const [tab, setTab] = useState<"phone" | "email">("phone");
+  const [error, setError] = useState<string | null>(null);
+  const key = (kind: AlertKind, sz: string) => (kind === "back_in_stock" ? `bis:${sz}` : "price");
+
+  const create = async (kind: AlertKind, sz = size): Promise<void> => {
     setBusy(kind);
+    setError(null);
     try {
-      await api("/api/account/alerts", { method: "POST", body: { productId: product.id, kind, ...(kind === "back_in_stock" ? { size } : {}) } });
-      setDone((d) => ({ ...d, [kind === "back_in_stock" ? `bis:${size}` : "price"]: true }));
-      showMessageToast(kind === "back_in_stock" ? `We'll tell you when ${size} is back` : "We'll tell you if the price drops");
+      await api("/api/account/alerts", { method: "POST", body: { productId: product.id, kind, ...(kind === "back_in_stock" ? { size: sz } : {}) } });
+      setDone((d) => ({ ...d, [key(kind, sz)]: true }));
+      setGuest(null);
+      showMessageToast(kind === "back_in_stock" ? `Done — we'll tell you when ${sz} is back` : "Done — we'll tell you if the price drops");
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
-        showMessageToast("Sign in to get alerts — then come back to this product.");
+        setGuest({ kind, size: sz }); // not signed in → ask for a mobile number or email
         return;
       }
-      showMessageToast(e instanceof ApiError ? e.message : "Couldn't set the alert.");
+      const message = e instanceof ApiError ? e.message : "Couldn't set the alert.";
+      if (guest) setError(message);
+      else showMessageToast(message);
     } finally {
       setBusy(null);
     }
   };
 
+  // "Sold out · Notify me" from the main buttons calls this (an event handler, not an effect).
+  useEffect(() => {
+    if (!startRef) return;
+    startRef.current = () => {
+      if (soldOutSizes.length && !done[key("back_in_stock", size)]) void create("back_in_stock");
+    };
+    return () => {
+      startRef.current = null;
+    };
+  });
+
+  const verified = async () => {
+    if (!guest) return;
+    router.refresh(); // header / account state now signed in
+    await create(guest.kind, guest.size);
+  };
+
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2 text-[12.5px]">
-      {soldOutSizes.length ? (
-        <span className="flex items-center gap-2">
-          <label className="sr-only" htmlFor={`bis-${product.id}`}>
-            Sold-out size
-          </label>
-          <select id={`bis-${product.id}`} value={size} onChange={(e) => setSize(e.target.value)} className="h-9 border border-line bg-white px-2">
-            {soldOutSizes.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <Button size="sm" variant="outline" loading={busy === "back_in_stock"} disabled={!!done[`bis:${size}`]} onClick={() => create("back_in_stock")}>
-            <Icon icon={Notification03Icon} size={15} />
-            {done[`bis:${size}`] ? "We'll notify you" : "Notify me"}
-          </Button>
-        </span>
+    <div className="mt-3 text-[12.5px]">
+      <div className="flex flex-wrap items-center gap-2">
+        {soldOutSizes.length ? (
+          <span className="flex items-center gap-2">
+            {soldOutSizes.length > 1 ? (
+              <>
+                <label className="sr-only" htmlFor={`bis-${product.id}`}>
+                  Sold-out size
+                </label>
+                <select id={`bis-${product.id}`} value={size} onChange={(e) => setSize(e.target.value)} className="h-9 border border-line bg-white px-2">
+                  {soldOutSizes.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </>
+            ) : null}
+            <Button size="sm" variant="outline" loading={busy === "back_in_stock" && !guest} disabled={!!done[key("back_in_stock", size)]} onClick={() => create("back_in_stock")}>
+              <Icon icon={Notification03Icon} size={15} />
+              {done[key("back_in_stock", size)] ? "We'll notify you" : soldOutSizes.length === 1 ? `Notify me when ${size} is back` : "Notify me"}
+            </Button>
+          </span>
+        ) : null}
+        <Button size="sm" variant="ghost" loading={busy === "price_drop" && !guest} disabled={!!done.price} onClick={() => create("price_drop")} className="px-1 underline underline-offset-4">
+          <Icon icon={DiscountTag01Icon} size={15} />
+          {done.price ? "Price alert set" : "Price drop alert"}
+        </Button>
+      </div>
+
+      {guest ? (
+        <section aria-labelledby={`alert-form-${product.id}`} className="mt-3 border border-ink bg-white p-4">
+          <div className="flex items-start justify-between gap-3">
+            <h3 id={`alert-form-${product.id}`} className="text-[14px] font-bold">
+              {guest.kind === "back_in_stock" ? `Get a message when ${guest.size} is back` : "Get a message if the price drops"}
+            </h3>
+            <button type="button" onClick={() => setGuest(null)} aria-label="Close" className="-m-1 grid size-8 shrink-0 place-items-center text-ink-2 hover:text-ink">
+              <Icon icon={Cancel01Icon} size={16} />
+            </button>
+          </div>
+          <p className="mb-3 mt-1 text-[12.5px] text-ink-2">
+            Add your mobile number or email. We&apos;ll send a code once to confirm it&apos;s yours, then message you only about this product. You can remove the alert any time in Account → Alerts.
+          </p>
+          <Tabs value={tab} onValueChange={(v) => setTab(v === "email" ? "email" : "phone")}>
+            <TabsList aria-label="Notify me by">
+              <TabsTrigger value="phone">Mobile (SMS)</TabsTrigger>
+              <TabsTrigger value="email">Email</TabsTrigger>
+            </TabsList>
+            <TabsContent value="phone" className="pt-4">
+              <OtpSignIn social={false} submitLabel="Send code" onSignedIn={() => void verified()} />
+            </TabsContent>
+            <TabsContent value="email" className="pt-4">
+              <EmailSignIn initialMode="code" compact onSignedIn={() => void verified()} />
+            </TabsContent>
+          </Tabs>
+          {error ? (
+            <p role="alert" className="mt-3 text-[13px] font-semibold text-accent">
+              {error}
+            </p>
+          ) : null}
+        </section>
       ) : null}
-      <Button size="sm" variant="ghost" loading={busy === "price_drop"} disabled={!!done.price} onClick={() => create("price_drop")} className="px-1 underline underline-offset-4">
-        <Icon icon={DiscountTag01Icon} size={15} />
-        {done.price ? "Price alert set" : "Price drop alert"}
-      </Button>
     </div>
   );
 }

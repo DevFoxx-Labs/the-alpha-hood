@@ -1,7 +1,7 @@
 "use client";
 
 import { ExchangeNote, ProductAlerts, SizeAdvice } from "./pdp-extras";
-import { CheckmarkCircle02Icon, DeliveryTruck01Icon, FavouriteIcon, ShoppingBag02Icon } from "@hugeicons/core-free-icons";
+import { CheckmarkCircle02Icon, DeliveryTruck01Icon, FavouriteIcon, Notification03Icon, ShoppingBag02Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -96,6 +96,13 @@ export function ProductDetail({
   const add = () => {
     const s = requireSize();
     if (s) addToBag(product, s);
+  };
+
+  // PDP-10: the Sold out buttons start "Notify me" (signed in: set at once; guest: the mobile / email form opens).
+  const startNotify = useRef<(() => void) | null>(null);
+  const notifyMe = () => {
+    sizesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    startNotify.current?.();
   };
   // PDP-06 BUY NOW: add, then straight to checkout.
   const buyNow = async () => {
@@ -197,7 +204,7 @@ export function ProductDetail({
               }}
             />
           ) : null}
-          <ProductAlerts product={product} soldOutSizes={product.sizes.filter((s) => s.stock === 0).map((s) => s.label)} />
+          <ProductAlerts product={product} soldOutSizes={product.sizes.filter((s) => s.stock === 0).map((s) => s.label)} startRef={startNotify} />
         </div>
 
         <p className="mt-4 flex items-center gap-2 bg-soft px-3.5 py-2.5 text-[12.5px]">
@@ -217,8 +224,9 @@ export function ProductDetail({
 
         <div ref={ctaRef} className="mt-4 hidden flex-col gap-2.5 lg:flex">
           {soldOut ? (
-            <Button size="lg" disabled className="w-full">
-              Sold out
+            <Button size="lg" variant="outline" className="w-full" onClick={notifyMe}>
+              <Icon icon={Notification03Icon} size={18} />
+              Sold out · Notify me
             </Button>
           ) : (
             <>
@@ -315,8 +323,8 @@ export function ProductDetail({
       <div className="fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-line bg-white p-2.5 pb-[max(10px,env(safe-area-inset-bottom))] lg:hidden">
         {wishButton("size-12")}
         {soldOut ? (
-          <Button disabled className="flex-1">
-            Sold out
+          <Button variant="outline" className="flex-1" onClick={notifyMe}>
+            Sold out · Notify me
           </Button>
         ) : (
           <Button className="flex-1" onClick={add}>
@@ -355,8 +363,8 @@ export function ProductDetail({
               </Button>
             </>
           ) : (
-            <Button disabled className="h-11 w-[240px]">
-              Sold out
+            <Button variant="outline" className="h-11 w-[240px]" onClick={notifyMe}>
+              Sold out · Notify me
             </Button>
           )}
         </div>

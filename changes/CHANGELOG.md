@@ -1,5 +1,46 @@
 # Change log
 
+## 2026-12-02 — PDP-10 "Notify me" for guests (mobile number or email)
+
+**Asked for:** when a product is out of stock, the customer can give a mobile number or email on the product page and
+subscribe to a notification for that article.
+
+### What changed
+- PDP: "Notify me" (sold-out size) and "Price drop alert" now work without an account. A guest gets an inline form
+  right there — **Mobile (SMS)** or **Email** tab → a 6-digit code to that number / address → verified → the alert is
+  set. The code signs them in (a free account is created on first use; the Terms / Privacy notice sits next to the
+  button and the consent row is recorded), so they can see and remove the alert in Account → Alerts.
+- When every size is sold out, the main, mobile-bar and sticky-bar buttons read **"Sold out · Notify me"** and start
+  the same flow (was a disabled "Sold out").
+- With one sold-out size the button names it ("Notify me when M is back"); with several, a size select stays.
+- Signed-in customers: unchanged — one tap.
+- No new server route, table or migration: the form reuses `/api/otp/*`, `/api/auth/email/*` and
+  `POST /api/account/alerts`; delivery reuses the outbox (back-in-stock is SMS + email, price drop email only).
+  `EmailSignIn` got a `compact` mode (code only) for this form. Files: `components/pdp/pdp-extras.tsx`,
+  `components/pdp/purchase-panel.tsx`, `components/account/email-sign-in.tsx`.
+
+### Threat model
+| Abuse case | Defence (layer) | Test |
+|---|---|---|
+| Subscribing someone else's number / email to messages (spam, SMS cost, no consent) | The contact must be confirmed with a code sent to it; a code for another address fails (prevent) | `guest by EMAIL`, `guest by MOBILE` |
+| SMS / email bombing through the form | Same send limits as sign-in: per-contact cooldown + hourly / daily caps, per-IP caps, Turnstile when on (prevent) | sign-in tests |
+| Alert spam per account | 40 alerts / day / account, 30 open max, duplicates collapse to one (prevent) | `same alert twice` |
+| Tampered stock / price | Stock and price checked on the server; an in-stock size is refused (409) (prevent) | existing PDP-10 test |
+| Repeated messages | An alert fires once (atomic `fire`) (prevent) | `fires once` |
+| Contact data leaking into the outbox | Outbox holds template + references only (prevent) | `never the contact` |
+| Someone else removing my alert | Owner-scoped delete → 404 (prevent) | existing PDP-10 test |
+
+### Legal
+- No new personal data or purpose beyond what the Privacy Notice already lists (account mobile / email, "Product
+  alerts" retention row). The notice text needs no change; the account the form creates records `terms_privacy`.
+
+### Verified
+- `pnpm typecheck` ✔, `pnpm lint` ✔, `pnpm test` 41 files / 593 tests ✔ (2 new guest-flow tests in `m9-api.test.ts`).
+- Dev server: PDPs with sold-out sizes render "Notify me" + "Price drop alert"; fully in-stock PDPs render only the
+  price alert.
+- Not verified: the form visually at 1440 / 390 / 360 px (browser extension not connected); the all-sizes-sold-out
+  button (no fully sold-out product in the local catalogue).
+
 ## 2026-12-02 — ACC-01 complete: email + password, email code, Google sign-up, mobile OTP (all three ways in)
 
 **Asked for:** email/password login, Gmail (Google) login and mobile-number login/sign-up, production grade (rate

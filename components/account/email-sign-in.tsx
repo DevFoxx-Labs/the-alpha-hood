@@ -47,11 +47,14 @@ export function EmailSignIn({
   onSignedIn,
   initialMode = "password",
   lockedEmail,
+  compact = false,
 }: {
   onSignedIn: (r: { created?: boolean; passwordSet?: boolean }) => void;
   initialMode?: EmailMode;
   /** Settings → "Set a password": the account's sign-in email, not editable; no mode switching. */
   lockedEmail?: string;
+  /** Code only, no switching to password / sign-up (e.g. the PDP "Notify me" form). */
+  compact?: boolean;
 }) {
   const id = useId();
   const [mode, setMode] = useState<EmailMode>(initialMode);
@@ -270,7 +273,7 @@ export function EmailSignIn({
         {submitLabel}
       </Button>
 
-      {!lockedEmail ? (
+      {!lockedEmail && !compact ? (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12.5px]">
           {mode !== "password" ? (
             <button type="button" onClick={() => switchMode("password")} className={linkBtn}>

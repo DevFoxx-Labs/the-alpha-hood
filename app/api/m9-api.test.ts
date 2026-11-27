@@ -31,6 +31,9 @@ import { POST as placePOST } from "./checkout/place/route";
 import { POST as quotePOST } from "./checkout/quote/route";
 import { GET as cronGET } from "./cron/sweep/route";
 import { POST as otpSend } from "./otp/send/route";
+import { POST as emailSend } from "./auth/email/send/route";
+import { POST as emailVerify } from "./auth/email/verify/route";
+import { resolveCustomers } from "@/lib/customers/store";
 import { POST as otpVerify } from "./otp/verify/route";
 import { POST as photoPOST } from "./returns/photos/route";
 import { GET as ugcListGET } from "./ugc/route";
@@ -225,6 +228,59 @@ describe("PDP-10 alerts", () => {
     expect((await alertDELETE(req(`/api/account/alerts/${id}`, "DELETE", {}, { cookie: other }), p({ id }))).status).toBe(404);
     expect((await alertsGET(req("/api/account/alerts", "GET", undefined, { cookie: other }))).status).toBe(200);
     expect((await alertDELETE(req(`/api/account/alerts/${id}`, "DELETE", {}, { cookie: s }), p({ id }))).status).toBe(200);
+  });
+
+  it("guest by EMAIL: code confirms the address, account + alert created, restock queues one message to that account", async () => {
+    const soldOut = MOCK_PRODUCTS.find((x) => x.sizes.some((s) => s.stock === 0))!;
+    const sz = soldOut.sizes.find((s) => s.stock === 0)!.label;
+    // Not signed in: the alert route asks for an identity first (the PDP then shows the mobile / email form).
+    expect((await alertsPOST(req("/api/account/alerts", "POST", { productId: soldOut.id, kind: "back_in_stock", size: sz }))).status).toBe(401);
+    const email = `notify.${Date.now()}@example.com`;
+    const sent = await (await emailSend(req("/api/auth/email/send", "POST", { email }))).json();
+    // A code for a different address can't be used to subscribe this one (or anyone else).
+    expect((await emailVerify(req("/api/auth/email/verify", "POST", { email: `other.${email}`, challengeId: sent.challengeId, code: sent.demoCode, intent: "signin" }))).status).toBe(422);
+    const verified = await emailVerify(req("/api/auth/email/verify", "POST", { email, challengeId: sent.challengeId, code: sent.demoCode, intent: "signin" }));
+    expect(verified.status).toBe(200);
+    const session = verified.headers.getSetCookie().find((c) => c.startsWith("ah_session="))!.split(";")[0];
+    const created = await alertsPOST(req("/api/account/alerts", "POST", { productId: soldOut.id, kind: "back_in_stock", size: sz }, { cookie: session }));
+    expect(created.status).toBe(201);
+    // Same alert twice → still one open alert.
+    await alertsPOST(req("/api/account/alerts", "POST", { productId: soldOut.id, kind: "back_in_stock", size: sz }, { cookie: session }));
+    const mine = (await (await alertsGET(req("/api/account/alerts", "GET", undefined, { cookie: session }))).json()).alerts;
+    expect(mine.filter((a: { productId: string; size: string; firedAt: string | null }) => a.productId === soldOut.id && a.size === sz && !a.firedAt)).toHaveLength(1);
+
+    const customerId = (await resolveCustomers().findByLoginEmail(email))!.id;
+    // DPDP: the account the alert created has the Terms / Privacy consent row.
+    expect((await resolveLedger().listByUser(customerId)).some((r) => r.purpose === "terms_privacy" && r.status === "granted")).toBe(true);
+
+    clearOutboxForTests();
+    await commerce.inventory.adjust(soldOut.id, sz, 2);
+    try {
+      const { resolveAlerts } = await import("@/lib/alerts/service");
+      expect(await sweepAlerts({ commerce, alerts: resolveAlerts() }, soldOut.id)).toBeGreaterThanOrEqual(1);
+      const queued = (await outboxFor(customerId)).filter((m) => m.template === "back_in_stock");
+      expect(queued).toHaveLength(1);
+      expect(queued[0].refs).toMatchObject({ productId: soldOut.id, size: sz });
+      expect(JSON.stringify(queued[0])).not.toContain(email); // the outbox holds references, never the contact
+      // Fires once: a second sweep sends nothing more.
+      await sweepAlerts({ commerce, alerts: resolveAlerts() }, soldOut.id);
+      expect((await outboxFor(customerId)).filter((m) => m.template === "back_in_stock")).toHaveLength(1);
+    } finally {
+      await commerce.inventory.adjust(soldOut.id, sz, -2);
+    }
+  });
+
+  it("guest by MOBILE: SMS code → account → alert; a wrong code subscribes nobody", async () => {
+    const soldOut = MOCK_PRODUCTS.find((x) => x.sizes.some((s) => s.stock === 0))!;
+    const sz = soldOut.sizes.find((s) => s.stock === 0)!.label;
+    const sent = await (await otpSend(req("/api/otp/send", "POST", { phone: "9713000099" }))).json();
+    const wrong = sent.demoCode === "000000" ? "111111" : "000000";
+    const bad = await otpVerify(req("/api/otp/verify", "POST", { challengeId: sent.challengeId, code: wrong }));
+    expect(bad.status).toBe(422);
+    expect(bad.headers.getSetCookie().some((c) => c.startsWith("ah_session=") && !c.startsWith("ah_session=;"))).toBe(false);
+    const ok = await otpVerify(req("/api/otp/verify", "POST", { challengeId: sent.challengeId, code: sent.demoCode }));
+    const session = ok.headers.getSetCookie().find((c) => c.startsWith("ah_session="))!.split(";")[0];
+    expect((await alertsPOST(req("/api/account/alerts", "POST", { productId: soldOut.id, kind: "back_in_stock", size: sz }, { cookie: session }))).status).toBe(201);
   });
 
   it("back-in-stock fires once when stock returns", async () => {

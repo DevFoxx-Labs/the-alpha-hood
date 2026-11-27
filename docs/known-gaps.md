@@ -206,6 +206,9 @@
     the address owner — accepted.
   - 🟡 Accounts started by email / Google have no mobile until checkout or Settings; SMS order updates and COD need it
     (enforced: `phone_required`).
+- 🟡 (2026-12-02) PDP-10 guest "Notify me": the form isn't checked visually at 1440 / 390 / 360 px yet, and product
+  cards (CARD-02 "Sold out · Notify me" on listings) still link to the PDP only. A guest who subscribes by email gets
+  an email-only account; back-in-stock SMS needs a mobile on the account.
 - 🟠 No list of active sessions/devices and no new-device alerts yet.
 - 🟠 COD refunds to UPI are queued (`payout_pending`) — needs the gateway payout API + ops approval (M7). UPI IDs must be
   encrypted at rest once a database exists.
