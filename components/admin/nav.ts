@@ -23,6 +23,7 @@ import {
   HardDriveIcon,
   StarIcon,
   Message02Icon,
+  Home01Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import { can, type Permission, type Role, ROLES } from "@/lib/admin/permissions";
@@ -46,6 +47,7 @@ const ALL: NavItem[] = [
   { type: "section", label: "Catalogue" },
   { label: "Inventory", icon: WarehouseIcon, route: "/admin/inventory", permission: "inventory.read" },
   { label: "Products", icon: PackageIcon, route: "/admin/catalog", permission: "catalog.read" },
+  { label: "Homepage", icon: Home01Icon, route: "/admin/homepage", permission: "catalog.read" },
   { label: "Categories", icon: HierarchySquare02Icon, route: "/admin/categories", permission: "catalog.read" },
   { label: "Collections", icon: Layers01Icon, route: "/admin/collections", permission: "catalog.read" },
   { label: "Promotions", icon: Discount01Icon, route: "/admin/promotions", permission: "promotions.read" },

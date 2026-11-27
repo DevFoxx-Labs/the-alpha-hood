@@ -1,5 +1,6 @@
 import { ProductCard } from "@/components/store/product-card";
-import { ArrowLink, CampaignBand, CategoryRailItem, CollectionTile, OfferTile, PromoBand } from "@/components/store/merch-tiles";
+import { ArrowLink, CampaignBand, CollectionTile, OfferTile, PromoBand } from "@/components/store/merch-tiles";
+import { CategorySlider } from "./category-slider";
 import { SectionHeader } from "@/components/store/section-header";
 import { deviceClass } from "@/lib/cms/schedule";
 import type { ResolvedHomeBlock } from "@/lib/storefront";
@@ -37,11 +38,7 @@ function Block({ resolved }: { resolved: ResolvedHomeBlock }) {
           <div id={`${block.id}-h`}>
             <SectionHeader lead={block.lead} title={block.title} underline />
           </div>
-          <div className="scrollbar-none -mx-4 mt-6 flex gap-4 overflow-x-auto px-4 lg:mx-0 lg:mt-10 lg:grid lg:grid-cols-6 lg:gap-6 lg:overflow-visible lg:px-0">
-            {categories.map((c) => (
-              <CategoryRailItem key={c.handle} category={c} />
-            ))}
-          </div>
+          <CategorySlider categories={categories} labelledBy={`${block.id}-h`} />
           <div className="mt-6 lg:mt-8">
             <ArrowLink href={block.viewAllHref}>Shop all</ArrowLink>
           </div>

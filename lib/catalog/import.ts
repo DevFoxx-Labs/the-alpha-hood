@@ -131,7 +131,12 @@ export async function planImport(deps: CatalogAdminDeps, file: ImportFile): Prom
 export async function applyImport(deps: CatalogAdminDeps, file: ImportFile, now = new Date()): Promise<ImportReport> {
   const plan = await planImport(deps, file);
   if (plan.errors.length) return plan;
-  if (file.categories !== undefined) await deps.store.putDocs(parseCategories(file.categories));
+  if (file.categories !== undefined) {
+    // The file replaces the categories / rail / collections only: homepage content and the Shop all list stay.
+    const current = await deps.store.getDocs();
+    const next = parseCategories(file.categories);
+    await deps.store.putDocs({ ...next, ...(current?.homepage ? { homepage: current.homepage } : {}), ...(current?.shopAll ? { shopAll: current.shopAll.filter((h) => next.tree.some((c) => c.handle === h)) } : {}) });
+  }
   const bySku = new Map((await deps.store.listRecords()).map((r) => [r.sku, r]));
   for (const [index, p] of (file.products ?? []).entries()) {
     const sku = String((p as { sku: string }).sku).toUpperCase();

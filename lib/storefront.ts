@@ -10,6 +10,9 @@ import { reviews } from "@/lib/reviews";
 import { isLive, liveBlocks } from "@/lib/cms/schedule";
 import type { CatalogQuery, CatalogScope } from "@/lib/catalog/types";
 import type { HomeBlock } from "@/lib/cms/types";
+import { applyHomepage } from "@/lib/cms/homepage";
+import { storedCatalogDocs } from "@/lib/cms/stored";
+import { shopAllCategories } from "@/lib/catalog/taxonomy";
 
 /**
  * Server-side data loaders for store pages. Cached for minutes (CDN/ISR-friendly, PRD §7); CMS schedules
@@ -53,7 +56,9 @@ export async function getHomePage(): Promise<ResolvedHomeBlock[] | null> {
   cacheTag(CATALOG_TAG);
   if (!storefrontAvailable()) return null;
 
-  const blocks = liveBlocks(await cms.getHomepage(), new Date());
+  // Admin → Homepage content (hero, campaign band, SEO block) replaces the built-in parts it covers.
+  const [builtIn, docs] = await Promise.all([cms.getHomepage(), storedCatalogDocs()]);
+  const blocks = liveBlocks(applyHomepage(builtIn, docs?.homepage), new Date());
   return Promise.all(
     blocks.map(async (block): Promise<ResolvedHomeBlock> => {
       switch (block.type) {
@@ -107,6 +112,16 @@ export async function getCategoryTree() {
   cacheTag(CATALOG_TAG);
   if (!storefrontAvailable()) return null;
   return commerce.listCategoryTree();
+}
+
+/** The categories the "Shop all" page shows: chosen in Admin → Categories (in that order), else all of them. */
+export async function getShopAllCategories() {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag(CATALOG_TAG);
+  if (!storefrontAvailable()) return null;
+  const [tree, docs] = await Promise.all([commerce.listCategoryTree(), storedCatalogDocs()]);
+  return shopAllCategories(tree, docs?.shopAll);
 }
 
 /** Scope + parsed URL query → products, totals and facets. Cached per canonical query. */

@@ -10,6 +10,7 @@ import { MOCK_PRODUCTS } from "@/lib/commerce/mock/data";
 import { rateLimiter } from "@/lib/http/rate-limit";
 import { GET as auditGET } from "./admin/audit/route";
 import { GET as categoriesGET, PUT as categoriesPUT } from "./admin/categories/route";
+import { GET as homepageGET, PUT as homepagePUT } from "./admin/homepage/route";
 import { POST as collectionPreviewPOST } from "./admin/collections/preview/route";
 import { GET as collectionsGET, PUT as collectionsPUT } from "./admin/collections/route";
 import { GET as styleGET, PUT as stylePUT } from "./admin/styles/[styleId]/route";
@@ -477,6 +478,17 @@ describe("categories & collections: authorization (lib/catalog/taxonomy.ts)", ()
     expect((await categoriesGET(req("/api/admin/categories", "GET", undefined, { cookie: owner }))).status).toBe(409);
     expect((await categoriesPUT(req("/api/admin/categories", "PUT", { revision: 0, tree: [] }, { cookie: owner }))).status).toBe(409);
     expect((await collectionPreviewPOST(req("/api/admin/collections/preview", "POST", { builder: {} }, { cookie: owner }))).status).toBe(409);
+  });
+
+  it("homepage editor: no session → 401; no catalog.read → 403; marketing can't save; cross-origin refused; mock catalogue read-only", async () => {
+    expect((await homepageGET(req("/api/admin/homepage", "GET"))).status).toBe(401);
+    expect((await homepagePUT(req("/api/admin/homepage", "PUT", { revision: 0, hero: [] }))).status).toBe(401);
+    const support = await invite(`support-home-${ip}@example.test`, "support");
+    expect((await homepageGET(req("/api/admin/homepage", "GET", undefined, { cookie: support }))).status).toBe(403);
+    const marketing = await invite(`mkt-home-${ip}@example.test`, "marketing");
+    expect((await homepagePUT(req("/api/admin/homepage", "PUT", { revision: 0, hero: [] }, { cookie: marketing }))).status).toBe(403);
+    expect((await homepagePUT(req("/api/admin/homepage", "PUT", { revision: 0, hero: [] }, { cookie: owner, headers: { origin: "https://evil.example" } }))).status).toBe(403);
+    expect((await homepageGET(req("/api/admin/homepage", "GET", undefined, { cookie: owner }))).status).toBe(409);
   });
 });
 

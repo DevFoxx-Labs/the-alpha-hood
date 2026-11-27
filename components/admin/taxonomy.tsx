@@ -159,6 +159,8 @@ interface CatData {
   revision: number;
   tree: Cat[];
   featured: { handle: string; title: string; image: Img; href?: string }[];
+  /** Shop all page categories in order; null = every category. */
+  shopAll: string[] | null;
   usage: Record<string, number>;
 }
 
@@ -173,6 +175,8 @@ export function CategoriesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [tree, setTree] = useState<Cat[]>([]);
   const [rail, setRail] = useState<RailTile[]>([]);
+  /** null = every category, in tree order. */
+  const [shopAll, setShopAll] = useState<string[] | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dialog, setDialog] = useState<NodeDialog>(null);
@@ -187,6 +191,7 @@ export function CategoriesScreen() {
         setServer(d);
         setTree(d.tree);
         setRail(d.featured.map((f) => ({ handle: f.handle, subcategory: f.href?.split("/")[3] ?? NONE, title: f.title, image: f.image })));
+        setShopAll(d.shopAll);
         setDirty(false);
         setError(null);
       })
@@ -201,6 +206,10 @@ export function CategoriesScreen() {
   const usage = server?.usage ?? {};
   const edit = (next: Cat[]) => (setTree(next), setDirty(true));
   const editRail = (next: RailTile[]) => (setRail(next), setDirty(true));
+  const editShopAll = (next: string[] | null) => (setShopAll(next), setDirty(true));
+  // The list the editor shows: the chosen ones in their order (still in the tree), then the rest, hidden.
+  const shopAllShown = shopAll ? shopAll.filter((h) => tree.some((c) => c.handle === h)) : tree.map((c) => c.handle);
+  const shopAllHidden = tree.filter((c) => !shopAllShown.includes(c.handle));
 
   async function save() {
     if (!server) return;
@@ -212,6 +221,8 @@ export function CategoriesScreen() {
           revision: server.revision,
           tree: tree.map((c) => ({ handle: c.handle, title: c.title, image: imgBody(c.image), subcategories: c.subcategories.map((s) => ({ handle: s.handle, title: s.title, image: imgBody(s.image) })) })),
           featured: rail.map((r) => ({ handle: r.handle, title: r.title, image: imgBody(r.image), ...(r.subcategory !== NONE ? { subcategory: r.subcategory } : {}) })),
+          // Every category, in tree order → null (new categories then show up automatically).
+          shopAll: shopAll === null || (shopAllShown.length === tree.length && shopAllShown.every((h, i) => h === tree[i].handle)) ? null : shopAllShown,
         },
       });
       notify("success", "Categories saved — the store shows them within a few seconds");
@@ -344,6 +355,55 @@ export function CategoriesScreen() {
                 </li>
               );
             })}
+          </ul>
+        )}
+      </Card>
+
+      <Card
+        title={`Shop all page · ${shopAllShown.length} of ${tree.length}`}
+        action={canEdit && shopAll !== null ? <AButton size="sm" variant="outline" onClick={() => editShopAll(null)}>Show all categories</AButton> : undefined}
+      >
+        <p className="mb-3 text-sm text-muted-foreground">
+          The category tiles at the top of the “Shop all” page (/men — where the homepage&apos;s <b>Shop all</b> link goes), in this order.
+          {shopAll === null ? " Showing every category; new categories appear automatically." : " Only these show; a new category stays hidden here until you add it."}
+        </p>
+        {tree.length === 0 ? (
+          <EmptyState title="No categories yet" description="Create a category first." />
+        ) : (
+          <ul className="divide-y divide-border">
+            {shopAllShown.map((h, i) => {
+              const c = tree.find((x) => x.handle === h)!;
+              return (
+                <li key={h} className="flex items-center gap-3 py-2.5">
+                  <Thumb image={c.image} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{c.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">Shown · /men/{c.handle}</p>
+                  </div>
+                  {canEdit ? (
+                    <div className="flex items-center">
+                      <IconButton icon={ArrowUp01Icon} label={`Move ${c.title} up on Shop all`} disabled={i === 0} onClick={() => editShopAll(move(shopAllShown, i, -1))} />
+                      <IconButton icon={ArrowDown01Icon} label={`Move ${c.title} down on Shop all`} disabled={i === shopAllShown.length - 1} onClick={() => editShopAll(move(shopAllShown, i, 1))} />
+                      <IconButton icon={Cancel01Icon} tone="danger" label={`Hide ${c.title} on Shop all`} disabled={shopAllShown.length === 1} onClick={() => editShopAll(shopAllShown.filter((x) => x !== h))} />
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+            {shopAllHidden.map((c) => (
+              <li key={c.handle} className="flex items-center gap-3 py-2.5 opacity-60">
+                <Thumb image={c.image} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{c.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">Hidden on Shop all · its page /men/{c.handle} still works</p>
+                </div>
+                {canEdit ? (
+                  <AButton size="sm" variant="outline" onClick={() => editShopAll([...shopAllShown, c.handle])}>
+                    <AIcon icon={Add01Icon} /> Show
+                  </AButton>
+                ) : null}
+              </li>
+            ))}
           </ul>
         )}
       </Card>

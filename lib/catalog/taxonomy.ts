@@ -76,6 +76,8 @@ export interface TaxonomyView {
   revision: number;
   tree: CategoryNode[];
   featured: Category[];
+  /** Shop all page categories in order; null = every category. */
+  shopAll: string[] | null;
   collections: CollectionView[];
   /** Products (any status) per category and per `category/subcategory`. */
   usage: Record<string, number>;
@@ -179,6 +181,7 @@ export async function taxonomyView(deps: CatalogAdminDeps): Promise<TaxonomyView
     revision: docs?.revision ?? 0,
     tree: docs?.tree ?? [],
     featured: docs?.featured ?? [],
+    shopAll: docs?.shopAll ?? null,
     collections: (docs?.collections ?? []).map((c) => ({
       handle: c.handle,
       title: c.title,
@@ -201,7 +204,7 @@ function handleOf(v: unknown, where: string): string {
   return v;
 }
 
-function revisionOf(v: unknown): number {
+export function revisionOf(v: unknown): number {
   if (typeof v !== "number" || !Number.isSafeInteger(v) || v < 0) throw new ValidationError("Missing revision — reload the page.");
   return v;
 }
@@ -336,9 +339,11 @@ export function parseBuilder(raw: unknown, ctx: { tree: CategoryNode[]; productI
 
 // ── Saves ────────────────────────────────────────────────────────────────────────────────────────
 
-async function write(deps: CatalogAdminDeps, current: CatalogDocs | null, next: Omit<CatalogDocs, "revision">, expected: number) {
+/** Saves the documents. Fields a save doesn't set (homepage content, Shop all list…) are kept as they are. */
+export async function write(deps: CatalogAdminDeps, current: CatalogDocs | null, next: Partial<Omit<CatalogDocs, "revision">>, expected: number) {
   if ((current?.revision ?? 0) !== expected) throw stale();
-  const ok = await deps.store.replaceDocs({ ...next, revision: expected + 1 }, expected);
+  const merged: Omit<CatalogDocs, "revision"> = { tree: [], featured: [], collections: [], ...current, ...next };
+  const ok = await deps.store.replaceDocs({ ...merged, revision: expected + 1 }, expected);
   if (!ok) throw stale();
   deps.invalidate();
   return expected + 1;
@@ -351,14 +356,40 @@ export interface SaveResult {
   summary: Record<string, number>;
 }
 
+/**
+ * Which top-level categories the "Shop all" page (/men) shows, in order. Handles must be in the tree, no repeats.
+ * `undefined` in the body = leave as it is; `null` = show every category (the default).
+ */
+export function parseShopAll(raw: unknown, tree: CategoryNode[]): string[] | null | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === null) return null;
+  if (!Array.isArray(raw) || raw.length > LIMITS.categories) throw new ValidationError("Choose the categories for the Shop all page.");
+  const known = new Set(tree.map((c) => c.handle));
+  const seen = new Set<string>();
+  for (const h of raw) {
+    if (typeof h !== "string" || !known.has(h)) throw new ValidationError("A Shop all category isn't in the category list any more. Reload and try again.");
+    if (seen.has(h)) throw new ValidationError("A category is listed twice on the Shop all page.");
+    seen.add(h);
+  }
+  return raw as string[];
+}
+
+/** Top-level categories for the Shop all page: the admin's list in its order, or every category when none is set. */
+export function shopAllCategories<T extends { handle: string }>(tree: T[], shopAll: string[] | null | undefined): T[] {
+  if (!shopAll) return tree;
+  const byHandle = new Map(tree.map((c) => [c.handle, c]));
+  return shopAll.map((h) => byHandle.get(h)).filter((c): c is T => !!c);
+}
+
 /** Replaces the category tree and the homepage rail. Categories products still use can't be removed. */
 export async function saveCategories(deps: CatalogAdminDeps, body: unknown): Promise<SaveResult> {
   const b = asObject(body);
-  rejectUnknownFields(b, ["revision", "tree", "featured"]);
+  rejectUnknownFields(b, ["revision", "tree", "featured", "shopAll"]);
   const expected = revisionOf(b.revision);
   const photos = new Set<string>();
   const tree = parseTree(b.tree, photos);
   const featured = parseFeatured(b.featured, tree, photos);
+  const shopAllIn = parseShopAll(b.shopAll, tree);
   await checkPhotos(deps, photos);
 
   const [current, records] = await Promise.all([deps.store.getDocs(), deps.store.listRecords()]);
@@ -379,8 +410,11 @@ export async function saveCategories(deps: CatalogAdminDeps, body: unknown): Pro
       if (missing) throw new ValidationError(`Collection “${c.title}” uses “${missing}”. Change that collection first.`);
     }
   }
-  const revision = await write(deps, current, { tree, featured, collections: current?.collections ?? [] }, expected);
-  return { revision, summary: { categories: tree.length, subcategories: tree.reduce((n, c) => n + c.subcategories.length, 0), railTiles: featured.length } };
+  // Shop all list: the new one, or the stored one minus categories that were just removed.
+  const kept2 = new Set(tree.map((c) => c.handle));
+  const shopAll = shopAllIn !== undefined ? shopAllIn : current?.shopAll ? current.shopAll.filter((h) => kept2.has(h)) : null;
+  const revision = await write(deps, current, { tree, featured, shopAll }, expected);
+  return { revision, summary: { categories: tree.length, subcategories: tree.reduce((n, c) => n + c.subcategories.length, 0), railTiles: featured.length, shopAll: shopAll?.length ?? -1 } };
 }
 
 /**
@@ -422,7 +456,7 @@ export async function saveCollections(deps: CatalogAdminDeps, body: unknown): Pr
     if (seen.has(h) || !refs.has(h)) continue;
     throw new ValidationError(`Collection “${h}” is used by ${refs.get(h)!.join(", ")}. Remove those links first.`);
   }
-  const revision = await write(deps, current, { tree, featured: current?.featured ?? [], collections }, expected);
+  const revision = await write(deps, current, { collections }, expected);
   return { revision, summary: { collections: collections.length } };
 }
 

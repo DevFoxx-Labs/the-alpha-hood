@@ -44,7 +44,16 @@ const NAV = [
  * when signed out. The first state comes from the server's session check (app/(store)/account/layout.tsx), so a guest
  * sees the sign-in form straight away; the browser only asks GET /api/account/me when the server couldn't decide.
  */
-export function AccountFrame({ title, children }: { title: string; children: React.ReactNode }) {
+export function AccountFrame({
+  title,
+  children,
+  signIn,
+}: {
+  title: string;
+  children: React.ReactNode;
+  /** What the signed-out screen says on this page (e.g. Alpha Club: why to sign in). Default: plain sign-in. */
+  signIn?: { heading: string; text: string; points?: string[] };
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const session = useAccountSession();
@@ -99,8 +108,19 @@ export function AccountFrame({ title, children }: { title: string; children: Rea
       {state.kind === "signed_out" ? (
         <div className="mx-auto grid max-w-[880px] items-center gap-8 py-6 lg:grid-cols-[1fr_360px] lg:gap-14">
           <div className="max-w-[420px]">
-            <h1 className="type-section">Sign in</h1>
-            <p className="mb-6 mt-2 text-[14px] text-ink-2">Use your mobile number, email or Google — new here? We&apos;ll create your account.</p>
+            <h1 className="type-section">{signIn?.heading ?? "Sign in"}</h1>
+            <p className="mt-2 text-[14px] text-ink-2">{signIn?.text ?? "Use your mobile number, email or Google — new here? We'll create your account."}</p>
+            {signIn?.points?.length ? (
+              <ul className="mt-3 space-y-1 text-[13px]">
+                {signIn.points.map((p) => (
+                  <li key={p} className="flex gap-2">
+                    <span aria-hidden="true">✓</span>
+                    {p}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="mb-6" />
             <SignInPanel onSignedIn={reload} />
           </div>
           {/* MASCOT_PROMPTS #5 "Welcome salute" — desktop only, so the form stays first on phones. */}

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ListingHeader, ListingResults } from "@/components/listing/listing-page";
 import { Holding } from "@/components/store/holding";
 import { emptyQuery } from "@/lib/catalog/query";
-import { getCategoryTree, getListing } from "@/lib/storefront";
+import { getListing, getShopAllCategories } from "@/lib/storefront";
 
 export const metadata: Metadata = {
   title: "Men's clothing — shirts, tees, jeans & more",
@@ -10,9 +10,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/men" },
 };
 
-/** PLP-01: every style, with the top-level category rail. */
+/** PLP-01: every style, with the top-level category rail (the categories chosen in Admin → Categories → Shop all page). */
 export default async function MenPage({ searchParams }: PageProps<"/men">) {
-  const [tree, base] = await Promise.all([getCategoryTree(), getListing({ kind: "all" }, emptyQuery())]);
+  const [tree, base] = await Promise.all([getShopAllCategories(), getListing({ kind: "all" }, emptyQuery())]);
   if (!tree || !base) return <Holding />;
   return (
     <>

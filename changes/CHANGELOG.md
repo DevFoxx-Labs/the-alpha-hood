@@ -1,5 +1,62 @@
 # Change log
 
+## 2026-12-02 — Admin → Homepage (hero, campaign band, SEO block), Shop all categories, category slider, Alpha Club sign-in
+
+**Asked for:** admin can customise the hero carousel; choose which categories show on the homepage and which on
+"Shop all"; Shop by category as a left/right slider; campaign band customisable if possible; the full Alpha Club
+join flow; how the SEO block's categories / popular searches are set.
+
+### Admin → Homepage (new, `/admin/homepage`, Catalogue section)
+- **Hero carousel:** "Customise" copies today's built-in slides into the editor; then add (up to 6), edit, reorder,
+  switch on/off, remove. Per slide: small line, 1–3 headline lines, text, button text + link, headline colour,
+  background colour, desktop image (≈16:7) and mobile image (≈4:5) — upload a JPEG/PNG or pick a built-in brand
+  image — alt text, mobile/desktop/both, optional start and end time. "Use built-in" goes back.
+- **Campaign band:** on/off, small line, headline, text, button, image (upload or built-in), alt text, panel colour.
+- **SEO block:** heading, up to 3 link groups (one link per row: `Text | /link`, up to 24 each — e.g. "Top
+  categories" and "Popular searches", where a search link is `/search?q=…`), up to 3 paragraphs.
+- Stored as `homepage` in the catalogue documents (one versioned JSON document, MySQL / PostgreSQL / MongoDB — **no
+  migration**); a part never customised keeps the built-in content. Saves refresh the store via the catalogue cache
+  tag (seconds). Files: `lib/cms/homepage.ts` (types, validation, merge), `lib/cms/homepage-admin.ts` (service),
+  `app/api/admin/homepage/route.ts`, `components/admin/homepage-editor.tsx`, `lib/cms/stored.ts`, `lib/storefront.ts`.
+
+### Categories
+- Homepage: unchanged — Admin → Categories → "Homepage category rail" already chooses the homepage tiles (up to 12).
+- **New card "Shop all page"** (Admin → Categories): which top-level categories the /men page (where "Shop all"
+  goes) shows, in which order; hidden categories keep their own pages. Default = all (new categories appear
+  automatically). `shopAll` in the catalogue documents; `getShopAllCategories()` in `lib/storefront.ts`.
+- **Shop by category is a slider** (`components/home/category-slider.tsx`): swipe / scroll on every screen, snap,
+  and ← → buttons on desktop that show only when there are more tiles than fit. Server-rendered tiles; no layout shift.
+
+### Alpha Club
+- The join flow already existed end to end: homepage band / `/alpha-club` → "Join" → `/account/club` → sign in or
+  sign up → the explicit consent box → "Join for free" (consent recorded in the ledger) → dashboard with coins, tier
+  and referral link `/r/<code>`; "Leave" withdraws. Fixed the gap: a guest landing on `/account/club` saw a generic
+  "Sign in". It now says **"Join the Alpha Club"** with the benefits and what happens next. Joining stays a separate,
+  ticked choice after sign-in (DPDP: never bundled with sign-up).
+
+### Fixed while here
+- Saving categories / collections / an import used to rebuild the catalogue document from a fixed field list, so any
+  other field would have been dropped. `write()` now merges (`{ ...current, ...next }`) and the import keeps
+  `homepage` / `shopAll` — tested.
+
+### Threat model
+| Abuse case | Defence | Test |
+|---|---|---|
+| Script / phishing link in a button or SEO link (`javascript:`, other host, `//`, `/\`) | Same-site path allow-list `INTERNAL_HREF_RE` on the server | `links: same-site paths only` |
+| Image from another host / path tricks / data: URLs (tracking, SSRF, mixed content) | Only `/api/media/med_<32 hex>` that exists in our media store, or a shipped built-in image | `images: …`, `must exist` |
+| Stored XSS via text | `cleanText` (control chars stripped, lengths capped) + React escaping; no HTML rendered | `plain text` |
+| Mass assignment / extra props | `rejectUnknownFields` at every level | `unknown fields refused` |
+| Lost update (two admins) | Optimistic revision under a row lock → 409 | `stale save is refused` |
+| One screen wiping another's content | Merge-on-write | `never wipes` |
+| Unauthorised edit | `catalog.read` to view, `catalog.write` to save, same-origin, rate-limited, size-capped (64 KB), audited `content.homepage` | admin-api `homepage editor` |
+
+### Verified
+- `pnpm typecheck` ✔, `pnpm lint` ✔, `pnpm test` 43 files / 613 tests ✔ (new `lib/cms/homepage.test.ts`, homepage
+  editor authorization in `admin-api.test.ts`). Dev server: home 200 with the slider buttons, hero, campaign and SEO; `/men` 200;
+  `/account/club` (guest) shows "Join the Alpha Club" + benefits; `/admin/homepage` 200.
+- Not verified: the admin editor and slider visually (browser extension not connected); a live save through the
+  admin API (needs a staff session with MFA).
+
 ## 2026-12-02 — Fix: /account showed the account screen for a few seconds before the sign-in form
 
 **Reported:** opening /account while signed out first showed the account (dashboard) shell, then after 3–4 seconds

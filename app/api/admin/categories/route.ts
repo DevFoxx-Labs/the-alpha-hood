@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const deps = catalogAdminDeps();
     if (!deps) throw readonly();
     const v = await taxonomyView(deps);
-    return privateJson({ revision: v.revision, tree: v.tree, featured: v.featured, usage: v.usage });
+    return privateJson({ revision: v.revision, tree: v.tree, featured: v.featured, shopAll: v.shopAll, usage: v.usage });
   } catch (error) {
     return adminError(error);
   }

@@ -2,6 +2,7 @@ import type { Category, CategoryNode, Collection, Product, SizeOption } from "@/
 import type { Paise } from "@/lib/format";
 import type { CatalogSnapshot } from "./reader";
 import type { CollectionRule } from "./collection-rules";
+import type { HomepageContent } from "@/lib/cms/homepage";
 
 /**
  * Own-backend catalogue (phase 4). Products are stored as records with a status and a version; the storefront
@@ -46,6 +47,10 @@ export interface CatalogDocs {
   tree: CategoryNode[];
   featured: Category[];
   collections: (Collection & { rule: CollectionRule })[];
+  /** Top-level category handles for the "Shop all" page (/men), in order. Absent / null = every category. */
+  shopAll?: string[] | null;
+  /** Admin → Homepage: hero slides, campaign band, SEO block (lib/cms/homepage.ts). Absent = the built-in content. */
+  homepage?: HomepageContent;
   /** Bumped by every admin save (optimistic lock, `replaceDocs`); absent = 0 (seeded / imported). */
   revision?: number;
 }

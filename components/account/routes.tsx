@@ -75,7 +75,14 @@ export function AccountSettings() {
 
 export function AccountClub() {
   return (
-    <AccountFrame title="Alpha Club">
+    <AccountFrame
+      title="Alpha Club"
+      signIn={{
+        heading: "Join the Alpha Club",
+        text: "Free to join. Sign in or create your account with your mobile number, email or Google — then tap Join on the next screen.",
+        points: ["Hood Coins on every order", "30-day returns and early access to drops", "A code to share: your friend saves, you earn coins"],
+      }}
+    >
       <ClubView />
     </AccountFrame>
   );
