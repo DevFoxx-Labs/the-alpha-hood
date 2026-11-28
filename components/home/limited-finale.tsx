@@ -5,7 +5,7 @@ import type { HomeBlock } from "@/lib/cms/types";
 import type { Product } from "@/lib/commerce/types";
 import { frontWords, Tape } from "./brand-marquee";
 import { EditionTally, LimitedCues } from "./limited-cues";
-import { editionLeft, SignaturePiece } from "./signature-pieces";
+import { editionLeft } from "./signature-pieces";
 
 type Block = Extract<HomeBlock, { type: "limited_edition" }>;
 
@@ -135,15 +135,6 @@ export function LimitedFinale({ block, products }: { block: Block; products: Pro
               </span>
               <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] origin-left scale-x-0 bg-volt transition-transform duration-300 ease-out group-hover/cta:scale-x-100 group-focus-visible/cta:scale-x-100" />
             </Link>
-            {products.length ? (
-              <ul className="mt-5 hidden gap-2 lg:flex">
-                {products.slice(0, 2).map((p) => (
-                  <li key={p.id}>
-                    <SignaturePiece product={p} tone="light" className="w-[150px] p-2 text-[12px]" />
-                  </li>
-                ))}
-              </ul>
-            ) : null}
           </div>
 
           {/* line 2 — in front of the art */}

@@ -159,9 +159,6 @@
   address + customer, GST assumes one warehouse state, consent sources are web/android/ios only.
 
 ## Product / design
-- 🟡 Limited-edition finale (`components/home/limited-finale.tsx`), pre-existing layout: at 1440×900 the giant
-  "EDITION." line sits in front of the two product cards under the CTA and hides their titles/prices. Fix: hide the
-  cards below ~950 px viewport height, or move them beside the CTA.
 - 🟡 Limited-edition signature: no real ambassador signature uploaded yet, so the write-on and the "Signed" stamp/tape
   words don't show. Upload a transparent PNG in Admin → Homepage → Limited edition once the ambassador signs.
 - 🟡 Hero crossed tapes (`components/home/brand-marquee.tsx`, 2026-11-29): the front/back words are built in

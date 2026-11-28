@@ -1,5 +1,15 @@
 # Change log
 
+## 2026-11-29 — Limited-edition finale: product cards under the CTA removed
+
+**Asked for:** remove the two product cards under "Shop the drop". The giant "EDITION." line covered them, so they
+added nothing.
+
+- Removed the desktop card list from `components/home/limited-finale.tsx`. The picked products still feed the
+  pieces-left count and the drop tape (`editionLeft`). The ambassador band still uses `SignaturePiece`.
+- Closes the known gap logged earlier today (cards hidden behind "EDITION." at 1440×900).
+- **Verification:** below.
+
 ## 2026-11-29 — Limited-edition finale: brand motion in place of the sparkle burst
 
 **Asked for:** the firecracker sparkles over the mascot in the limited-edition section didn't fit the brand. Replace
