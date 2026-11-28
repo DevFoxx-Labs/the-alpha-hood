@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Mascot } from "@/components/brand/mascot";
+import { OutlineMarquee } from "@/components/brand/outline-marquee";
 import { ModelFigure } from "@/components/store/garment-art";
 import { Price } from "@/components/store/price";
 import { SectionHeader } from "@/components/store/section-header";
@@ -112,11 +113,12 @@ export function ShopTheLook({ look, products, lead, title }: { look: Look; produ
   );
 }
 
-/** HOME-09 Alpha Club band: mascot #2 (lean back) + the club card art #24, on black. */
+/** HOME-09 Alpha Club band: mascot #2 (lean back) + the club card art #24, on black over "ALPHA CLUB" outline text. */
 export function ClubBand({ title, text, cta }: { title: string; text: string; cta: { label: string; href: string } }) {
   return (
-    <section aria-label={title} className="on-dark overflow-hidden bg-black text-white">
-      <div className="mx-auto grid max-w-[1440px] items-center gap-6 px-6 py-10 lg:grid-cols-[260px_1fr_420px] lg:gap-10 lg:px-10 lg:py-14">
+    <section aria-label={title} className="on-dark relative isolate overflow-hidden bg-black text-white">
+      <OutlineMarquee text="ALPHA CLUB" rows={3} accentRow={1} />
+      <div className="relative z-[1] mx-auto grid max-w-[1440px] items-center gap-6 px-6 py-10 lg:grid-cols-[260px_1fr_420px] lg:gap-10 lg:px-10 lg:py-14">
         <Mascot name="alpha-02-lean-back" sizes="(min-width: 1024px) 260px, 160px" className="mx-auto w-[150px] lg:w-full" />
         <div className="text-center lg:text-left">
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-volt">Members only</p>

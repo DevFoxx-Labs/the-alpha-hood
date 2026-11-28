@@ -192,9 +192,19 @@ function Slide({ slide, active, first, position }: { slide: HeroSlide; active: b
   );
 }
 
-/** Art-directed hero image (16:7 desktop, 4:5 mobile) — only the matching one downloads. */
+/**
+ * Art-directed hero image (16:7 desktop, 4:5 mobile) — only the matching one downloads.
+ * Slide 1 is the LCP image: eager + fetchPriority=high, so the browser's preload scanner fetches it straight
+ * from the HTML (getImageProps defaults to lazy, which waited for the first layout). Not `preload`: with
+ * two art-directed sources, Next's docs advise eager + fetchPriority instead (a <link> would fetch both).
+ */
 function HeroImage({ image, first }: { image: NonNullable<HeroSlide["image"]>; first: boolean }) {
-  const common = { alt: image.alt, sizes: "100vw", fetchPriority: first ? ("high" as const) : undefined };
+  const common = {
+    alt: image.alt,
+    sizes: "100vw",
+    loading: first ? ("eager" as const) : ("lazy" as const),
+    fetchPriority: first ? ("high" as const) : undefined,
+  };
   const {
     props: { srcSet: desktop },
   } = getImageProps({ ...common, src: image.desktop, width: 1920, height: 840 });

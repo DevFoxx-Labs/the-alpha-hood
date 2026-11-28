@@ -42,7 +42,7 @@ export async function SiteFooter({ content }: { content: FooterContent | null })
       {content ? (
         <div className="mx-auto grid max-w-[1440px] grid-cols-2 gap-x-6 gap-y-10 px-4 pb-10 pt-12 lg:grid-cols-[1.3fr_0.8fr_0.8fr_0.8fr_1.6fr] lg:gap-10 lg:px-10 lg:pt-16">
           <div className="col-span-2 lg:col-span-1">
-            <Logo tone="light" />
+            <Logo tone="light" lazy />
             <p className="mt-4 max-w-[300px] text-[14px] leading-[1.6] text-white/70">{content.blurb}</p>
           </div>
           {content.columns.map((col) => (
@@ -51,7 +51,9 @@ export async function SiteFooter({ content }: { content: FooterContent | null })
               <ul className="mt-4 flex flex-col gap-2.5">
                 {col.links.map((l) => (
                   <li key={l.href}>
-                    <Link href={l.href} className={linkCls}>
+                    {/* No prefetch: ~20 footer links each fetched a route shell on every page view, taking
+                        bandwidth from images. Rarely-used links load on click (web-performance rule). */}
+                    <Link href={l.href} prefetch={false} className={linkCls}>
                       {l.label}
                     </Link>
                   </li>
@@ -97,7 +99,7 @@ export async function SiteFooter({ content }: { content: FooterContent | null })
           </p>
           <nav aria-label="Legal" className="flex flex-wrap gap-x-5 gap-y-2">
             {LEGAL_LINKS.map((l) => (
-              <Link key={l.href} href={l.href} className="text-[12px] text-white/70 hover:text-white">
+              <Link key={l.href} href={l.href} prefetch={false} className="text-[12px] text-white/70 hover:text-white">
                 {l.label}
               </Link>
             ))}

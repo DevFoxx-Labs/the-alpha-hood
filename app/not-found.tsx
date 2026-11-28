@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { Mascot } from "@/components/brand/mascot";
+import { OutlineMarquee } from "@/components/brand/outline-marquee";
 import { Logo } from "@/components/store/logo";
 import { Button } from "@/components/ui/button";
 
 export default function NotFound() {
   return (
-    <main className="grid min-h-dvh place-items-center px-6 py-16 text-center">
-      <div className="flex flex-col items-center gap-6">
+    <main className="relative isolate grid min-h-dvh place-items-center overflow-hidden px-6 py-16 text-center">
+      {/* Light variant of the brand-video outline text (black stroke at 8%, fades to white). */}
+      <OutlineMarquee theme="light" rows={5} />
+      <div className="relative z-[1] flex flex-col items-center gap-6">
         <Logo />
         {/* MASCOT_PROMPTS #14 "Peek from the side" — curious, never alarming. */}
         <Mascot name="alpha-14-peek" sizes="(min-width: 1024px) 420px, 80vw" className="w-[min(420px,80vw)]" />

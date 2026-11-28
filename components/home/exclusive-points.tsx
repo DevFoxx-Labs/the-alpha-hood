@@ -1,12 +1,15 @@
+import { OutlineMarquee } from "@/components/brand/outline-marquee";
 import type { HomeBlock } from "@/lib/cms/types";
 
 type Block = Extract<HomeBlock, { type: "exclusive_points" }>;
 
-/** "Exclusive drop" layout: why the pieces are worth their price — numbered tiles on black (volt numbers). */
+/** "Exclusive drop" layout: why the pieces are worth their price — numbered tiles on black (volt numbers), over the
+ *  brand-video outline text (it shows around the heading and the section edges; the tiles stay solid so their text stays readable). */
 export function ExclusivePoints({ block }: { block: Block }) {
   return (
-    <section aria-labelledby={`${block.id}-h`} className="on-dark bg-black text-white">
-      <div className="mx-auto max-w-[1440px] px-4 py-12 lg:px-10 lg:py-20">
+    <section aria-labelledby={`${block.id}-h`} className="on-dark relative isolate overflow-hidden bg-black text-white">
+      <OutlineMarquee rows={4} accentRow={1} />
+      <div className="relative z-[1] mx-auto max-w-[1440px] px-4 py-12 lg:px-10 lg:py-20">
         <h2 id={`${block.id}-h`} className="font-display text-[44px] uppercase leading-none lg:text-[80px]">
           {block.title}
         </h2>

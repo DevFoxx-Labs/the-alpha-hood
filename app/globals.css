@@ -1,6 +1,17 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Metric fallback for the self-hosted Inter (app/layout.tsx). Values copied verbatim from what
+   next/font/google generated, so text measures exactly as before while Inter loads (no layout shift). */
+@font-face {
+  font-family: "Inter Fallback";
+  src: local(Arial);
+  ascent-override: 90.44%;
+  descent-override: 22.52%;
+  line-gap-override: 0%;
+  size-adjust: 107.12%;
+}
+
 /*
  * The Alpha Hood — design tokens (DESIGN.md §2).
  * The UI is ~90% black/white/grey. Red (`accent`) only for price/discount/sale/urgency and the
@@ -481,4 +492,105 @@
   border: 3px solid #fff;
   box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
   transform: rotate(-45deg);
+}
+
+/*
+ * Outline-text marquee background (components/brand/outline-marquee.tsx; brief in docs/samples/outline-text-background/).
+ * Absolute layer behind the section's content: rows of outlined Anton words drifting sideways, a vignette that fades
+ * them into the section colour (--olm-fade), and optional film grain. Transform-only animation (no layout, no CLS).
+ * Change the stroke opacity with --olm-op (the `opacity` prop) and the fade colour with --olm-fade.
+ */
+@layer components {
+  .olm {
+    --olm-rgb: 255 255 255;
+    --olm-op: 0.08;
+    --olm-fade: var(--color-black);
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    user-select: none;
+    contain: layout paint style;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .olm[data-theme="light"] {
+    --olm-rgb: 0 0 0;
+    --olm-fade: var(--color-white);
+  }
+  .olm-row {
+    display: flex;
+    flex: none;
+    width: max-content;
+    white-space: nowrap;
+  }
+  /* One copy of the word. The text is drawn from data-text, so it isn't in the DOM text. Row height ≈ 14svh on phones, 19svh from 640 px. */
+  .olm-row > span {
+    display: block;
+    padding-right: 0.35em;
+    font-family: var(--font-display);
+    font-size: clamp(70px, 14svh, 140px);
+    line-height: 0.95;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: transparent;
+    -webkit-text-stroke: max(1px, 0.0075em) rgb(var(--olm-rgb) / var(--olm-op));
+  }
+  .olm-row > span::before {
+    content: attr(data-text);
+  }
+  @media (min-width: 640px) {
+    .olm-row > span {
+      font-size: clamp(90px, 19svh, 210px);
+    }
+  }
+  .olm-row[data-accent] > span {
+    -webkit-text-stroke-color: color-mix(in srgb, var(--color-volt) calc(var(--olm-op) * 150%), transparent);
+  }
+  /* Spotlight: centre clear, edges fade into the section colour. */
+  .olm::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 45%, transparent 30%, var(--olm-fade) 88%);
+  }
+  /* Film grain: one small SVG noise tile at 4%. */
+  .olm[data-grain]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .olm-row {
+      will-change: transform;
+      animation: olm-left var(--olm-dur, 60s) linear var(--olm-delay, 0s) infinite;
+    }
+    .olm-row[data-dir="right"] {
+      animation-name: olm-right;
+    }
+    .olm[data-paused] .olm-row {
+      animation-play-state: paused;
+    }
+  }
+  @keyframes olm-left {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes olm-right {
+    from {
+      transform: translateX(-50%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
 }

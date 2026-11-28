@@ -1,5 +1,30 @@
 # Change log
 
+## 2026-11-28 — Brand-video outline-text background (`OutlineMarquee`)
+
+**Asked for:** the moving outlined "ALPHA HOOD" rows from the brand videos as a reusable section background, used
+where it fits, with the owner's sample kept as a separate, unused copy.
+
+- **Component:** `components/brand/outline-marquee.tsx` + `.olm*` CSS in `app/globals.css`. Props: `text`, `rows` (1–8),
+  `theme` (`dark` | `light`), `speed`, `accentRow` (volt, dark only), `opacity`, `grain`. Rows are server-rendered empty
+  spans, and the word comes from `content: attr(data-text)`, so there is no JS build step, no layout shift, and the word isn't
+  repeated in the page text. Two identical halves with translateX 0 → -50% (seamless), alternate directions, 58–72 s
+  loops (about 70 px/s). Transform only. Static under reduced motion, paused off-screen (IntersectionObserver).
+  Uses the self-hosted Anton (no Google Fonts request) and the volt token in place of the sample's `#F2C714`.
+- **Used on:** home Exclusive points (dark, accent row) · home Alpha Club band (`ALPHA CLUB`, 3 rows) · About hero ·
+  Coming-soon holding page · 404 (light theme). Not used on the hero carousel, Ambassador band or Limited finale,
+  which already have photo-led LCPs or their own giant moving type. It would clash there.
+- **Reference copy (unused):** `docs/samples/outline-text-background/` holds the owner's `sample.html` (unchanged, opens
+  in a browser) and the brief. Dev demo: `/dev/outline-marquee` (dark hero, light, soft, props; `devPagesEnabled`).
+- **Threat model:** decorative only, with no input, data or network. `text` is a prop set in code, rendered as an attribute
+  (escaped by React). No new dependency.
+- **Tests:** `components/brand/outline-marquee.test.ts`: aria-hidden, no DOM text, rows/directions/halves, speed
+  scaling, single accent row, clamping, CSS reduced-motion / pause / transform-only.
+- **Verification:** `pnpm typecheck` ✔ · eslint on changed files ✔ · `pnpm test` 48 files / 657 tests ✔ · `pnpm build` ✔
+  (throwaway `SECRET_BOX_KEY`). Headless Chromium screenshots of the production build: 404 (light, 1440) and About
+  (dark, 390) show the rows. The running `next dev` kept serving the old CSS (restart it). The demo page and the
+  home sections weren't screenshotted, and a real 360 px check was not done (headless Chrome's minimum window width).
+
 ## 2026-12-04 — "Show as sold out" switch: demand test for products and drop spotlights
 
 **Asked for:** a switch on products, and on the drop's spotlight products, that shows a piece as out of stock while it

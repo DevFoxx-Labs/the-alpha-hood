@@ -33,6 +33,7 @@ export function Logo({
   href = "/",
   tone = "dark",
   compact = false,
+  lazy = false,
   className,
   onClick,
 }: {
@@ -40,6 +41,11 @@ export function Logo({
   tone?: "dark" | "light";
   /** Always use the small mobile size (e.g. inside drawers and checkout). */
   compact?: boolean;
+  /**
+   * Below the fold (the footer): load lazily. A non-lazy <img> makes React put a high-priority
+   * `<link rel="preload">` in the <head>, which competed with the hero (LCP) image on every page.
+   */
+  lazy?: boolean;
   className?: string;
   onClick?: () => void;
 }) {
@@ -52,7 +58,8 @@ export function Logo({
         alt=""
         width={LOCKUP.w}
         height={LOCKUP.h}
-        fetchPriority={tone === "dark" && !compact ? "high" : undefined}
+        fetchPriority={tone === "dark" && !compact && !lazy ? "high" : undefined}
+        loading={lazy ? "lazy" : undefined}
         decoding="async"
         draggable={false}
         // Header slot is 64 px: lockup 40 px tall on mobile (≈ 120 px wide, the kit's minimum), 48 px on desktop.

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { Mascot } from "@/components/brand/mascot";
+import { OutlineMarquee } from "@/components/brand/outline-marquee";
 import { DraftNotice, NoticeSections } from "@/components/legal/notice-view";
 import { MASCOT, type MascotName } from "@/lib/brand/mascot";
 import { renderContentPage } from "@/lib/content/pages";
@@ -34,8 +35,9 @@ export default function AboutPage() {
         dangerouslySetInnerHTML={{ __html: toJsonLd(breadcrumbJsonLd([{ name: "Home", url: siteUrl("/") }, { name: page.title, url: siteUrl(page.path) }])) }}
       />
 
-      <section className="on-dark overflow-hidden bg-black text-white">
-        <div className="mx-auto grid max-w-[1440px] items-end lg:grid-cols-[1fr_520px]">
+      <section className="on-dark relative isolate overflow-hidden bg-black text-white">
+        <OutlineMarquee rows={4} accentRow={2} />
+        <div className="relative z-[1] mx-auto grid max-w-[1440px] items-end lg:grid-cols-[1fr_520px]">
           <div className="px-4 pb-10 pt-12 lg:px-[72px] lg:py-24">
             <nav aria-label="Breadcrumb" className="mb-6 text-[12px] text-white/60">
               <Link href="/" className="hover:underline">

@@ -38,7 +38,7 @@ export function CookieBanner() {
             We use strictly necessary cookies to run the store. With your OK we&apos;d also use{" "}
             {activePurposes.map((p) => PURPOSES[p].label.toLowerCase()).join(" and ")} cookies. Nothing optional loads
             until you choose.{" "}
-            <Link href="/legal/cookies" className="underline underline-offset-2">
+            <Link href="/legal/cookies" prefetch={false} className="underline underline-offset-2">
               Cookie Policy
             </Link>
           </p>
@@ -115,7 +115,7 @@ function PreferencesBody({
       <div className="flex-1 overflow-y-auto px-5 py-5">
         <SheetDescription id="cookie-prefs-desc" className="text-[13px] leading-[1.6]">
           Choose which optional cookies we may use. You can change this any time from the footer.{" "}
-          <Link href="/legal/cookies" className="underline underline-offset-2" onClick={onClose}>
+          <Link href="/legal/cookies" prefetch={false} className="underline underline-offset-2" onClick={onClose}>
             Cookie Policy
           </Link>
         </SheetDescription>
