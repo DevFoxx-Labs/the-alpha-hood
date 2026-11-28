@@ -64,7 +64,19 @@ export type ResolvedHomeBlock =
   /** Every colour of the style (the picked colour first in its own place); empty = nothing to show. */
   | { block: Extract<HomeBlock, { type: "product_spotlight" }>; products: Product[]; initial: number }
   | { block: Extract<HomeBlock, { type: "shop_the_look" }>; look: Look | null; products: Product[] }
-  | { block: Exclude<HomeBlock, { type: "category_rail" | "product_tabs" | "product_grid" | "shop_the_look" | "ambassador" | "limited_edition" | "product_spotlight" }> };
+  /** Live links for the front tape: categories (store) or the drop's spotlight pieces that are on the page. */
+  | { block: Extract<HomeBlock, { type: "marquee" }>; links: MarqueeLink[] }
+  | { block: Exclude<HomeBlock, { type: "category_rail" | "product_tabs" | "product_grid" | "shop_the_look" | "ambassador" | "limited_edition" | "product_spotlight" | "marquee" }> };
+
+export interface MarqueeLink {
+  label: string;
+  href: string;
+}
+
+/** The drop's spotlight pieces that actually render (a spotlight with no product is skipped), as in-page links. */
+export function spotlightLinks(resolved: ResolvedHomeBlock[]): MarqueeLink[] {
+  return resolved.flatMap((r) => (r.block.type === "product_spotlight" && "initial" in r && r.products.length ? [{ label: r.block.title, href: `#${r.block.id}` }] : []));
+}
 
 export async function getHomePage(): Promise<ResolvedHomeBlock[] | null> {
   "use cache";
@@ -78,11 +90,14 @@ export async function getHomePage(): Promise<ResolvedHomeBlock[] | null> {
   const layout = landingLayout(docs?.homepage);
   const builtIn = layout === "drop" ? MOCK_DROP_HOMEPAGE : storeBlocks;
   const blocks = liveBlocks(applyHomepage(builtIn, docs?.homepage, layout), new Date());
-  return Promise.all(
+  const resolved = await Promise.all(
     blocks.map(async (block): Promise<ResolvedHomeBlock> => {
       switch (block.type) {
         case "category_rail":
           return { block, categories: await commerce.listCategories() };
+        case "marquee":
+          // Drop links are filled in below, once the spotlights are resolved.
+          return { block, links: block.links === "categories" ? (await commerce.listCategories()).map((c) => ({ label: c.title, href: c.href ?? `/men/${c.handle}` })) : [] };
         case "product_tabs": {
           const tabs = await Promise.all(
             block.tabs.map(async (t) => ({
@@ -130,6 +145,8 @@ export async function getHomePage(): Promise<ResolvedHomeBlock[] | null> {
       }
     }),
   );
+  const pieces = spotlightLinks(resolved);
+  return resolved.map((r) => (r.block.type === "marquee" && r.block.links === "drop" ? { block: r.block, links: pieces } : r));
 }
 
 // ── Listing pages (M3) ────────────────────────────────────────────────────────────────────────────

@@ -80,6 +80,8 @@ export interface StoredLimited {
   cutoutImage: string;
   cutoutAlt: string;
   sceneImage: string;
+  /** Uploaded signature PNG; null / missing = none. */
+  signatureImage?: string | null;
   productIds: string[];
 }
 
@@ -309,7 +311,7 @@ export function parseAmbassador(raw: unknown): StoredAmbassador {
 
 export function parseLimited(raw: unknown): StoredLimited {
   const o = asObject(raw);
-  rejectUnknownFields(o, ["enabled", "eyebrow", "line1", "line2", "text", "cta", "editionSize", "cutoutImage", "cutoutAlt", "sceneImage", "productIds"]);
+  rejectUnknownFields(o, ["enabled", "eyebrow", "line1", "line2", "text", "cta", "editionSize", "cutoutImage", "cutoutAlt", "sceneImage", "signatureImage", "productIds"]);
   let editionSize: number | null = null;
   if (o.editionSize !== null && o.editionSize !== undefined && o.editionSize !== "") {
     if (typeof o.editionSize !== "number" || !Number.isSafeInteger(o.editionSize) || o.editionSize < 1 || o.editionSize > HOMEPAGE_LIMITS.editionMax) throw new ValidationError(`Limited edition: pieces must be a whole number from 1 to ${HOMEPAGE_LIMITS.editionMax}.`);
@@ -326,6 +328,7 @@ export function parseLimited(raw: unknown): StoredLimited {
     cutoutImage: imagePath(o.cutoutImage, "Limited edition cut-out", false),
     cutoutAlt: text(o.cutoutAlt, "Limited edition cut-out description", 4, 140),
     sceneImage: imagePath(o.sceneImage, "Limited edition scene", false),
+    signatureImage: imagePath(o.signatureImage, "Limited edition signature", true),
     productIds: productIds(o.productIds ?? [], "Limited edition products", HOMEPAGE_LIMITS.limitedProducts),
   };
 }
@@ -505,7 +508,7 @@ export function builtInContent(blocks: HomeBlock[], dropBlocks: HomeBlock[] = []
     limited:
       ltd?.type === "limited_edition"
         ? { enabled: true, ...(strip(ltd) as Omit<StoredLimited, "enabled">) }
-        : { enabled: false, eyebrow: "", line1: "Limited", line2: "Edition.", text: "", cta: { label: "Shop the drop", href: "/collections/new-in" }, editionSize: null, cutoutImage: MASCOT["alpha-01-hero-stance"].src, cutoutAlt: "Limited edition", sceneImage: MASCOT["scene-25-lookbook"].src, productIds: [] },
+        : { enabled: false, eyebrow: "", line1: "Limited", line2: "Edition.", text: "", cta: { label: "Shop the drop", href: "/collections/new-in" }, editionSize: null, cutoutImage: MASCOT["alpha-01-hero-stance"].src, cutoutAlt: "Limited edition", sceneImage: MASCOT["scene-25-lookbook"].src, signatureImage: null, productIds: [] },
     hero: heroOf(blocks),
     campaign:
       campaign?.type === "campaign_band"

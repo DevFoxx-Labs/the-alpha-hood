@@ -1,5 +1,101 @@
 # Change log
 
+## 2026-11-29 — Limited-edition finale: brand motion in place of the sparkle burst
+
+**Asked for:** the firecracker sparkles over the mascot in the limited-edition section didn't fit the brand. Replace
+them with motion that matches The Alpha Hood's energy, and add the other proposed ideas too (all of them).
+
+- **Sparkles removed** from the finale. `components/home/sparkles.tsx` + `.burst-*` CSS are kept for celebration
+  moments (e.g. order confirmed); nothing uses them right now.
+- **ALPHA drops in from above** with weight (ease-in, scrubbed; was a sideways swing). **On touchdown** (cue `land`):
+  three tapered **claw slashes** rip in behind him, his **shadow squashes**, he squashes/settles, **shock lines** kick
+  out at his feet, and an **"Authentic · Only 100" stamp** slams onto the art (tilted −8°, ink look).
+- **Line 1 "LIMITED"** sweeps in as an outline, then **fills with ink** as you scroll (transform-only wipe).
+- **Line 2 lands → the stage shakes once** (cue `slam`, 240 ms).
+- **Drop tape:** a black hazard tape (`Tape` from the hero marquee) straddles the section's top edge: "Limited edition ·
+  37 left · Only 100 made · When it's gone, it's gone", with the stock chip rules (`frontWords`). Placed in the flow, outside
+  the pinned stage, so the stage layout and the fixed header are untouched.
+- **Pieces left tally:** counts down from the edition size to the **real** stock when the CTA comes in (cue `tally`).
+  The server HTML and screen readers get the real number. Sold out never counts.
+- **Real signature write-on:** new optional `signatureImage` on the block, plus an Admin → Homepage → Limited edition
+  picker (upload only). If set, it wipes on under the CTA and the stamp/tape say "Signed"/"Hand-signed". If empty,
+  neither claim appears. A signature is never made up.
+- **CTA:** the arrow nudges and a volt bar sweeps under the button on hover and keyboard focus.
+- **How it runs:** entrances are CSS scroll timelines. Impacts are short time-based animations, started by 1 px
+  IntersectionObserver markers at fixed depths in the 260vh section (`components/home/limited-cues.tsx` →
+  `data-land/slam/tally` on the section). Only transform and opacity animate. With reduced motion, without scroll
+  timelines, or without JS: everything is static in its final place (the waiting states only apply under `data-cues`).
+- **Threat model:** the only new input is `signatureImage`, an admin-only field. It goes through the same `imagePath`
+  allow-list as the other images (own `/api/media/` uploads or built-ins; other hosts / `javascript:` / `//` refused,
+  unknown fields refused). The rest is display only. Stock is read-only, and claims come from the stored block.
+- **Tests:** `components/home/limited-finale.test.ts` (no sparkles; claims only from block data; signature only when
+  uploaded; real stock in SSR + sr-only; tally bounds; cue order; motion guards; keyframes transform/opacity only) and
+  signature validation cases in `lib/cms/homepage.test.ts`.
+- **Verification:** `pnpm typecheck` ✔ · `pnpm lint` ✔ · `pnpm test` 50 files / 674 tests ✔ · `pnpm build` ✔ (204 pages,
+  throwaway `SECRET_BOX_KEY` / `OTP_PEPPER` in the shell). Headless Chrome against the dev server at 1440×900, 390×844
+  and 360×740, plus reduced motion at 1440. The cues fired in order (land → slam → tally). The signature write-on was
+  only checked by tests, because there is no real signature file yet.
+
+## 2026-11-29 — Hero marquee → two crossed "caution tapes" (more engaging, same performance budget)
+
+**Asked for:** two crossing marquees, made more engaging and on-brand. Build all seven ideas and keep the page fast.
+
+- **Crossed tapes** (`components/home/brand-marquee.tsx`): volt tape in front (runs left, 38 s), black tape behind
+  (runs right, 46 s, `--animate-marquee-back`). The X tilt is 5° on phones, 3° from 768 px and 2° from 1280 px; at a
+  fixed 2° the tapes overlapped on narrow screens. Tape look: sheen + grain, and volt/black hazard edges on the black tape.
+- **Solid / outline words** alternate (the brand-video outline look).
+- **Logo-mark separators**, drawn by CSS (`.mq-word::after`) from new 72 px WebP copies of the kit's own PNG masters
+  (`scripts/build-logo-mark-small.py`: resize only, 2.9 KB / 2.3 KB). The SVG masters are ~20 KB gzipped each.
+- **Scroll push:** each tape slides further its own way as the section crosses the screen (CSS view timeline `--mq`,
+  no JS, no scroll listener).
+- **Clickable words, pause on hover:** store layout links the live categories (`commerce.listCategories`); drop
+  layout links the spotlight pieces actually on the page (`spotlightLinks`, so ids/titles follow Admin → Homepage). No
+  prefetch. `tabIndex=-1` + `aria-hidden`: mouse/touch shortcuts to pages the menu and category rail already offer.
+- **Drop: pieces left** from real stock after the first word, red chip at ≤ 10, "Sold out" at 0. One rule for the tape
+  and the finale: `editionLeft` (`components/home/signature-pieces.tsx`). It hides the count when stock exceeds the
+  edition size.
+- **ALPHA (#4 pointing, transparent cut-out) rises between the tapes** on desktop as the section scrolls in (half up on
+  load, fully up after a short scroll). `<picture>` with a ≥ 1024 px source: phones download nothing.
+- **Block shape:** `marquee { front, back, below, links: "categories" | "drop" | "none" }`; resolved with `links`.
+  Built-in words for both layouts in `lib/cms/mock-home.ts` (only claims the store already makes).
+- **Performance:** server-rendered, fixed height per breakpoint (no CLS), transform-only animations, static under
+  reduced motion and without scroll timelines. The first version put a wrapper + `<img>` around every word (162
+  elements; home page 983). Separators are now CSS, so it's 66 elements / 14 KB HTML (home page 851, budget ~1,000).
+- **Threat model:** no input. Links come from our own catalogue or the page's own section ids. Stock is read-only
+  and shows counts only. Nothing new reaches the client beyond what the page already shows.
+- **Tests:** `components/home/brand-marquee.test.ts` (crossing/directions/halves, aria-hidden + tabindex −1, outline
+  alternation, CSS separators ≤ 4 KB, desktop-only mascot, stock chip rules, loop width, reduced-motion / scroll-timeline
+  guards, fixed heights, both layouts) + `spotlightLinks` / `editionLeft`.
+- **Verification:** `pnpm typecheck` ✔ · eslint on changed files ✔ · `pnpm test` 50 files / 674 tests ✔ ·
+  `pnpm build` ✔ (clean `.next/cache`). Screenshots at 1440 / 1024 / 500 px (drop layout). The screenshots used a fallback
+  font, because fonts from another port are blocked on a file:// page; the live store layout wasn't viewed (the running
+  dev server serves stale CSS, so restart it).
+- Another session was changing the limited-edition finale at the same time (it now reuses `Tape` and
+  `editionLeft`). Nothing of theirs was changed here.
+
+## 2026-11-29 — GymYardHQ-style word marquee under the hero (full store + drop layouts)
+
+**Asked for:** the marquee from the GymYardHQ landing page, the same, on The Alpha Hood landing page, in both the
+full-store and the "Exclusive drop" layout.
+
+- **Same build as GymYardHQ** (`gymyardhq-web/app/page.tsx` "MARQUEE"): a band tilted −1° with ink rules top and bottom,
+  uppercase words with a small rotated-square diamond between them, two identical halves scrolling left
+  (translateX 0 → −50%, 38 s, `--animate-marquee` in `app/globals.css`). Brand swaps: lime → **volt**, Archivo wide →
+  **Anton**. `components/home/brand-marquee.tsx`, server-rendered, CSS only, `motion-safe:` (holds still under reduced
+  motion), `aria-hidden` (words repeat the page).
+- **New CMS block `marquee`** (`words`, `below`) placed right after the hero in both built-in layouts (`lib/cms/mock-home.ts`):
+  full store, with categories and store promises, `below: "light"` (category rail); drop, with the drop's own points,
+  `below: "dark"` (ambassador band). `below` paints the gaps around the tilted strip (black on top, the next section's
+  colour underneath), so no stray band shows. The words use only claims the pages already make, with no ₹ (Anton is latin-only).
+- Not editable in Admin → Homepage yet (built-in words; see known gaps if wanted).
+- **Threat model:** decorative, built-in data only, no input or network. Nothing to defend.
+- **Tests:** `components/home/brand-marquee.test.ts` (halves, aria-hidden, motion-safe, gap colours, block right after the
+  hero in both layouts, ≥ 8 words, Anton-safe characters); block-order tests in `lib/cms/cms.test.ts` /
+  `lib/cms/homepage.test.ts` updated.
+- **Verification:** `pnpm typecheck` ✔ · eslint ✔ · `vitest run components/home lib/cms` 38 ✔ · `pnpm build` ✔. The full suite
+  was not re-run for this change. Screenshot at 1440 px (drop layout, strip over dark and white next sections) and 500 px.
+  A stale Turbopack cache (`.next/cache`) first built CSS without the new class; a clean build fixed it.
+
 ## 2026-11-28 — Brand-video outline-text background (`OutlineMarquee`)
 
 **Asked for:** the moving outlined "ALPHA HOOD" rows from the brand videos as a reusable section background, used

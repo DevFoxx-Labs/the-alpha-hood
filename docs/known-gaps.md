@@ -159,6 +159,18 @@
   address + customer, GST assumes one warehouse state, consent sources are web/android/ios only.
 
 ## Product / design
+- 🟡 Limited-edition finale (`components/home/limited-finale.tsx`), pre-existing layout: at 1440×900 the giant
+  "EDITION." line sits in front of the two product cards under the CTA and hides their titles/prices. Fix: hide the
+  cards below ~950 px viewport height, or move them beside the CTA.
+- 🟡 Limited-edition signature: no real ambassador signature uploaded yet, so the write-on and the "Signed" stamp/tape
+  words don't show. Upload a transparent PNG in Admin → Homepage → Limited edition once the ambassador signs.
+- 🟡 Hero crossed tapes (`components/home/brand-marquee.tsx`, 2026-11-29): the front/back words are built in
+  (`lib/cms/mock-home.ts`) for both layouts. Admin → Homepage can't edit them yet. Fix: add `marquee.front/back` to the
+  homepage document + editor (allow-listed length and characters, Anton-safe). Links and stock are already live.
+- 🟡 Hero tapes on very wide screens: each half of the loop is sized for screens up to about 2560 px. Wider ones could show
+  a gap at the end of the loop. Fix: raise `fillHalf`'s `minPx` (costs DOM nodes).
+- 🟡 `docs/` is in `.gitignore`, so `docs/samples/outline-text-background/` (the owner's original sample, 2026-11-28)
+  is only on this machine. Force-add it (`git add -f`) if it should be in the repo.
 - 🟠 Trademark files (`docs/brand/trademark/`) are cut from a vector-traced logo concept. Before filing, confirm who
   owns the concept artwork and get a designer's final master. No clearance search has been done yet.
 - 🟡 PLP-08 rail gallery (`components/listing/product-rail-gallery.tsx`):

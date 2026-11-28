@@ -85,6 +85,11 @@ export type HomeBlock = Targeting & { id: string } & (
         cutoutAlt: string;
         /** Scene on the right (desktop). */
         sceneImage: string;
+        /**
+         * The ambassador's real signature (uploaded transparent PNG); it writes itself on under the call to action and
+         * adds "Signed" to the stamp. Empty = no signature and no "Signed" claim — never a made-up one.
+         */
+        signatureImage?: string | null;
         productIds: string[];
       }
     | {
@@ -135,6 +140,25 @@ export type HomeBlock = Targeting & { id: string } & (
     | { type: "club_band"; title: string; text: string; cta: { label: string; href: string } }
     | { type: "ugc_grid"; title: string; text: string }
     | { type: "trust_strip" }
+    | {
+        /**
+         * Two crossed "caution tape" word strips under the hero (the GymYardHQ marquee, doubled): a volt tape in front
+         * and a black tape behind, running opposite ways. Mostly decorative; the front tape's links are shortcuts to
+         * pages the menu already offers.
+         */
+        type: "marquee";
+        /** Words on the volt tape (front). */
+        front: string[];
+        /** Words on the black tape (behind). */
+        back: string[];
+        /** Colour of the section below, so the gaps around the tilted tapes blend in (the hero above is always dark). */
+        below: "dark" | "light";
+        /**
+         * Live links added to the front tape: the store's categories, or (drop layout) the drop's spotlight pieces plus
+         * the pieces left in the limited edition, from real stock.
+         */
+        links: "categories" | "drop" | "none";
+      }
     | {
         type: "seo";
         heading: string;

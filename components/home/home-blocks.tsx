@@ -2,8 +2,10 @@ import { ProductCard } from "@/components/store/product-card";
 import { ArrowLink, CampaignBand, CollectionTile, OfferTile, PromoBand } from "@/components/store/merch-tiles";
 import { CategorySlider } from "./category-slider";
 import { AmbassadorBand } from "./ambassador-band";
+import { BrandMarquee } from "./brand-marquee";
 import { LimitedFinale } from "./limited-finale";
 import { ProductSpotlight } from "./product-spotlight";
+import { editionLeft } from "./signature-pieces";
 import { ExclusivePoints } from "./exclusive-points";
 import { SectionHeader } from "@/components/store/section-header";
 import { deviceClass } from "@/lib/cms/schedule";
@@ -21,14 +23,17 @@ const section = "py-8 lg:py-16";
 
 /** Renders CMS homepage blocks in CMS order (HOME-01…06, 08, 11, 12), honouring device targeting. */
 export function HomeBlocks({ blocks }: { blocks: ResolvedHomeBlock[] }) {
+  // Pieces left in the drop's edition: the same products and rule as the limited-edition finale, so both agree.
+  const limited = blocks.find((r) => r.block.type === "limited_edition");
+  const left = limited && limited.block.type === "limited_edition" && "products" in limited ? editionLeft(limited.products, limited.block.editionSize) : null;
   return blocks.map((resolved) => (
     <div key={resolved.block.id} className={deviceClass(resolved.block.devices)}>
-      <Block resolved={resolved} />
+      <Block resolved={resolved} left={left} />
     </div>
   ));
 }
 
-function Block({ resolved }: { resolved: ResolvedHomeBlock }) {
+function Block({ resolved, left }: { resolved: ResolvedHomeBlock; left: number | null }) {
   const { block } = resolved;
   switch (block.type) {
     case "hero":
@@ -120,6 +125,17 @@ function Block({ resolved }: { resolved: ResolvedHomeBlock }) {
 
     case "ugc_grid":
       return <UgcGrid title={block.title} text={block.text} />;
+
+    case "marquee":
+      return (
+        <BrandMarquee
+          front={block.front}
+          back={block.back}
+          links={"links" in resolved ? resolved.links : []}
+          left={block.links === "drop" ? left : null}
+          below={block.below}
+        />
+      );
 
     case "trust_strip":
       return (

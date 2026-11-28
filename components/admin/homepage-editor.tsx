@@ -867,6 +867,7 @@ function LimitedFields({ value, onChange, builtIns, titles, onTitles, max, editi
           <AInput id={`${id}-ca`} value={value.cutoutAlt} maxLength={140} onChange={(e) => set({ cutoutAlt: e.target.value })} />
         </Field>
         <ImagePicker id={`${id}-sc`} label="Scene (right, desktop)" value={value.sceneImage} onChange={(v) => v && set({ sceneImage: v })} builtIns={builtIns} allowNone={false} aspect="h-20 w-16" help="A product or campaign photo; it fades into the yellow on its left edge." />
+        <ImagePicker id={`${id}-sg`} label="Signature (optional)" value={value.signatureImage ?? null} onChange={(v) => set({ signatureImage: v })} builtIns={[]} allowNone aspect="h-10 w-24" help="The ambassador's real signature: dark ink on a transparent PNG, wide (about 4:1). It writes itself on under the button and adds “Signed” to the stamp. Leave empty if the pieces aren't signed." />
         <div className="space-y-1.5">
           <ALabel>Limited pieces (up to {max})</ALabel>
           <ProductPicker ids={value.productIds} titles={titles} onTitles={onTitles} onChange={(productIds) => set({ productIds })} max={max} />

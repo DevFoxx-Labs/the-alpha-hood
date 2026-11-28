@@ -53,6 +53,19 @@
   /* 2.3 Motion */
   --ease-out-store: cubic-bezier(0.22, 1, 0.36, 1);
   --animate-shimmer: shimmer 1.2s linear infinite;
+  /* Crossed word tapes under the hero (components/home/brand-marquee.tsx): the GymYardHQ marquee (38 s loop) and a
+     second tape behind it, running the other way at a different speed so the two never line up. */
+  --animate-marquee: marquee 38s linear infinite;
+  --animate-marquee-back: marquee 46s linear infinite reverse;
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
 
   @keyframes shimmer {
     from {
@@ -355,8 +368,10 @@
  * Ambassador (view timeline --amb): the two giant lines sweep in from opposite sides as the band enters and split
  * apart again as it leaves; the copy rises first, the product cards a little slower, the scene zooms slowest.
  * Line 1 turns to "glass" over the subject on wide screens (fill fades, an outline takes over).
- * Limited (view timeline --ltd, section 260vh, sticky stage): line 1 sweeps in behind the art, the scene slides in
- * from the right, the cut-out swings in from the left (sparks burst), line 2 sweeps in front, then the CTA.
+ * Limited (view timeline --ltd, section 260vh, sticky stage): a black drop tape runs across the top; line 1 sweeps in
+ * behind the art as an outline and fills with ink; the scene slides in from the right; ALPHA drops in from above.
+ * On touchdown (cue "land") the claws slash, the shadow squashes, shock lines kick out and the stamp slams on; line 2
+ * lands in front and the stage shakes once (cue "slam"), the signature writes itself on; then the CTA.
  * Not inside a cascade layer (as in GymYardHQ): these rules must beat Tailwind utilities on the same elements
  * (e.g. `relative` vs the sticky stage), and unlayered CSS always does.
  */
@@ -378,9 +393,35 @@
 
 @keyframes ltd-line1 { from { opacity: 0; transform: translateX(-35%) scale(0.9); } to { opacity: 1; transform: none; } }
 @keyframes ltd-line2 { from { opacity: 0; transform: translateX(35%) scale(0.9); } to { opacity: 1; transform: none; } }
-@keyframes ltd-duo { from { opacity: 0; transform: translateX(-45%) rotate(-6deg); } to { opacity: 1; transform: none; } }
+/* ALPHA drops from above with weight (ease-in on the element = gravity). */
+@keyframes ltd-duo { 0% { opacity: 0; transform: translateY(-80%); } 25% { opacity: 1; } 100% { opacity: 1; transform: none; } }
 @keyframes ltd-scene { from { opacity: 0; transform: translateX(35%) scale(0.9); } to { opacity: 1; transform: none; } }
 @keyframes ltd-cta { from { opacity: 0; transform: translateX(30%); } to { opacity: 1; transform: none; } }
+/* Line 1 ink fill: a transform-only wipe (the window moves in from the left, its content counter-moves, so the
+   text itself stays put). */
+@keyframes ltd-fill { from { transform: translateX(-100%); } to { transform: none; } }
+@keyframes ltd-fill-in { from { transform: translateX(100%); } to { transform: none; } }
+
+/* Impacts (time-based, started by the cues in components/home/limited-cues.tsx). */
+@keyframes ltd-claw { from { transform: scaleX(0); } to { transform: none; } }
+@keyframes ltd-squash { 0% { transform: scale(1.05, 0.9); } 55% { transform: scale(0.98, 1.02); } 100% { transform: none; } }
+/* (the shadow is centred with the `translate` property, so these only scale) */
+@keyframes ltd-shadow { 0% { transform: scale(1.45, 1.3); } 55% { transform: scale(0.92); } 100% { transform: none; } }
+@keyframes ltd-shock-l { 0% { opacity: 1; transform: translateX(0) scaleX(0.3); } 100% { opacity: 0; transform: translateX(-48px) scaleX(1); } }
+@keyframes ltd-shock-r { 0% { opacity: 1; transform: translateX(0) scaleX(0.3); } 100% { opacity: 0; transform: translateX(48px) scaleX(1); } }
+@keyframes ltd-stamp {
+  0% { opacity: 0; transform: rotate(-2deg) scale(1.9); }
+  55% { opacity: 1; transform: rotate(-8deg) scale(0.93); }
+  75% { transform: rotate(-8deg) scale(1.03); }
+  100% { opacity: 1; transform: rotate(-8deg); }
+}
+@keyframes ltd-shake {
+  0%, 100% { transform: none; }
+  20% { transform: translate(4px, -3px); }
+  40% { transform: translate(-4px, 2px); }
+  60% { transform: translate(3px, 2px); }
+  80% { transform: translate(-2px, -1px); }
+}
 
 /* Firecracker burst (sparks fly out along --rot, fade), 1.6 s cycle. */
 @keyframes burst-spark {
@@ -407,6 +448,11 @@
 
 .amb { view-timeline-name: --amb; }
 .ltd { view-timeline-name: --ltd; }
+/* Static (final) states of the finale's impacts: the stamp sits tilted, the shock lines are only a moment. */
+.ltd-stamp { transform: rotate(-8deg); }
+.ltd-shock-l, .ltd-shock-r { opacity: 0; }
+.ltd-claw > i { transform-origin: left center; }
+.ltd-squash { transform-origin: 50% 100%; }
 
 @media (prefers-reduced-motion: no-preference) {
   .amb-float { animation: amb-float 5s ease-in-out infinite; }
@@ -431,18 +477,95 @@
 
     .ltd { height: 260vh; }
     .ltd-stage { position: sticky; top: 0; }
-    .ltd-line1, .ltd-line2, .ltd-duo, .ltd-scene, .ltd-cta {
+    .ltd-line1, .ltd-line2, .ltd-duo, .ltd-scene, .ltd-cta, .ltd-fill, .ltd-fill-in {
       animation-timeline: --ltd;
       animation-fill-mode: both;
       animation-timing-function: linear;
     }
     .ltd-line1 { animation-name: ltd-line1; animation-range: entry 55% contain 25%; }
+    .ltd-fill { animation-name: ltd-fill; animation-range: contain 15% contain 45%; }
+    .ltd-fill-in { animation-name: ltd-fill-in; animation-range: contain 15% contain 45%; }
     .ltd-scene { animation-name: ltd-scene; animation-range: entry 45% contain 25%; }
-    .ltd-duo { animation-name: ltd-duo; animation-range: contain 10% contain 40%; }
+    .ltd-duo { animation-name: ltd-duo; animation-range: contain 10% contain 40%; animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
     .ltd-line2 { animation-name: ltd-line2; animation-range: contain 20% contain 50%; }
     .ltd-cta { animation-name: ltd-cta; animation-range: contain 40% contain 65%; }
+
+    /* Impacts: waiting states only once the cues are running (data-cues), so nothing hides without JavaScript. */
+    .ltd[data-cues]:not([data-land]) .ltd-claw > i { transform: scaleX(0); }
+    .ltd[data-cues]:not([data-land]) .ltd-stamp { opacity: 0; }
+    .ltd[data-cues]:not([data-slam]) .ltd-sign-wipe { transform: translateX(-100%); }
+    .ltd[data-cues]:not([data-slam]) .ltd-sign-in { transform: translateX(100%); }
+
+    .ltd[data-land] .ltd-claw > i { animation: ltd-claw 220ms cubic-bezier(0.2, 0.9, 0.2, 1) var(--d, 0ms) both; }
+    .ltd[data-land] .ltd-squash { animation: ltd-squash 380ms cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+    .ltd[data-land] .ltd-shadow { animation: ltd-shadow 380ms cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+    .ltd[data-land] .ltd-shock-l { animation: ltd-shock-l 360ms ease-out var(--d, 0ms) both; }
+    .ltd[data-land] .ltd-shock-r { animation: ltd-shock-r 360ms ease-out var(--d, 0ms) both; }
+    .ltd[data-land] .ltd-stamp { animation: ltd-stamp 340ms cubic-bezier(0.2, 0.8, 0.3, 1) 260ms both; }
+    .ltd[data-slam] .ltd-shake { animation: ltd-shake 240ms linear both; }
+    .ltd[data-slam] .ltd-sign-wipe { animation: ltd-fill 900ms cubic-bezier(0.45, 0, 0.3, 1) 250ms both; }
+    .ltd[data-slam] .ltd-sign-in { animation: ltd-fill-in 900ms cubic-bezier(0.45, 0, 0.3, 1) 250ms both; }
   }
 }
+
+/*
+ * Hero tapes (components/home/brand-marquee.tsx). Static texture: sheen + grain on both tapes, volt hazard edges on
+ * the black one (gradients, painted once). Scroll: each tape gets an extra push in its own direction while the
+ * section crosses the screen, and ALPHA rises between them. Transform only, on their own wrappers, so these never
+ * fight the endless loop. Without scroll timelines or with reduced motion: no push, ALPHA shown risen.
+ */
+.mq { view-timeline-name: --mq; }
+.mq-tape {
+  background-image:
+    linear-gradient(180deg, rgb(255 255 255 / 0.22), transparent 42%, transparent 70%, rgb(0 0 0 / 0.1)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.09'/%3E%3C/svg%3E");
+}
+.mq-tape-back { border-block: 5px solid transparent; }
+.mq-tape-back::before,
+.mq-tape-back::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  height: 5px;
+  background: repeating-linear-gradient(-45deg, var(--color-volt) 0 7px, var(--color-black) 7px 14px);
+}
+.mq-tape-back::before { top: -5px; }
+.mq-tape-back::after { bottom: -5px; }
+.mq-tape-back { overflow: visible; }
+.mq-peek { transform: translateY(16%); }
+/* The logo mark between words, drawn after each word (no extra element). The small 72 px WebP copies from
+   scripts/build-logo-mark-small.py (2–3 KB, one download each). It sits in the word's right margin, outside the hover chip. */
+.mq-word::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -2rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  translate: 0 -50%;
+  background: url("/brand/logo/mark_color@72.webp") center / contain no-repeat;
+}
+.mq-tape-back .mq-word::after { background-image: url("/brand/logo/mark_white@72.webp"); }
+@media (min-width: 64rem) {
+  .mq-word::after { right: -2.5rem; width: 1.5rem; height: 1.5rem; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .mq-push-l, .mq-push-r, .mq-peek {
+      animation-timeline: --mq;
+      animation-fill-mode: both;
+      animation-timing-function: linear;
+    }
+    .mq-push-l { animation-name: mq-push-l; animation-range: cover 0% cover 100%; }
+    .mq-push-r { animation-name: mq-push-r; animation-range: cover 0% cover 100%; }
+    /* Half risen when the page opens (the tapes sit near the fold), fully up after a short scroll. */
+    .mq-peek { animation-name: mq-peek; animation-range: cover 0% cover 32%; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+  }
+}
+@keyframes mq-push-l { from { transform: translateX(6vw); } to { transform: translateX(-6vw); } }
+@keyframes mq-push-r { from { transform: translateX(-6vw); } to { transform: translateX(6vw); } }
+@keyframes mq-peek { from { transform: translateY(100%); } to { transform: translateY(16%); } }
 
 /* Search inputs: the overlay has its own close button — hide the native clear "×". */
 @layer base {

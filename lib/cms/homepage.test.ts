@@ -175,6 +175,10 @@ describe("brand ambassador + limited edition sections", () => {
     expect(() => parseLimited({ ...base.limited, productIds: ["a", "b", "c", "d"] })).toThrow(/up to 3/);
     for (const bad of [0, -5, 1.5, "100", 100_001]) expect(() => parseLimited({ ...base.limited, editionSize: bad }), String(bad)).toThrow();
     expect(parseLimited({ ...base.limited, editionSize: null }).editionSize).toBeNull();
+    // Signature: optional, and only an uploaded file or a built-in, never another host or a script URL.
+    expect(parseLimited(base.limited).signatureImage).toBeNull();
+    expect(parseLimited({ ...base.limited, signatureImage: "" }).signatureImage).toBeNull();
+    for (const bad of ["https://evil.example/sig.png", "javascript:alert(1)", "//evil.example/s.png", 42]) expect(() => parseLimited({ ...base.limited, signatureImage: bad }), String(bad)).toThrow(/signature/);
   });
 
   it("switched off → not on the page; customised → admin text and picks replace the demo", () => {
@@ -202,7 +206,7 @@ describe("landing page layout switch (full store ↔ exclusive drop)", () => {
   it("the drop layout has no discount / combo / category / tab / new-arrival blocks — only the drop's sections", () => {
     const types = MOCK_DROP_HOMEPAGE.map((b) => b.type);
     for (const gone of ["promo_band", "offer_tiles", "collection_tiles", "category_rail", "product_tabs", "product_grid"]) expect(types, gone).not.toContain(gone);
-    expect(types).toEqual(["hero", "ambassador", "product_spotlight", "product_spotlight", "exclusive_points", "limited_edition", "club_band", "ugc_grid", "trust_strip", "seo"]);
+    expect(types).toEqual(["hero", "marquee", "ambassador", "product_spotlight", "product_spotlight", "exclusive_points", "limited_edition", "club_band", "ugc_grid", "trust_strip", "seo"]);
   });
 
   it("layout must be store, drop or null (follow the environment); default store", () => {

@@ -41,6 +41,7 @@ describe("CMS adapter", () => {
   it("the homepage covers HOME-01…06, 08, 11, 12 in reference order (+ ambassador band and limited-edition finale)", () => {
     expect(MOCK_HOMEPAGE.map((b) => b.type)).toEqual([
       "hero",
+      "marquee",
       "category_rail",
       "ambassador",
       "promo_band",

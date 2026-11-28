@@ -44,6 +44,16 @@ export const MOCK_HOMEPAGE: HomeBlock[] = [
       },
     ],
   },
+  // Crossed word tapes under the hero (GymYardHQ marquee, doubled). The front tape gets the live categories as links.
+  // The words only repeat what the store already says (no new claims).
+  {
+    id: "marquee",
+    type: "marquee",
+    front: ["New drops every week", "Designed in India"],
+    back: ["Built for the ones who lead", "Easy size exchanges", "COD available", "New drops every week", "Designed in India", "Wear the hood"],
+    below: "light",
+    links: "categories",
+  },
   { id: "categories", type: "category_rail", lead: "Shop by", title: "Category", viewAllHref: "/men" },
   {
     // DEMO: the mascot stands in for the brand ambassador until the real shoot (Admin → Homepage replaces it).
@@ -212,6 +222,16 @@ export const MOCK_DROP_HOMEPAGE: HomeBlock[] = [
         placeholder: { fill: "#0a0a0a", look: { top: "#151515", bottom: "#151515", skin: "#C9946B" } },
       },
     ],
+  },
+  // Same tapes as the full store, with the drop's own words (from its points below). The front tape also gets the
+  // live spotlight pieces as links and the pieces left in the edition.
+  {
+    id: "marquee-drop",
+    type: "marquee",
+    front: ["The signed drop", "Hand-signed", "Numbered", "Made in small numbers"],
+    back: ["Limited", "Certified", "Collector's box", "Signed by Alpha", "When it's gone, it's gone", "Designed in India"],
+    below: "dark",
+    links: "drop",
   },
   blockById("ambassador"),
   {
