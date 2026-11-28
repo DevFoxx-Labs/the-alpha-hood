@@ -1,5 +1,39 @@
 # Change log
 
+## 2026-11-29 — Signature upload works at any size (Auto-fit / Use as uploaded), real upload progress; real claw marks
+
+**Asked for:** (1) the limited-edition signature upload stuck on "Uploading…", then failed with "must be 600–6000 px".
+A signature can be any size: auto-adjust it or use it as given, the choice is made in the admin, and the upload
+should show a %. (2) The "claw marks" looked like plain slashes: make them look like claws or remove them.
+
+- **Cause:** `/api/admin/media` only knew product photos (600–6000 px per side). A signature (small and wide) was
+  always refused. `fetch` also gave no progress, so a slow upload looked frozen.
+- **Server:** `?kind=signature` (allow-list `photo|signature`; anything else 422). Signatures: 16–6000 px. Everything else
+  is the same as photos: type sniffed, EXIF/text stripped, ≤ 8 MB, 6000 px ceiling, staff `catalog.write`, same-origin,
+  rate-limited, audited (now with `kind`). Product photos keep 600 px.
+- **Admin → Homepage → Limited edition → Signature:** choose **Auto-fit (recommended)** or **Use as uploaded**.
+  - Auto-fit runs in the browser with canvas (no new package): white or light paper turns transparent, empty edges
+    are trimmed, and it scales to fit 960 × 240 (never upscales). A blank image is refused with a clear message.
+  - Use as uploaded sends the file untouched.
+  - The preview sits on the finale's volt, uncropped.
+- **Real progress on every admin upload** (one helper, `components/admin/upload-media.ts` + `upload-progress.tsx`):
+  XHR upload with a % bar → "Processing on the server…". Used by the homepage pickers, product photos ("Photo 2 of 5")
+  and category images. 120 s timeout with a clear message. The file input resets, so the same file can be picked again.
+- **Claw marks redrawn** (`clawPath` in `components/home/limited-finale.tsx`): four curved gashes fanned like the toes of
+  a paw. Each has a needle tip, bows upward, is thickest just before the middle, tapers to a dragged tail and has a torn
+  top edge. Built as CSS clip-path polygons (not an icon), deterministic so server and client match. Same rip-in animation.
+  They moved into the open space at ALPHA's upper left (behind his body only thin ends showed, which read as slashes).
+  The "Authentic" stamp moved down to his lower left to make room. Checked at 1440 / 390 / 360 px.
+- **Threat model:** the new input is the `kind` query (allow-listed). The client-side auto-fit is convenience only;
+  the server re-checks every byte. The smaller minimum only applies to `kind=signature`, which still needs
+  `catalog.write`. Uploaded media stays public-by-id as before (a signature is meant to be shown on the store).
+- **Tests:** `lib/catalog/media.test.ts` (photo keeps 600 px; 800×200 and 120×40 signatures accepted; < 16 px, > 6000 px
+  and non-images refused; kind allow-list; auto-fit pixel step, crop margin, blank detection, fit size; progress
+  phases) + claw shape test in `components/home/limited-finale.test.ts`.
+- **Verification:** `pnpm typecheck` ✔ · `pnpm lint` ✔ · `pnpm test` 51 files / 682 tests ✔. Auto-fit checked in headless Chrome:
+  a 1600×900 JPEG of ink on off-white paper → 862×182 PNG, 93% transparent, trimmed. A blank image is refused.
+  **Not checked:** a real signed-in upload in the admin (needs the owner's sign-in).
+
 ## 2026-11-29 — Limited-edition finale: product cards under the CTA removed
 
 **Asked for:** remove the two product cards under "Shop the drop". The giant "EDITION." line covered them, so they
@@ -8,7 +42,7 @@ added nothing.
 - Removed the desktop card list from `components/home/limited-finale.tsx`. The picked products still feed the
   pieces-left count and the drop tape (`editionLeft`). The ambassador band still uses `SignaturePiece`.
 - Closes the known gap logged earlier today (cards hidden behind "EDITION." at 1440×900).
-- **Verification:** below.
+- **Verification:** `pnpm typecheck` ✔ · `pnpm lint` ✔ · `pnpm test` 50 files / 674 tests ✔ · screenshot at 1440 px.
 
 ## 2026-11-29 — Limited-edition finale: brand motion in place of the sparkle burst
 

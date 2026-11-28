@@ -24,15 +24,45 @@ export function stampLines(block: Pick<Block, "editionSize" | "signatureImage">)
   return ["Authentic", block.editionSize ? `Only ${block.editionSize.toLocaleString("en-IN")}` : "Limited", block.signatureImage ? "Signed" : "Alpha Hood"];
 }
 
-/** Claw marks: three tapered blades, staggered. */
-const CLAWS = [0, 1, 2];
+/**
+ * One claw gash as a CSS clip-path polygon in its own box (left → right = the direction of the swipe). It's a curved
+ * crescent: a needle tip where the claw goes in, deepest just before the middle, thinning out to a long dragged tail.
+ * The upper edge is torn (deterministic jitter from `seed`, so server and client render the same).
+ */
+export function clawPath(seed: number, steps = 18): string {
+  const jitter = (k: number) => {
+    const x = Math.sin((k + 1) * 12.9898 + seed * 78.233) * 43758.5453;
+    return x - Math.floor(x); // 0–1
+  };
+  const pt = (x: number, y: number) => `${x.toFixed(1)}% ${y.toFixed(1)}%`;
+  const top: string[] = [];
+  const bottom: string[] = [];
+  for (let k = 0; k <= steps; k++) {
+    const t = k / steps;
+    const s = Math.sin(Math.PI * Math.pow(t, 0.8)); // fattest a little before the middle
+    const centre = 70 - 26 * Math.sin(Math.PI * t); // the gash bows upward
+    const half = 36 * Math.pow(s, 0.8) * (1 - 0.35 * t); // tapers to a long tail
+    const torn = k > 0 && k < steps ? (jitter(k) - 0.5) * half * 0.55 : 0;
+    top.push(pt(t * 100, centre - half + torn));
+    bottom.push(pt(t * 100, centre + half * 0.85));
+  }
+  return `polygon(${[...top, ...bottom.reverse()].join(",")})`;
+}
+
+/** Four gashes, fanned like the toes of a paw: angle, length, start offset (% of the swipe). */
+const CLAWS = [
+  { fan: -6, len: 74, off: 12 },
+  { fan: -2, len: 94, off: 3 },
+  { fan: 2, len: 98, off: 0 },
+  { fan: 6, len: 78, off: 9 },
+].map((c, i) => ({ ...c, i, path: clawPath(i + 1) }));
 
 /**
  * Limited-edition drop, after the GymYardHQ download finale: volt background, pinned, full height (view timeline --ltd).
  * - A black drop tape runs across the top ("Limited edition · Only 100 made · 37 left · When it's gone, it's gone").
  * - Line 1 sweeps in behind the art as an outline, then fills with ink as you scroll.
  * - The scene slides in on the right.
- * - ALPHA drops in from above with weight. On touchdown, three claw marks slash behind him, his shadow squashes,
+ * - ALPHA drops in from above with weight. On touchdown, four torn claw gashes rip in behind him, his shadow squashes,
  *   shock lines kick out at his feet and an "Authentic · Only 100" stamp slams onto the art.
  * - Line 2 lands in front and the stage shakes once. The real signature, if uploaded, writes itself on.
  * - The call to action slides in, and the pieces-left count runs down to the real stock.
@@ -80,9 +110,12 @@ export function LimitedFinale({ block, products }: { block: Block; products: Pro
 
           {/* left: ALPHA drops in; claws, shadow, shock lines and the stamp on touchdown */}
           <div className="ltd-duo absolute bottom-0 left-1/2 z-10 h-[46%] -translate-x-1/2 lg:left-[2vw] lg:h-[70%] lg:translate-x-0">
-            <span aria-hidden="true" className="ltd-claw pointer-events-none absolute left-[55%] top-[38%] flex w-[95%] -translate-x-1/2 -translate-y-1/2 -rotate-[58deg] flex-col gap-[clamp(8px,1.4vw,20px)]">
-              {CLAWS.map((i) => (
-                <i key={i} className="block h-[clamp(14px,2.4vw,34px)] bg-ink [clip-path:polygon(0_50%,12%_8%,70%_0,100%_50%,70%_100%,12%_92%)]" style={{ "--d": `${i * 70}ms`, marginLeft: `${[6, 0, 10][i]}%`, width: `${[82, 100, 76][i]}%` } as CSSProperties} />
+            {/* in the open space at his upper left, so the whole swipe reads (behind his body it looked like slashes) */}
+            <span aria-hidden="true" className="ltd-claw pointer-events-none absolute left-[13%] top-[26%] flex w-[72%] -translate-x-1/2 -translate-y-1/2 -rotate-[62deg] flex-col gap-[clamp(2px,0.4vw,6px)] lg:left-[19%]">
+              {CLAWS.map((c) => (
+                <span key={c.i} className="block" style={{ transform: `rotate(${c.fan}deg)`, marginLeft: `${c.off}%`, width: `${c.len}%` }}>
+                  <i className="block h-[clamp(22px,3.6vw,52px)] bg-ink" style={{ clipPath: c.path, "--d": `${c.i * 55}ms` } as CSSProperties} />
+                </span>
               ))}
             </span>
             <span aria-hidden="true" className="ltd-shadow pointer-events-none absolute bottom-[-1.5%] left-1/2 h-[5%] w-[62%] -translate-x-1/2 rounded-[50%] bg-black/35 blur-md" />
@@ -97,7 +130,7 @@ export function LimitedFinale({ block, products }: { block: Block; products: Pro
             <span className="ltd-squash relative block h-full">
               <Image src={block.cutoutImage} alt={block.cutoutAlt} width={1122} height={1402} sizes="(min-width: 1024px) 34vw, 50vw" className="h-full w-auto max-w-none drop-shadow-[0_30px_40px_rgb(0_0_0/0.35)]" />
             </span>
-            <span aria-hidden="true" className="ltd-stamp pointer-events-none absolute right-[70%] top-[14%] z-10 block whitespace-nowrap border-[3px] border-ink p-[3px] text-center text-ink mix-blend-multiply lg:left-[-2%] lg:right-auto">
+            <span aria-hidden="true" className="ltd-stamp pointer-events-none absolute right-[70%] top-[58%] z-10 block whitespace-nowrap border-[3px] border-ink p-[3px] text-center text-ink mix-blend-multiply lg:left-[-2%] lg:right-auto">
               <span className="block border-[1.5px] border-ink px-2.5 py-1.5 lg:px-3.5 lg:py-2">
                 <span className="block text-[9px] font-bold uppercase tracking-[0.3em] lg:text-[11px]">{stampTop}</span>
                 <span className="block font-display text-[22px] uppercase leading-none lg:text-[30px]">{stampMid}</span>

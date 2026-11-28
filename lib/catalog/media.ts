@@ -13,6 +13,17 @@ import { type PhotoType, sniffType, stripJpeg, stripPng } from "@/lib/returns/ph
 export const MEDIA_MAX_BYTES = 8 * 1024 * 1024;
 export const MEDIA_MIN_PX = 600;
 export const MEDIA_MAX_PX = 6000;
+/**
+ * What an upload is for. "photo" = product / campaign photo (600–6000 px). "signature" = a signature (limited-edition
+ * block): any size from 16 px, because a signature is small and wide. Same type sniffing, stripping, byte cap and
+ * 6000 px ceiling (no decompression bombs).
+ */
+export const MEDIA_KINDS = ["photo", "signature"] as const;
+export type MediaKind = (typeof MEDIA_KINDS)[number];
+export const SIGNATURE_MIN_PX = 16;
+const MIN_PX: Record<MediaKind, number> = { photo: MEDIA_MIN_PX, signature: SIGNATURE_MIN_PX };
+/** The `kind` query value → a known kind; missing = "photo"; anything else = null (refused). */
+export const parseMediaKind = (v: string | null): MediaKind | null => (v === null || v === "" ? "photo" : (MEDIA_KINDS as readonly string[]).includes(v) ? (v as MediaKind) : null);
 export const MEDIA_ID_RE = /^med_[a-f0-9]{32}$/;
 export const mediaUrl = (id: string) => `/api/media/${id}`;
 
@@ -60,7 +71,7 @@ export function imageSize(bytes: Uint8Array, type: PhotoType): { width: number; 
   return null;
 }
 
-export function prepareProductPhoto(raw: Uint8Array, createdBy: string, now = new Date()): MediaItem {
+export function prepareProductPhoto(raw: Uint8Array, createdBy: string, now = new Date(), kind: MediaKind = "photo"): MediaItem {
   if (raw.length === 0 || raw.length > MEDIA_MAX_BYTES) throw new MediaError("bad_size", "Photos must be 8 MB or smaller.");
   const type = sniffType(raw);
   if (!type) throw new MediaError("bad_type", "Upload a JPEG or PNG photo.");
@@ -71,8 +82,9 @@ export function prepareProductPhoto(raw: Uint8Array, createdBy: string, now = ne
     throw new MediaError("bad_type", "That file isn't a valid JPEG or PNG photo.");
   }
   const size = imageSize(bytes, type);
-  if (!size || size.width < MEDIA_MIN_PX || size.height < MEDIA_MIN_PX || size.width > MEDIA_MAX_PX || size.height > MEDIA_MAX_PX) {
-    throw new MediaError("bad_dimensions", `Photos must be ${MEDIA_MIN_PX}–${MEDIA_MAX_PX} px on each side.`);
+  const min = MIN_PX[kind];
+  if (!size || size.width < min || size.height < min || size.width > MEDIA_MAX_PX || size.height > MEDIA_MAX_PX) {
+    throw new MediaError("bad_dimensions", `${kind === "signature" ? "Signatures" : "Photos"} must be ${min}–${MEDIA_MAX_PX} px on each side.`);
   }
   return { id: `med_${randomBytes(16).toString("hex")}`, type, ...size, bytes, createdAt: now.toISOString(), createdBy };
 }

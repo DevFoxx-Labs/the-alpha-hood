@@ -12,6 +12,8 @@ import { formatINR } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { adminApi, notify, useAdmin } from "./admin-shell";
 import { AButton, AIcon, AInput, ALabel, ASelect, ATextarea, Card, Confirm, DataTable, EmptyState, ErrorState, FormDialog, PageHeader, StatusBadge, Tip } from "./ui";
+import { uploadMedia } from "./upload-media";
+import { progressPhase, type UploadPhase, UploadProgress } from "./upload-progress";
 
 /**
  * Category tree, homepage category rail and collections (own backend). The screens only collect choices; the
@@ -84,20 +86,19 @@ function move<T>(list: T[], i: number, d: -1 | 1): T[] {
 
 /** Placeholder drawing + colour, alt text and an optional uploaded photo (JPEG/PNG to our own media store). */
 function ImageFields({ value, onChange }: { value: Img; onChange: (v: Img) => void }) {
-  const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<UploadPhase>({ step: "idle" });
+  const busy = phase.step !== "idle";
   async function upload(file: File | undefined) {
     if (!file) return;
     if (file.type !== "image/jpeg" && file.type !== "image/png") return notify("error", "Use a JPEG or PNG photo.");
-    setBusy(true);
+    setPhase(progressPhase(0));
     try {
-      const res = await fetch("/api/admin/media", { method: "POST", headers: { "Content-Type": file.type }, body: file, cache: "no-store" });
-      const data = (await res.json().catch(() => null)) as { id?: string; error?: { message?: string } } | null;
-      if (!res.ok || !data?.id) throw new Error(data?.error?.message ?? "Upload failed.");
+      const data = await uploadMedia(file, { onProgress: (pct) => setPhase(progressPhase(pct)) });
       onChange({ ...value, url: `${MEDIA_PREFIX}${data.id}` });
     } catch (e) {
       notify("error", errText(e, "Upload failed."));
     } finally {
-      setBusy(false);
+      setPhase({ step: "idle" });
     }
   }
   return (
@@ -109,8 +110,9 @@ function ImageFields({ value, onChange }: { value: Img; onChange: (v: Img) => vo
           <label className={cn("inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent", busy && "pointer-events-none opacity-50")}>
             <AIcon icon={ImageUpload01Icon} />
             {busy ? "Uploading…" : value.url ? "Replace photo" : "Upload photo"}
-            <input type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => void upload(e.target.files?.[0])} />
+            <input type="file" accept="image/jpeg,image/png" className="sr-only" disabled={busy} onChange={(e) => void upload(e.target.files?.[0]).finally(() => (e.target.value = ""))} />
           </label>
+          <UploadProgress phase={phase} />
           {value.url ? (
             <AButton type="button" size="sm" variant="ghost" onClick={() => onChange({ ...value, url: undefined })}>
               Use the drawing instead

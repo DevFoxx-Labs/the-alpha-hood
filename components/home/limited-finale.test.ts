@@ -8,7 +8,7 @@ import type { HomeBlock } from "@/lib/cms/types";
 import { MOCK_PRODUCTS } from "@/lib/commerce/mock/data";
 import type { Product } from "@/lib/commerce/types";
 import { cueOn, LTD_CUES, tallyAt } from "./limited-cues";
-import { dropTapeWords, LimitedFinale, stampLines } from "./limited-finale";
+import { clawPath, dropTapeWords, LimitedFinale, stampLines } from "./limited-finale";
 
 type Block = Extract<HomeBlock, { type: "limited_edition" }>;
 const base = MOCK_HOMEPAGE.find((b): b is Block => b.type === "limited_edition")!;
@@ -23,6 +23,26 @@ describe("Limited-edition finale — brand motion (no sparkles)", () => {
     const html = render();
     expect(html).not.toContain("burst-spark");
     for (const c of ["ltd-claw", "ltd-shadow", "ltd-shock-l", "ltd-shock-r", "ltd-stamp", "ltd-squash", "ltd-shake", "mq-tape-back"]) expect(html, c).toContain(c);
+  });
+
+  it("claw marks: four curved, torn gashes (needle tips, bowed, ragged top edge), same shape on server and client", () => {
+    const html = render();
+    expect((html.match(/clip-path:polygon\(/g) ?? []).length).toBe(4);
+    const p = clawPath(1);
+    expect(clawPath(1)).toBe(p);
+    expect(p).not.toMatch(/NaN|Infinity/);
+    const pts = p.slice(8, -1).split(",").map((s) => s.trim().split(" ").map(parseFloat));
+    const top = pts.slice(0, 19);
+    expect(top[0]).toEqual([0, 70]); // tip where the claw goes in
+    expect(top[18]).toEqual([100, 70]); // tail
+    expect(Math.min(...top.map(([, y]) => y))).toBeLessThan(30); // bows upward, not a straight bar
+    for (const [x, y] of pts) {
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(x).toBeLessThanOrEqual(100);
+      expect(y).toBeGreaterThanOrEqual(0);
+      expect(y).toBeLessThanOrEqual(100);
+    }
+    expect(clawPath(2)).not.toBe(p); // each gash tears differently
   });
 
   it("claims come only from the block: no size → no 'Only N', no signature → no 'Signed' / 'Hand-signed'", () => {

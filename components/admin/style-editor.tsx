@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 import { adminApi, notify, useAdmin } from "./admin-shell";
 import { type Demand, type HoldColour, SoldOutHold } from "./sold-out-hold";
 import { AButton, AIcon, AInput, ALabel, ASelect, ATextarea, Card, ErrorState, PageHeader, StatusBadge } from "./ui";
+import { uploadMedia } from "./upload-media";
+import { progressPhase, type UploadPhase, UploadProgress } from "./upload-progress";
 
 /**
  * ADM-01 style editor: one product with its colours (each with its own web address, photos, price and status) and
@@ -828,19 +830,21 @@ function withView(p: Photo, value: string): Photo {
  */
 function PhotoManager({ photos, title, onChange }: { photos: Photo[]; title: string; onChange: (p: Photo[]) => void }) {
   const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<UploadPhase>({ step: "idle" });
   async function upload(files: FileList | null) {
     if (!files?.length) return;
     setBusy(true);
     const added: Photo[] = [];
-    for (const file of Array.from(files).slice(0, 8 - photos.length)) {
+    const batch = Array.from(files).slice(0, 8 - photos.length);
+    for (const [n, file] of batch.entries()) {
       if (file.type !== "image/jpeg" && file.type !== "image/png") {
         notify("error", `${file.name}: use a JPEG or PNG photo.`);
         continue;
       }
       try {
-        const res = await fetch("/api/admin/media", { method: "POST", headers: { "Content-Type": file.type }, body: file, cache: "no-store" });
-        const data = (await res.json().catch(() => null)) as { id?: string; error?: { message?: string } } | null;
-        if (!res.ok || !data?.id) throw new Error(data?.error?.message ?? "Upload failed.");
+        const label = batch.length > 1 ? `Photo ${n + 1} of ${batch.length}` : undefined;
+        setPhase(progressPhase(0, label));
+        const data = await uploadMedia(file, { onProgress: (pct) => setPhase(progressPhase(pct, label)) });
         added.push({ id: data.id, alt: title ? `${title}, photo ${photos.length + added.length + 1}` : "" });
       } catch (e) {
         notify("error", `${file.name}: ${e instanceof Error ? e.message : "upload failed"}`);
@@ -850,6 +854,7 @@ function PhotoManager({ photos, title, onChange }: { photos: Photo[]; title: str
       onChange([...photos, ...added]);
       notify("success", added.length === 1 ? "Photo uploaded — save the product to use it" : `${added.length} photos uploaded — save the product to use them`);
     }
+    setPhase({ step: "idle" });
     setBusy(false);
   }
   const move = (i: number, d: -1 | 1) => {
@@ -897,6 +902,9 @@ function PhotoManager({ photos, title, onChange }: { photos: Photo[]; title: str
         {busy ? "Uploading…" : "Upload photos"}
         <input type="file" accept="image/jpeg,image/png" multiple className="sr-only" disabled={busy || photos.length >= 8} onChange={(e) => void upload(e.target.files).finally(() => (e.target.value = ""))} />
       </label>
+      <div className="max-w-xs">
+        <UploadProgress phase={phase} />
+      </div>
     </div>
   );
 }

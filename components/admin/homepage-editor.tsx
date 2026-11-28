@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { adminApi, notify, useAdmin } from "./admin-shell";
 import { type HoldColour, SoldOutHold } from "./sold-out-hold";
 import { ProductPicker } from "./taxonomy";
+import { fitSignature, type UploadKind, uploadMedia } from "./upload-media";
+import { progressPhase, type UploadPhase, UploadProgress } from "./upload-progress";
 import { AButton, AIcon, AInput, ALabel, ASelect, ATextarea, Card, Confirm, ErrorState, FormDialog, PageHeader, StatusBadge } from "./ui";
 
 /**
@@ -93,44 +95,74 @@ function Field({ id, label, help, children }: { id: string; label: string; help?
   );
 }
 
-function Preview({ src, className }: { src: string | null; className?: string }) {
+function Preview({ src, className, contain }: { src: string | null; className?: string; contain?: boolean }) {
   return (
-    <div className={cn("relative shrink-0 overflow-hidden rounded-md border border-border bg-muted", className)}>
-      {src ? <Image src={src} alt="" fill sizes="160px" className="object-cover" /> : <span className="absolute inset-0 grid place-items-center text-[10px] text-muted-foreground">No image</span>}
+    // Signatures preview on the finale's volt, uncropped, so you see what the store shows.
+    <div className={cn("relative shrink-0 overflow-hidden rounded-md border border-border", contain ? "bg-[#F4E04D]" : "bg-muted", className)}>
+      {src ? <Image src={src} alt="" fill sizes="160px" className={contain ? "object-contain p-1" : "object-cover"} /> : <span className="absolute inset-0 grid place-items-center text-[10px] text-muted-foreground">No image</span>}
     </div>
   );
 }
 
-/** Upload a JPEG / PNG to our own media store, or pick one of the built-in brand images. */
-function ImagePicker({ id, label, value, onChange, builtIns, allowNone, help, aspect }: { id: string; label: string; value: string | null; onChange: (v: string | null) => void; builtIns: string[]; allowNone: boolean; help: string; aspect: string }) {
-  const [busy, setBusy] = useState(false);
+/**
+ * Upload a JPEG / PNG to our own media store, or pick one of the built-in brand images. `kind="signature"` accepts any
+ * size and offers Auto-fit (paper → transparent, trimmed, sized for the page) or Use as uploaded.
+ */
+function ImagePicker({ id, label, value, onChange, builtIns, allowNone, help, aspect, kind = "photo" }: { id: string; label: string; value: string | null; onChange: (v: string | null) => void; builtIns: string[]; allowNone: boolean; help: string; aspect: string; kind?: UploadKind }) {
+  const [phase, setPhase] = useState<UploadPhase>({ step: "idle" });
+  const [fit, setFit] = useState<"auto" | "original">("auto");
+  const busy = phase.step !== "idle";
+  const signature = kind === "signature";
   async function upload(file: File | undefined) {
     if (!file) return;
     if (file.type !== "image/jpeg" && file.type !== "image/png") return notify("error", "Use a JPEG or PNG image.");
-    setBusy(true);
     try {
-      const res = await fetch("/api/admin/media", { method: "POST", headers: { "Content-Type": file.type }, body: file, cache: "no-store" });
-      const data = (await res.json().catch(() => null)) as { url?: string; error?: { message?: string } } | null;
-      if (!res.ok || !data?.url) throw new Error(data?.error?.message ?? "Upload failed.");
-      onChange(data.url);
+      let body: Blob = file;
+      if (signature && fit === "auto") {
+        setPhase({ step: "preparing" });
+        body = await fitSignature(file);
+      }
+      setPhase({ step: "sending", pct: 0 });
+      const done = await uploadMedia(body, { kind, onProgress: (pct) => setPhase(progressPhase(pct)) });
+      onChange(done.url);
+      notify("success", signature ? "Signature uploaded. Save to publish it." : "Photo uploaded. Save to publish it.");
     } catch (e) {
       notify("error", errText(e, "Upload failed."));
     } finally {
-      setBusy(false);
+      setPhase({ step: "idle" });
     }
   }
-  const options = [...(allowNone ? [{ value: "__none", label: "No image (placeholder drawing)" }] : []), ...(value?.startsWith("/api/media/") ? [{ value, label: "Uploaded photo" }] : []), ...builtIns.map((b) => ({ value: b, label: `Built-in: ${imageName(b)}` }))];
+  const options = [...(allowNone ? [{ value: "__none", label: signature ? "No signature" : "No image (placeholder drawing)" }] : []), ...(value?.startsWith("/api/media/") ? [{ value, label: signature ? "Uploaded signature" : "Uploaded photo" }] : []), ...builtIns.map((b) => ({ value: b, label: `Built-in: ${imageName(b)}` }))];
   return (
     <fieldset className="space-y-2 rounded-lg border border-border p-3">
       <legend className="px-1 text-sm font-medium">{label}</legend>
       <div className="flex items-start gap-3">
-        <Preview src={value} className={aspect} />
+        <Preview src={value} className={aspect} contain={signature} />
         <div className="min-w-0 flex-1 space-y-2">
+          {signature ? (
+            <div role="radiogroup" aria-label="How to use the uploaded signature" className="space-y-1.5">
+              {(
+                [
+                  ["auto", "Auto-fit (recommended)", "Any size or photo of paper: white paper turns transparent, empty edges are trimmed and it's sized for the page."],
+                  ["original", "Use as uploaded", "Exactly your file. Best for a ready transparent PNG; a JPEG keeps its white box."],
+                ] as const
+              ).map(([v, title, note]) => (
+                <label key={v} className={cn("flex cursor-pointer items-start gap-2 rounded-md border p-2 text-xs", fit === v ? "border-primary bg-primary/5" : "border-border", busy && "pointer-events-none opacity-60")}>
+                  <input type="radio" name={`${id}-fit`} value={v} checked={fit === v} disabled={busy} onChange={() => setFit(v)} className="mt-0.5 accent-[hsl(var(--primary))]" />
+                  <span>
+                    <span className="block font-medium">{title}</span>
+                    <span className="block text-muted-foreground">{note}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          ) : null}
           <label className={cn("inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent", busy && "pointer-events-none opacity-50")}>
             <AIcon icon={ImageUpload01Icon} />
-            {busy ? "Uploading…" : "Upload photo"}
-            <input id={id} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => void upload(e.target.files?.[0])} />
+            {busy ? "Uploading…" : signature ? "Upload signature" : "Upload photo"}
+            <input id={id} type="file" accept="image/jpeg,image/png" className="sr-only" disabled={busy} onChange={(e) => void upload(e.target.files?.[0]).finally(() => (e.target.value = ""))} />
           </label>
+          <UploadProgress phase={phase} />
           <ASelect label={`${label}: choose`} className="w-full" value={value ?? "__none"} onValueChange={(v) => onChange(v === "__none" ? null : v)} options={options} />
           <p className="text-xs text-muted-foreground">{help}</p>
         </div>
@@ -867,7 +899,7 @@ function LimitedFields({ value, onChange, builtIns, titles, onTitles, max, editi
           <AInput id={`${id}-ca`} value={value.cutoutAlt} maxLength={140} onChange={(e) => set({ cutoutAlt: e.target.value })} />
         </Field>
         <ImagePicker id={`${id}-sc`} label="Scene (right, desktop)" value={value.sceneImage} onChange={(v) => v && set({ sceneImage: v })} builtIns={builtIns} allowNone={false} aspect="h-20 w-16" help="A product or campaign photo; it fades into the yellow on its left edge." />
-        <ImagePicker id={`${id}-sg`} label="Signature (optional)" value={value.signatureImage ?? null} onChange={(v) => set({ signatureImage: v })} builtIns={[]} allowNone aspect="h-10 w-24" help="The ambassador's real signature: dark ink on a transparent PNG, wide (about 4:1). It writes itself on under the button and adds “Signed” to the stamp. Leave empty if the pieces aren't signed." />
+        <ImagePicker id={`${id}-sg`} label="Signature (optional)" value={value.signatureImage ?? null} onChange={(v) => set({ signatureImage: v })} builtIns={[]} allowNone aspect="h-12 w-32" kind="signature" help="The ambassador's real signature, any size, JPEG or PNG (a photo of it on white paper works with Auto-fit). It writes itself on under the button and adds “Signed” to the stamp. Leave empty if the pieces aren't signed." />
         <div className="space-y-1.5">
           <ALabel>Limited pieces (up to {max})</ALabel>
           <ProductPicker ids={value.productIds} titles={titles} onTitles={onTitles} onChange={(productIds) => set({ productIds })} max={max} />

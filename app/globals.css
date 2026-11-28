@@ -451,7 +451,7 @@
 /* Static (final) states of the finale's impacts: the stamp sits tilted, the shock lines are only a moment. */
 .ltd-stamp { transform: rotate(-8deg); }
 .ltd-shock-l, .ltd-shock-r { opacity: 0; }
-.ltd-claw > i { transform-origin: left center; }
+.ltd-claw i { transform-origin: left center; }
 .ltd-squash { transform-origin: 50% 100%; }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -491,12 +491,12 @@
     .ltd-cta { animation-name: ltd-cta; animation-range: contain 40% contain 65%; }
 
     /* Impacts: waiting states only once the cues are running (data-cues), so nothing hides without JavaScript. */
-    .ltd[data-cues]:not([data-land]) .ltd-claw > i { transform: scaleX(0); }
+    .ltd[data-cues]:not([data-land]) .ltd-claw i { transform: scaleX(0); }
     .ltd[data-cues]:not([data-land]) .ltd-stamp { opacity: 0; }
     .ltd[data-cues]:not([data-slam]) .ltd-sign-wipe { transform: translateX(-100%); }
     .ltd[data-cues]:not([data-slam]) .ltd-sign-in { transform: translateX(100%); }
 
-    .ltd[data-land] .ltd-claw > i { animation: ltd-claw 220ms cubic-bezier(0.2, 0.9, 0.2, 1) var(--d, 0ms) both; }
+    .ltd[data-land] .ltd-claw i { animation: ltd-claw 220ms cubic-bezier(0.2, 0.9, 0.2, 1) var(--d, 0ms) both; }
     .ltd[data-land] .ltd-squash { animation: ltd-squash 380ms cubic-bezier(0.3, 1.4, 0.5, 1) both; }
     .ltd[data-land] .ltd-shadow { animation: ltd-shadow 380ms cubic-bezier(0.3, 1.4, 0.5, 1) both; }
     .ltd[data-land] .ltd-shock-l { animation: ltd-shock-l 360ms ease-out var(--d, 0ms) both; }

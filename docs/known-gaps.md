@@ -160,7 +160,9 @@
 
 ## Product / design
 - 🟡 Limited-edition signature: no real ambassador signature uploaded yet, so the write-on and the "Signed" stamp/tape
-  words don't show. Upload a transparent PNG in Admin → Homepage → Limited edition once the ambassador signs.
+  words don't show. Upload it in Admin → Homepage → Limited edition (any size; Auto-fit or Use as uploaded).
+- 🟡 Signature Auto-fit (`components/admin/upload-media.ts`) treats light pixels as paper. A signature in light ink
+  (e.g. silver/gold pen) or on dark paper loses ink. Then use "Use as uploaded" with a transparent PNG.
 - 🟡 Hero crossed tapes (`components/home/brand-marquee.tsx`, 2026-11-29): the front/back words are built in
   (`lib/cms/mock-home.ts`) for both layouts. Admin → Homepage can't edit them yet. Fix: add `marquee.front/back` to the
   homepage document + editor (allow-listed length and characters, Anton-safe). Links and stock are already live.
